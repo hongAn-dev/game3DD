@@ -1,0 +1,8 @@
+Ultimate Monsters by Quaternius
+https://quaternius.com/packs/ultimatemonsters.html
+
+License: CC0 1.0 Universal (Public Domain)
+https://creativecommons.org/publicdomain/zero/1.0/
+
+BlueDemon.fbx was converted from the pack's glTF model (via https://poly.pizza/m/S7jYW6Amye)
+with Blender 4.2 so Unity 2020.3 can import it natively.

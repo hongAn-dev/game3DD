@@ -12,7 +12,7 @@ PlayerSettings:
   targetDevice: 2
   useOnDemandResources: 0
   accelerometerFrequency: 60
-  companyName: Vin Busquet
+  companyName: hongAn-dev
   productName: LiBot Adventure
   defaultCursor: {fileID: 0}
   cursorHotspot: {x: 0, y: 0}
@@ -153,10 +153,10 @@ PlayerSettings:
   androidSupportedAspectRatio: 1
   androidMaxAspectRatio: 2.1
   applicationIdentifier:
-    Android: com.computationalcore.libotadventure
-    Standalone: com.vinbusquet.LiBotAdventure.macos
-    iPhone: com.vinbusquet.LiBotAdventure
-    tvOS: com.vinbusquet.LiBotAdventure
+    Android: com.hongandev.game3dd
+    Standalone: com.hongandev.game3dd
+    iPhone: com.hongandev.game3dd
+    tvOS: com.hongandev.game3dd
   buildNumber:
     Standalone: 3
     iPhone: 3

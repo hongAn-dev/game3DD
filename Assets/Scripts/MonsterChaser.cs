@@ -18,7 +18,14 @@ public class MonsterChaser : MonoBehaviour {
 	public float minDist = 1f;
 	public Transform target;
 
+	// Legacy animation clip names (set by the asset replacer for the Quaternius model).
+	[Tooltip("Animation clip played while chasing the target.")]
+	public string runClip = "Anim_Run";
+	[Tooltip("Animation clip played when close enough to attack.")]
+	public string attackClip = "Anim_Attack";
+
 	private float speed;
+	private Animation anim;
 
 	/// <summary>
 	/// Use this for initialization.
@@ -40,6 +47,9 @@ public class MonsterChaser : MonoBehaviour {
 		} else {
 			speed = speedEasy;
 		}
+
+		// The Animation component may live on the model child.
+		anim = GetComponentInChildren<Animation> ();
 	}
 	
 	/// <summary>
@@ -60,12 +70,20 @@ public class MonsterChaser : MonoBehaviour {
 			//transform.position += transform.forward * speed * Time.deltaTime;
 		} else if (distance > minDist && distance < maxDist) {
 			transform.position += transform.forward * speed * Time.deltaTime;
+			PlayClip (runClip);
 		}
 		// It is close enough so play the attack animation.
 		else {
-			Animation anim = GetComponent<Animation> ();
-			anim.CrossFade ("Anim_Attack");
+			PlayClip (attackClip);
 		}
+	}
+
+	/// <summary>
+	/// Cross fade to the given clip if it exists.
+	/// </summary>
+	void PlayClip(string clipName) {
+		if (anim != null && anim.GetClip (clipName) != null)
+			anim.CrossFade (clipName);
 	}
 
 	/// <summary>
