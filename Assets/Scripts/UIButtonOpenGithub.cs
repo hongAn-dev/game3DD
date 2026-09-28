@@ -11,7 +11,7 @@ public class UIButtonOpenGithub : MonoBehaviour {
 	/// </summary>
 	public void openGithub() {
 		//Open the project github page
-		Application.OpenURL("https://github.com/computationalcore/libot-adventure/");
+		Application.OpenURL("https://github.com/hongAn-dev/game3DD");
 	}
 
 }
