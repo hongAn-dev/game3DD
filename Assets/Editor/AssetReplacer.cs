@@ -39,12 +39,12 @@ public static class AssetReplacer {
 		{ "Plant_5", "mushroom_red" },
 		{ "Plant_6", "mushroom_tanGroup" },
 		{ "Plant_7", "plant_flatShort" },
-		{ "Rock_1", "rock_largeA" },
-		{ "Rock_2", "rock_largeB" },
-		{ "Rock_3", "rock_largeC" },
-		{ "Rock_4", "rock_largeD" },
-		{ "Rock_5", "rock_largeE" },
-		{ "Rock_6", "rock_largeF" },
+		{ "Rock_1", "stone_largeA" },
+		{ "Rock_2", "stone_largeB" },
+		{ "Rock_3", "stone_largeC" },
+		{ "Rock_4", "stone_largeD" },
+		{ "Rock_5", "stone_largeE" },
+		{ "Rock_6", "stone_largeF" },
 		{ "Stone_1", "stone_largeA" },
 	};
 
@@ -57,11 +57,55 @@ public static class AssetReplacer {
 	[MenuItem("Tools/Replace Assets (Kenney + Quaternius)")]
 	public static void ReplaceAll() {
 		AssetDatabase.Refresh();
+		// Reimport so ThirdPartyModelPostprocessor changes (clips) are applied.
+		AssetDatabase.ImportAsset("Assets/ThirdParty", ImportAssetOptions.ForceUpdate | ImportAssetOptions.ImportRecursive);
+		RemapKenneyMaterials();
 		ReplaceNaturePrefabs();
 		ReplaceMonsterPrefab();
 		ReplaceInScenes();
 		AssetDatabase.SaveAssets();
 		Debug.Log("AssetReplacer: done");
+	}
+
+	// Kenney's palette is teal/pastel; these tone it to the natural greens, browns and greys of the levels.
+	static readonly Dictionary<string, Color32> KenneyColors = new Dictionary<string, Color32> {
+		{ "leafsGreen", new Color32(92, 160, 52, 255) },
+		{ "leafsDark", new Color32(58, 122, 48, 255) },
+		{ "grass", new Color32(104, 172, 58, 255) },
+		{ "stone", new Color32(150, 150, 146, 255) },
+		{ "stoneDark", new Color32(112, 112, 110, 255) },
+		{ "dirt", new Color32(139, 94, 60, 255) },
+		{ "woodBark", new Color32(122, 82, 52, 255) },
+		{ "woodBarkDark", new Color32(98, 66, 42, 255) },
+		{ "woodInner", new Color32(214, 180, 140, 255) },
+	};
+
+	/// <summary>
+	/// Creates recolored materials in KenneyNatureKit/Models/Materials and remaps the models to them by name.
+	/// </summary>
+	static void RemapKenneyMaterials() {
+		string folder = KenneyModels + "Materials";
+		if (!AssetDatabase.IsValidFolder(folder))
+			AssetDatabase.CreateFolder(KenneyModels.TrimEnd('/'), "Materials");
+
+		foreach (KeyValuePair<string, Color32> pair in KenneyColors) {
+			string path = folder + "/" + pair.Key + ".mat";
+			Material material = AssetDatabase.LoadAssetAtPath<Material>(path);
+			if (material == null) {
+				material = new Material(Shader.Find("Standard"));
+				AssetDatabase.CreateAsset(material, path);
+			}
+			material.color = pair.Value;
+			material.SetFloat("_Glossiness", 0.1f);
+			EditorUtility.SetDirty(material);
+		}
+		AssetDatabase.SaveAssets();
+
+		foreach (string guid in AssetDatabase.FindAssets("t:Model", new[] { KenneyModels.TrimEnd('/') })) {
+			ModelImporter importer = (ModelImporter)AssetImporter.GetAtPath(AssetDatabase.GUIDToAssetPath(guid));
+			importer.SearchAndRemapMaterials(ModelImporterMaterialName.BasedOnMaterialName, ModelImporterMaterialSearch.Local);
+			importer.SaveAndReimport();
+		}
 	}
 
 	static GameObject LoadKenney(string name) {
@@ -80,7 +124,7 @@ public static class AssetReplacer {
 					Debug.Log("AssetReplacer: " + path + " already replaced, skipping");
 					continue;
 				}
-				ReplaceVisual(root, LoadKenney(pair.Value));
+				ReplaceVisual(root, LoadKenney(pair.Value), false);
 				PrefabUtility.SaveAsPrefabAsset(root, path);
 				Debug.Log("AssetReplacer: " + path + " -> " + pair.Value);
 			} finally {
@@ -106,7 +150,8 @@ public static class AssetReplacer {
 			if (oldAnimation != null)
 				Object.DestroyImmediate(oldAnimation);
 
-			GameObject instance = ReplaceVisual(root, model);
+			// The old skeleton sits next to the mesh, so every child goes.
+			GameObject instance = ReplaceVisual(root, model, true);
 
 			AnimationClip[] clips = AssetDatabase.LoadAllAssetsAtPath(MonsterModel)
 				.OfType<AnimationClip>()
@@ -153,7 +198,7 @@ public static class AssetReplacer {
 					if (PrefabUtility.IsPartOfPrefabInstance(filter))
 						continue;
 
-					ReplaceVisual(filter.gameObject, LoadKenney(kenney));
+					ReplaceVisual(filter.gameObject, LoadKenney(kenney), false);
 					Debug.Log("AssetReplacer: " + scene.path + " " + filter.name + " -> " + kenney);
 					changed = true;
 				}
@@ -165,19 +210,23 @@ public static class AssetReplacer {
 	}
 
 	/// <summary>
-	/// Removes the renderers of root (and the children holding them) and adds the new model as a
-	/// child named "Model", scaled and positioned to fit the old model bounds. Mesh colliders are
-	/// recreated on the new meshes.
+	/// Removes the renderers of root (and the children holding them, or every child when
+	/// removeAllChildren is set) and adds the new model as a child named "Model", scaled to the footprint of
+	/// the old model. Mesh colliders are recreated on the new meshes; other colliders that were
+	/// on removed children are replaced by a capsule collider on root.
 	/// </summary>
-	static GameObject ReplaceVisual(GameObject root, GameObject model) {
+	static GameObject ReplaceVisual(GameObject root, GameObject model, bool removeAllChildren) {
 		Bounds oldBounds;
 		bool hasOldBounds = TryGetLocalBounds(root, out oldBounds);
 		bool hadMeshCollider = root.GetComponentsInChildren<MeshCollider>(true).Length > 0;
+		bool hadChildCollider = false;
 
 		// Remove the old visual: components on the root and every child that holds a renderer.
 		foreach (Transform child in root.transform.Cast<Transform>().ToList()) {
-			if (child.GetComponentsInChildren<Renderer>(true).Length > 0)
+			if (removeAllChildren || child.GetComponentsInChildren<Renderer>(true).Length > 0) {
+				hadChildCollider |= child.GetComponentsInChildren<Collider>(true).Any(c => !(c is MeshCollider));
 				Object.DestroyImmediate(child.gameObject);
+			}
 		}
 		foreach (MeshCollider collider in root.GetComponents<MeshCollider>())
 			Object.DestroyImmediate(collider);
@@ -193,10 +242,10 @@ public static class AssetReplacer {
 
 		Bounds newBounds;
 		if (hasOldBounds && TryGetLocalBounds(root, out newBounds)) {
-			// Uniform scale so the largest dimension matches, then sit on the old bottom center.
-			float oldSize = Mathf.Max(oldBounds.size.x, oldBounds.size.y, oldBounds.size.z);
-			float newSize = Mathf.Max(newBounds.size.x, newBounds.size.y, newBounds.size.z);
-			float scale = newSize > 0f ? oldSize / newSize : 1f;
+			// Match the old footprint, but never more than twice the old height; then sit on the old bottom center.
+			float scale = Mathf.Min(
+				SafeRatio(Mathf.Max(oldBounds.size.x, oldBounds.size.z), Mathf.Max(newBounds.size.x, newBounds.size.z)),
+				2f * SafeRatio(oldBounds.size.y, newBounds.size.y));
 
 			Vector3 oldBottom = new Vector3(oldBounds.center.x, oldBounds.min.y, oldBounds.center.z);
 			Vector3 newBottom = new Vector3(newBounds.center.x, newBounds.min.y, newBounds.center.z);
@@ -208,7 +257,19 @@ public static class AssetReplacer {
 			foreach (MeshFilter filter in instance.GetComponentsInChildren<MeshFilter>(true))
 				filter.gameObject.AddComponent<MeshCollider>().sharedMesh = filter.sharedMesh;
 		}
+
+		Bounds fitted;
+		if (hadChildCollider && TryGetLocalBounds(root, out fitted)) {
+			CapsuleCollider capsule = root.AddComponent<CapsuleCollider>();
+			capsule.center = fitted.center;
+			capsule.height = fitted.size.y;
+			capsule.radius = Mathf.Min(fitted.size.y * 0.5f, Mathf.Max(fitted.size.x, fitted.size.z) * 0.5f);
+		}
 		return instance;
+	}
+
+	static float SafeRatio(float a, float b) {
+		return a > 0.01f && b > 0.01f ? a / b : float.MaxValue;
 	}
 
 	/// <summary>
