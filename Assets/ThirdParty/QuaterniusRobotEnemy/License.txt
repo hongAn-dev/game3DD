@@ -1,0 +1,3 @@
+Robot Enemy by Quaternius - https://poly.pizza/m/1gNo5ezvmr
+License: CC0 1.0 Universal (Public Domain) - https://creativecommons.org/publicdomain/zero/1.0/
+RobotEnemy.fbx was converted from the GLB with Tools/blender/glb_to_fbx.py.

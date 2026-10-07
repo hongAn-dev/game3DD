@@ -14,7 +14,7 @@ using UnityEngine;
 public static class AssetReplacer {
 
 	const string KenneyModels = "Assets/ThirdParty/KenneyNatureKit/Models/";
-	const string MonsterModel = "Assets/ThirdParty/QuaterniusUltimateMonsters/BlueDemon.fbx";
+	const string MonsterModel = "Assets/ThirdParty/QuaterniusRobotEnemy/RobotEnemy.fbx";
 	const string MonsterPrefab = "Assets/Prefabs/Enemy - Monster.prefab";
 	const string ModelChildName = "Model";
 
@@ -64,6 +64,7 @@ public static class AssetReplacer {
 		ReplaceMonsterPrefab();
 		ReplacePlayer();
 		ReplaceCores();
+		ReplaceScrap();
 		ReplaceInScenes();
 		AssetDatabase.SaveAssets();
 		Debug.Log("AssetReplacer: done");
@@ -226,7 +227,8 @@ public static class AssetReplacer {
 
 		GameObject root = PrefabUtility.LoadPrefabContents(MonsterPrefab);
 		try {
-			if (root.transform.Find(ModelChildName) != null) {
+			Transform existing = root.transform.Find(ModelChildName);
+			if (existing != null && PrefabUtility.GetCorrespondingObjectFromSource(existing.gameObject) == model) {
 				Debug.Log("AssetReplacer: " + MonsterPrefab + " already replaced, skipping");
 				return;
 			}
@@ -237,14 +239,19 @@ public static class AssetReplacer {
 				Object.DestroyImmediate(oldAnimation);
 
 			// The old skeleton sits next to the mesh, so every child goes.
+			// A previous model's capsule is refitted to the new one.
+			foreach (CapsuleCollider capsule in root.GetComponents<CapsuleCollider>())
+				Object.DestroyImmediate(capsule);
 			GameObject instance = ReplaceVisual(root, model, true);
+			if (root.GetComponent<CapsuleCollider>() == null)
+				AddFittedCapsule(root);
 
 			AnimationClip[] clips = AssetDatabase.LoadAllAssetsAtPath(MonsterModel)
 				.OfType<AnimationClip>()
 				.Where(c => !c.name.StartsWith("__preview__"))
 				.ToArray();
 			AnimationClip run = clips.FirstOrDefault(c => c.name == "Run") ?? clips.FirstOrDefault(c => c.name == "Walk");
-			AnimationClip attack = clips.FirstOrDefault(c => c.name == "Punch") ?? clips.FirstOrDefault(c => c.name == "Weapon");
+			AnimationClip attack = clips.FirstOrDefault(c => c.name == "Attack") ?? clips.FirstOrDefault(c => c.name == "Punch");
 
 			Animation animation = instance.GetComponent<Animation>();
 			if (animation == null)
@@ -349,14 +356,34 @@ public static class AssetReplacer {
 			}
 		}
 
+		if (hadChildCollider)
+			AddFittedCapsule(root);
+		return instance;
+	}
+
+	static void AddFittedCapsule(GameObject root) {
 		Bounds fitted;
-		if (hadChildCollider && TryGetLocalBounds(root, out fitted)) {
+		if (TryGetLocalBounds(root, out fitted)) {
 			CapsuleCollider capsule = root.AddComponent<CapsuleCollider>();
 			capsule.center = fitted.center;
 			capsule.height = fitted.size.y;
 			capsule.radius = Mathf.Min(fitted.size.y * 0.5f, Mathf.Max(fitted.size.x, fitted.size.z) * 0.5f);
 		}
-		return instance;
+	}
+
+	static void ReplaceScrap() {
+		GameObject model = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/ThirdParty/KenneySpaceStationKit/Models/container.fbx");
+		string path = "Assets/Prefabs/Enemy - Crater.prefab";
+		GameObject root = PrefabUtility.LoadPrefabContents(path);
+		try {
+			if (root.transform.Find(ModelChildName) != null)
+				return;
+			ReplaceVisual(root, model, false);
+			PrefabUtility.SaveAsPrefabAsset(root, path);
+			Debug.Log("AssetReplacer: Enemy - Crater -> container");
+		} finally {
+			PrefabUtility.UnloadPrefabContents(root);
+		}
 	}
 
 	static bool IsMeshRenderer(Renderer renderer) {

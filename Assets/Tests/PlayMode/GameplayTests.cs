@@ -76,4 +76,15 @@ public class GameplayTests {
 		MeshFilter filter = core.GetComponentInChildren<MeshFilter>();
 		Assert.AreEqual("EnergyCore", filter.sharedMesh.name);
 	}
+
+	[Test]
+	public void PatrolRobotUsesRobotClips() {
+#if UNITY_EDITOR
+		GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Enemy - Monster.prefab");
+		MonsterChaser chaser = prefab.GetComponent<MonsterChaser>();
+		Assert.AreEqual("Run", chaser.runClip);
+		Assert.AreEqual("Attack", chaser.attackClip);
+		Assert.IsNotNull(prefab.GetComponentInChildren<Animation>().GetClip("Attack"));
+#endif
+	}
 }
