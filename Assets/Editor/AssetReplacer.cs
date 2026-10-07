@@ -215,22 +215,24 @@ public static class AssetReplacer {
 	/// the old model. Mesh colliders are recreated on the new meshes; other colliders that were
 	/// on removed children are replaced by a capsule collider on root.
 	/// </summary>
-	static GameObject ReplaceVisual(GameObject root, GameObject model, bool removeAllChildren) {
+	public static GameObject ReplaceVisual(GameObject root, GameObject model, bool removeAllChildren) {
 		Bounds oldBounds;
 		bool hasOldBounds = TryGetLocalBounds(root, out oldBounds);
 		bool hadMeshCollider = root.GetComponentsInChildren<MeshCollider>(true).Length > 0;
+		bool convex = root.GetComponentsInChildren<MeshCollider>(true).Any(c => c.convex);
 		bool hadChildCollider = false;
 
 		// Remove the old visual: components on the root and every child that holds a renderer.
 		foreach (Transform child in root.transform.Cast<Transform>().ToList()) {
-			if (removeAllChildren || child.GetComponentsInChildren<Renderer>(true).Length > 0) {
+			if (removeAllChildren || child.GetComponentsInChildren<Renderer>(true).Any(IsMeshRenderer)) {
 				hadChildCollider |= child.GetComponentsInChildren<Collider>(true).Any(c => !(c is MeshCollider));
 				Object.DestroyImmediate(child.gameObject);
 			}
 		}
 		foreach (MeshCollider collider in root.GetComponents<MeshCollider>())
 			Object.DestroyImmediate(collider);
-		foreach (Renderer renderer in root.GetComponents<Renderer>())
+		// Trails and particle renderers are not part of the visual.
+		foreach (Renderer renderer in root.GetComponents<Renderer>().Where(IsMeshRenderer))
 			Object.DestroyImmediate(renderer);
 		foreach (MeshFilter filter in root.GetComponents<MeshFilter>())
 			Object.DestroyImmediate(filter);
@@ -254,8 +256,11 @@ public static class AssetReplacer {
 		}
 
 		if (hadMeshCollider) {
-			foreach (MeshFilter filter in instance.GetComponentsInChildren<MeshFilter>(true))
-				filter.gameObject.AddComponent<MeshCollider>().sharedMesh = filter.sharedMesh;
+			foreach (MeshFilter filter in instance.GetComponentsInChildren<MeshFilter>(true)) {
+				MeshCollider collider = filter.gameObject.AddComponent<MeshCollider>();
+				collider.sharedMesh = filter.sharedMesh;
+				collider.convex = convex;
+			}
 		}
 
 		Bounds fitted;
@@ -266,6 +271,10 @@ public static class AssetReplacer {
 			capsule.radius = Mathf.Min(fitted.size.y * 0.5f, Mathf.Max(fitted.size.x, fitted.size.z) * 0.5f);
 		}
 		return instance;
+	}
+
+	static bool IsMeshRenderer(Renderer renderer) {
+		return renderer is MeshRenderer || renderer is SkinnedMeshRenderer;
 	}
 
 	static float SafeRatio(float a, float b) {
