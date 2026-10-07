@@ -34,7 +34,7 @@ Output: `Builds/Linux/RoboLacLoi.x86_64`.
 | [Space Station Kit](https://kenney.nl/assets/space-station-kit) | Kenney | CC0 | Containers, pipes, base structures (`Assets/ThirdParty/KenneySpaceStationKit`) |
 | [Sci-fi](https://kenney.nl/assets/sci-fi-sounds) / [Interface](https://kenney.nl/assets/interface-sounds) Sounds | Kenney | CC0 | Pickup, explosion, win/lose, click, ambience (`Assets/ThirdParty/KenneyAudio`) |
 | Robot ball, energy core | this project (`Tools/blender/*.py`) | MIT | Player and pickups (`Assets/ThirdParty/RoboLacLoi`) |
-| [Open Sans](https://fonts.google.com/specimen/Open+Sans) | Steve Matteson | Apache 2.0 | UI font with Vietnamese glyphs (`Assets/Fonts/OpenSans`) |
+| [Chakra Petch](https://fonts.google.com/specimen/Chakra+Petch) | Cadson Demak | OFL 1.1 | Sci-fi UI font with Vietnamese glyphs (`Assets/Fonts/ChakraPetch`) |
 
 The look is applied by editor scripts, all runnable from the `Tools` menu or in batch mode with `-executeMethod`:
 
