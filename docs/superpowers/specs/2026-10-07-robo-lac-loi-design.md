@@ -17,7 +17,7 @@ một robot cầu nhỏ lăn qua thế giới hậu tận thế low-poly đang �
 ## 2. Ràng buộc
 
 - Unity **2020.3.19f1**, Built-in Render Pipeline, Input Manager cũ (CrossPlatformInput).
-- Asset chỉ dùng giấy phép **CC0** (Kenney, Quaternius) hoặc **OFL** (font). Ghi nguồn trong `README.md`
+- Asset chỉ dùng giấy phép **CC0** (Kenney, Quaternius); font dùng OpenSans có sẵn trong repo (Apache 2.0). Ghi nguồn trong `README.md`
   và `License.txt` của từng thư mục `Assets/ThirdParty/*`.
 - **Giữ nguyên luật chơi**: điểm cần để qua màn theo độ khó, chết khi rơi nước/vực, checkpoint, sinh địch
   ngẫu nhiên. Không thêm cơ chế tương tác mới; cổng, trạm sạc chỉ để trang trí (trừ hiệu ứng sáng khi thắng).
@@ -58,9 +58,12 @@ Mỗi scene:
 
 1. Đổi material/màu địa hình.
 2. Đổi skybox (procedural), fog và ánh sáng.
-3. Rải 15–30 đồ trang trí **ngoài đường đi**, mỗi món có collider đơn giản (box/mesh).
+3. Thay đồ trang trí sẵn có (instance của `Tree_*`, `Rock_*`, `Stone_1`, `Bush_*`, `Plant_*`, `Log_*`…)
+   bằng đồ của khu, **giữ đúng vị trí, hướng và diện tích chiếm đất**. Các vị trí này do người thiết kế màn gốc
+   đặt, đã nằm ngoài đường đi, nên không phải tìm chỗ mới. Mỗi khu có bảng "prefab cũ → model mới" riêng.
+   Level3 (Vùng hoang hóa) giữ phần lớn cây cỏ, chỉ thay đá nhỏ thành mảnh bê tông/phế liệu.
 
-Việc rải trang trí làm bằng Editor script đọc danh sách vị trí, để tái lập và sửa được.
+Việc thay làm bằng Editor script với bảng ánh xạ trong code, để tái lập và chỉnh được.
 Mỗi màn hiển thị tên khu trên HUD và thẻ giới thiệu.
 
 ### 3.3 Hiệu ứng
@@ -84,13 +87,13 @@ Script mới: `RobotLights`, đọc `GameManager.gm.score` và chỉ tiêu đi�
 
 - **Hiệu ứng:** Kenney Sci-fi Sounds, Impact Sounds, Interface Sounds. Gồm: nhặt năng lượng, va chạm, địch nổ,
   thắng (đủ năng lượng), thua (mất kết nối), bấm nút.
-- **Nhạc nền:** mỗi khu một bản ambient/electronic CC0, gán vào `GameManager.backgroundMusic` sẵn có.
-- Nếu không tìm được bản CC0 phù hợp cho một khu, dùng chung bản của khu gần nhất.
+- **Nhạc nền:** giữ các bản nhạc riêng từng màn có sẵn (`Assets/Audio/Level1..4.ogg`, gán qua
+  `GameManager.backgroundMusic`). Thêm tiếng nền môi trường (gió, máy chạy xa) bằng âm Kenney phát lặp nhỏ.
 
 ### 3.5 UI
 
 - Tên game: **"Robo Lạc Lối"**.
-- Font hỗ trợ tiếng Việt: Be Vietnam Pro hoặc Nunito (OFL).
+- Font: OpenSans Bold/Semibold có sẵn trong `Assets/Fonts/OpenSans` (đã kiểm tra đủ glyph tiếng Việt).
 - Phong cách bảng điều khiển: nền xám đậm, viền/điểm nhấn cyan, nhấn phụ vàng. Không trang trí sau chữ nhỏ.
 
 Thay đổi:
