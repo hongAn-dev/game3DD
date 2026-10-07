@@ -1,6 +1,9 @@
-# game3DD
+# Robo Lạc Lối
 
-3D ball adventure game made with Unity **2020.3.19f1**.
+A small spherical robot rolls through a low-poly post-apocalyptic world that nature is taking back,
+collecting energy cores to reach its home base. Made with Unity **2020.3.19f1**.
+
+Zones: Bãi phế liệu (Level1), Khu công nghiệp bỏ hoang (Level2), Vùng hoang hóa (Level3), Trạm căn cứ (Level4).
 
 ## Setup
 
@@ -17,9 +20,20 @@
 | Pack | Author | License | Used for |
 |------|--------|---------|----------|
 | [Nature Kit](https://kenney.nl/assets/nature-kit) | Kenney | CC0 | Trees, bushes, grass, plants, logs, rocks (`Assets/ThirdParty/KenneyNatureKit`) |
-| [Ultimate Monsters](https://quaternius.com/packs/ultimatemonsters.html) | Quaternius | CC0 | Chasing monster enemy (`Assets/ThirdParty/QuaterniusUltimateMonsters`) |
+| [Robot Enemy](https://poly.pizza/m/1gNo5ezvmr) | Quaternius | CC0 | Patrol robot enemy (`Assets/ThirdParty/QuaterniusRobotEnemy`) |
+| [City Kit (Industrial)](https://kenney.nl/assets/city-kit-industrial) | Kenney | CC0 | Scrapyard / industrial / base props (`Assets/ThirdParty/KenneyCityKitIndustrial`) |
+| [Survival Kit](https://kenney.nl/assets/survival-kit) | Kenney | CC0 | Barrels, boxes, metal panels (`Assets/ThirdParty/KenneySurvivalKit`) |
+| [Space Station Kit](https://kenney.nl/assets/space-station-kit) | Kenney | CC0 | Containers, pipes, base structures (`Assets/ThirdParty/KenneySpaceStationKit`) |
+| [Sci-fi](https://kenney.nl/assets/sci-fi-sounds) / [Interface](https://kenney.nl/assets/interface-sounds) Sounds | Kenney | CC0 | Pickup, explosion, win/lose, click, ambience (`Assets/ThirdParty/KenneyAudio`) |
+| Robot ball, energy core | this project (`Tools/blender/*.py`) | MIT | Player and pickups (`Assets/ThirdParty/RoboLacLoi`) |
+| [Open Sans](https://fonts.google.com/specimen/Open+Sans) | Steve Matteson | Apache 2.0 | UI font with Vietnamese glyphs (`Assets/Fonts/OpenSans`) |
 
-The models were swapped in with `Tools > Replace Assets (Kenney + Quaternius)` (`Assets/Editor/AssetReplacer.cs`).
+The look is applied by editor scripts, all runnable from the `Tools` menu or in batch mode with `-executeMethod`:
+
+- `AssetReplacer.ReplaceAll` — player, energy cores, patrol robot, scrap, nature props
+- `ZoneDresser.DressAll` — per-level terrain colors, sky, fog, lights, decorations, ambience
+- `EffectsTheme.Apply` — explosion colors and sounds
+- `UiTheme.Apply` — fonts, Vietnamese text, HUD
 
 ## License
 

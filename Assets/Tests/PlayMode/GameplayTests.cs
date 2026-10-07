@@ -101,4 +101,20 @@ public class GameplayTests {
 		yield return null;
 		Assert.IsNotNull(GameObject.FindWithTag("Player").GetComponent<RobotLights>());
 	}
+
+	[UnityTest]
+	public IEnumerator ScoreShowsCollectedOverTarget() {
+		yield return null;
+		GameManager gm = GameManager.gm;
+		Assert.AreEqual("0 / " + gm.beatEasyLevelScore, gm.mainScoreDisplay.text);
+	}
+
+	[Test]
+	public void ZoneTitlesAreVietnamese() {
+		Assert.AreEqual("Bãi phế liệu", Zones.Title("Level1"));
+		Assert.AreEqual("Khu công nghiệp bỏ hoang", Zones.Title("Level2"));
+		Assert.AreEqual("Vùng hoang hóa", Zones.Title("Level3"));
+		Assert.AreEqual("Trạm căn cứ", Zones.Title("Level4"));
+		Assert.AreEqual("", Zones.Title("MainMenu"));
+	}
 }

@@ -100,4 +100,13 @@ public class ThemeEditorTests {
 			Assert.AreEqual(pair.Value, prefab.GetComponentInChildren<AudioSource>().clip.name, pair.Key);
 		}
 	}
+
+	[Test]
+	public void AllUiTextsUseOpenSans() {
+		foreach (string guid in AssetDatabase.FindAssets("t:Prefab", new[] { "Assets/Prefabs" })) {
+			GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(guid));
+			foreach (UnityEngine.UI.Text text in prefab.GetComponentsInChildren<UnityEngine.UI.Text>(true))
+				StringAssert.StartsWith("OpenSans", text.font.name, prefab.name + "/" + text.name);
+		}
+	}
 }
