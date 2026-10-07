@@ -15,6 +15,14 @@ Zones: Bãi phế liệu (Level1), Khu công nghiệp bỏ hoang (Level2), Vùng
 2. Open the project with Unity 2020.3.19f1 (Unity Hub > Add > select the project folder).
 3. Open `Assets/Scenes/MainMenu.unity` and press Play.
 
+Linux build (do not pass `-nographics`, shaders would not be compiled and the game renders magenta):
+
+```bash
+unity -batchmode -quit -projectPath . -executeMethod BuildScript.BuildLinux
+```
+
+Output: `Builds/Linux/RoboLacLoi.x86_64`.
+
 ## Assets
 
 | Pack | Author | License | Used for |

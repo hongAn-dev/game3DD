@@ -1688,7 +1688,7 @@ public static class BuildScript {
 - [ ] **Step 2: Build**
 
 ```bash
-unity -batchmode -nographics -quit -projectPath . -executeMethod BuildScript.BuildLinux -logFile ~/Downloads/claude/work/logs/build.log
+unity -batchmode -quit -projectPath . -executeMethod BuildScript.BuildLinux -logFile ~/Downloads/claude/work/logs/build.log
 grep -E "BuildScript:|error" ~/Downloads/claude/work/logs/build.log | tail -3
 ls -la Builds/Linux/RoboLacLoi.x86_64
 ```
