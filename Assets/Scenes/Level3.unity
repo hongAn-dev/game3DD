@@ -14753,8 +14753,8 @@ MonoBehaviour:
   gameOverScoreDisplay: {fileID: 1699903444}
   beatLevelCanvas: {fileID: 1994372549}
   backgroundMusic: {fileID: 1460803884}
-  gameOverSFX: {fileID: 8300000, guid: b513e143fb7514876a6c05afa3240abb, type: 3}
-  beatLevelSFX: {fileID: 8300000, guid: 97e9e021c4ecf404db703fdbf5b802c3, type: 3}
+  gameOverSFX: {fileID: 8300000, guid: 4d40ae70fc80f770cb4487c520fa294f, type: 3}
+  beatLevelSFX: {fileID: 8300000, guid: f6ae857fdbb064d2694521a20b7898b2, type: 3}
   introBeatLevelCanvas: {fileID: 1572936640}
   introBeatLevelText: {fileID: 1572936641}
 --- !u!114 &1460803887

@@ -1950,7 +1950,7 @@ AudioSource:
   m_Enabled: 1
   serializedVersion: 4
   OutputAudioMixerGroup: {fileID: 0}
-  m_audioClip: {fileID: 0}
+  m_audioClip: {fileID: 8300000, guid: 850ad93d20b2c9b3a895d9de86c09f9c, type: 3}
   m_PlayOnAwake: 1
   m_Volume: 0.15
   m_Pitch: 1
@@ -2399,8 +2399,8 @@ MonoBehaviour:
   gameOverScoreDisplay: {fileID: 493596497}
   beatLevelCanvas: {fileID: 1330750793}
   backgroundMusic: {fileID: 1460803884}
-  gameOverSFX: {fileID: 8300000, guid: b513e143fb7514876a6c05afa3240abb, type: 3}
-  beatLevelSFX: {fileID: 8300000, guid: 97e9e021c4ecf404db703fdbf5b802c3, type: 3}
+  gameOverSFX: {fileID: 8300000, guid: 4d40ae70fc80f770cb4487c520fa294f, type: 3}
+  beatLevelSFX: {fileID: 8300000, guid: f6ae857fdbb064d2694521a20b7898b2, type: 3}
   introBeatLevelCanvas: {fileID: 1445462150}
   introBeatLevelText: {fileID: 60350145}
 --- !u!114 &1460803887

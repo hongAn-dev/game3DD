@@ -109,6 +109,11 @@ public static class ZoneDresser {
 		SetSkyFogSun(zone);
 		List<GameObject> swapped = SwapDecorations(zone, scene);
 		AddAmbient(zone);
+		GameManager manager = Object.FindObjectOfType<GameManager>();
+		if (manager != null) {
+			manager.gameOverSFX = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/ThirdParty/KenneyAudio/glitch_004.ogg");
+			manager.beatLevelSFX = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/ThirdParty/KenneyAudio/confirmation_004.ogg");
+		}
 		if (zone.beacons)
 			AddBeacons(swapped);
 		EditorSceneManager.MarkSceneDirty(scene);
