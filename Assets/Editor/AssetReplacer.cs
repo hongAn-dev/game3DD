@@ -193,6 +193,25 @@ public static class AssetReplacer {
 				PrefabUtility.UnloadPrefabContents(root);
 			}
 		}
+
+		// "Sil Coins" and "Vin Coins" spell words with plain coin objects (not Coin prefab instances).
+		foreach (string name in new[] { "Sil Coins", "Vin Coins" }) {
+			string path = "Assets/Prefabs/" + name + ".prefab";
+			GameObject root = PrefabUtility.LoadPrefabContents(path);
+			try {
+				int count = 0;
+				foreach (Treasure treasure in root.GetComponentsInChildren<Treasure>(true)) {
+					if (treasure.transform.Find(ModelChildName) != null)
+						continue;
+					ReplaceVisual(treasure.gameObject, model, false).transform.localScale *= 1.3f;
+					count++;
+				}
+				PrefabUtility.SaveAsPrefabAsset(root, path);
+				Debug.Log("AssetReplacer: " + name + " -> EnergyCore x" + count);
+			} finally {
+				PrefabUtility.UnloadPrefabContents(root);
+			}
+		}
 	}
 
 	static GameObject LoadKenney(string name) {

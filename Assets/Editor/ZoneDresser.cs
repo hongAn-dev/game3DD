@@ -17,6 +17,7 @@ public static class ZoneDresser {
 		public float fogDensity, sunIntensity;
 		public string ambient;     // Assets path of a looping clip, or null
 		public bool beacons;       // add win beacons on decorations
+		public string[] extraTerrain = new string[0];  // other ground prefabs recolored like the terrain
 		public Dictionary<string, string> props;  // old prefab name -> "Pack/model"
 	}
 
@@ -42,6 +43,53 @@ public static class ZoneDresser {
 				{ "Log_2", "KenneySpaceStationKit/pipe" },
 			},
 		},
+		new Zone {
+			scene = "Level2",
+			ground = C(112, 116, 120), accent = C(112, 66, 52), rock = C(84, 88, 94),
+			skyTint = C(150, 165, 180), ground_sky = C(70, 74, 80), fog = C(150, 158, 166), sun = C(220, 230, 240),
+			fogDensity = 0.014f, sunIntensity = 0.95f,
+			ambient = "Assets/ThirdParty/KenneyAudio/spaceEngineLow_000.ogg",
+			props = new Dictionary<string, string> {
+				{ "Rock_1", "KenneyCityKitIndustrial/detail-tank-large" },
+				{ "Rock_2", "KenneyCityKitIndustrial/shipping-container-b" },
+				{ "Rock_3", "KenneyCityKitIndustrial/chimney-small" },
+				{ "Rock_4", "KenneyCityKitIndustrial/shipping-container-c" },
+				{ "Rock_5", "KenneyCityKitIndustrial/detail-tank" },
+				{ "Stone_1", "KenneySurvivalKit/barrel" },
+			},
+		},
+		new Zone {
+			scene = "Level3",
+			extraTerrain = new[] { "Mounting_1", "Mounting_2", "Mounting_3" },
+			ground = C(86, 112, 58), accent = C(112, 100, 84), rock = C(120, 122, 116),
+			skyTint = C(160, 190, 170), ground_sky = C(80, 96, 70), fog = C(170, 190, 168), sun = C(250, 244, 220),
+			fogDensity = 0.010f, sunIntensity = 1.05f,
+			ambient = null,
+			props = new Dictionary<string, string> {
+				{ "Stone_1", "KenneySurvivalKit/metal-panel-screws-half" },
+				{ "Rock_4", "KenneySurvivalKit/structure-metal-wall" },
+				{ "Rock_6", "KenneySpaceStationKit/skip-rocks" },
+			},
+		},
+		new Zone {
+			scene = "Level4",
+			ground = C(78, 94, 106), accent = C(60, 70, 82), rock = C(108, 118, 126),
+			skyTint = C(110, 140, 170), ground_sky = C(50, 60, 72), fog = C(120, 140, 160), sun = C(200, 220, 255),
+			fogDensity = 0.012f, sunIntensity = 0.9f,
+			ambient = "Assets/ThirdParty/KenneyAudio/spaceEngineLow_000.ogg",
+			beacons = true,
+			props = new Dictionary<string, string> {
+				{ "Tree_1", "KenneySpaceStationKit/structure" },
+				{ "Tree_2", "KenneyCityKitIndustrial/solar-panel-portrait" },
+				{ "Tree_3", "KenneyCityKitIndustrial/chimney-basic" },
+				{ "Bush_1", "KenneySpaceStationKit/container" },
+				{ "Bush_2", "KenneySpaceStationKit/container-wide" },
+				{ "Bush_3", "KenneySpaceStationKit/computer-system" },
+				{ "Rock_2", "KenneySpaceStationKit/container-tall" },
+				{ "Rock_5", "KenneySpaceStationKit/pipe-ring" },
+				{ "Log_1", "KenneySpaceStationKit/pipe" },
+			},
+		},
 	};
 
 	[MenuItem("Tools/Robo Lac Loi/Dress All Zones")]
@@ -65,7 +113,29 @@ public static class ZoneDresser {
 			AddBeacons(swapped);
 		EditorSceneManager.MarkSceneDirty(scene);
 		EditorSceneManager.SaveScene(scene);
+		BakeEnvironment(zone);
 		Debug.Log("ZoneDresser: " + sceneName + " dressed, " + swapped.Count + " decorations swapped");
+	}
+
+	// The levels shared one LightingData asset baked from the old sky, so the new sky never reached the ambient light.
+	// Bake each level's own ambient probe and reflection probe; no lightmaps (baked/realtime GI off) keeps it fast.
+	static void BakeEnvironment(Zone zone) {
+		LightingSettings settings = null;
+		try {
+			settings = Lightmapping.lightingSettings;
+		} catch (System.Exception) {
+		}
+		if (settings == null) {
+			settings = new LightingSettings();
+			AssetDatabase.CreateAsset(settings, "Assets/Scenes/" + zone.scene + "Settings.lighting");
+			Lightmapping.lightingSettings = settings;
+		}
+		settings.bakedGI = false;
+		settings.realtimeGI = false;
+		Lightmapping.lightingDataAsset = null;
+		if (!Lightmapping.Bake())
+			throw new System.Exception("ZoneDresser: lighting bake failed for " + zone.scene);
+		EditorSceneManager.SaveScene(UnityEngine.SceneManagement.SceneManager.GetActiveScene());
 	}
 
 	static Material ZoneMaterial(Zone zone, string role, Color color) {
@@ -75,7 +145,11 @@ public static class ZoneDresser {
 	// The terrain prefab of each level ("Level1 Terrain") uses the shared color materials in Assets/Models/Materials.
 	// Ground-like colors become the zone ground, browns the accent, everything else the rock color.
 	static void ColorTerrain(Zone zone) {
-		string path = "Assets/Prefabs/" + zone.scene + " Terrain.prefab";
+		foreach (string prefab in new[] { zone.scene + " Terrain" }.Concat(zone.extraTerrain))
+			ColorTerrain(zone, "Assets/Prefabs/" + prefab + ".prefab");
+	}
+
+	static void ColorTerrain(Zone zone, string path) {
 		Material ground = ZoneMaterial(zone, "Ground", zone.ground);
 		Material accent = ZoneMaterial(zone, "Accent", zone.accent);
 		Material rock = ZoneMaterial(zone, "Rock", zone.rock);
@@ -113,19 +187,24 @@ public static class ZoneDresser {
 		sky.SetColor("_SkyTint", zone.skyTint);
 		sky.SetColor("_GroundColor", zone.ground_sky);
 		sky.SetFloat("_AtmosphereThickness", 1.4f);
-		sky.SetFloat("_Exposure", 1.1f);
+		sky.SetFloat("_Exposure", 0.9f);
 		EditorUtility.SetDirty(sky);
 
 		RenderSettings.skybox = sky;
 		RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Skybox;
+		// Full skybox ambient washes out the low-poly ground colors.
+		RenderSettings.ambientIntensity = 0.75f;
 		RenderSettings.fog = true;
 		RenderSettings.fogMode = FogMode.ExponentialSquared;
 		RenderSettings.fogColor = zone.fog;
 		RenderSettings.fogDensity = zone.fogDensity;
 
-		foreach (Light light in Object.FindObjectsOfType<Light>().Where(l => l.type == LightType.Directional)) {
-			light.color = zone.sun;
-			light.intensity = zone.sunIntensity;
+		// Some levels have a second directional light; keep it as a dim fill so the ground is not lit twice.
+		Light[] suns = Object.FindObjectsOfType<Light>().Where(l => l.type == LightType.Directional)
+			.OrderByDescending(l => l.shadows != LightShadows.None).ToArray();
+		for (int i = 0; i < suns.Length; i++) {
+			suns[i].color = zone.sun;
+			suns[i].intensity = i == 0 ? zone.sunIntensity : 0.25f;
 		}
 	}
 
