@@ -169,6 +169,8 @@ public static class AssetReplacer {
 				trail.startColor = new Color(Cyan.r, Cyan.g, Cyan.b, 0.8f);
 				trail.endColor = new Color(Cyan.r, Cyan.g, Cyan.b, 0f);
 			}
+			if (root.GetComponent<RobotLights>() == null)
+				root.AddComponent<RobotLights>();
 			PrefabUtility.SaveAsPrefabAsset(root, "Assets/Prefabs/Player.prefab");
 			Debug.Log("AssetReplacer: Player -> RoboBall");
 		} finally {

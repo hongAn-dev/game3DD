@@ -56,6 +56,8 @@ public class GameManager : MonoBehaviour {
 	// The beat score level
 	private int beatLevelScore = 0;
 
+	public int BeatLevelScore { get { return beatLevelScore; } }
+
 	/// <summary>
 	/// Use this for initialization.
 	/// </summary>

@@ -87,4 +87,18 @@ public class GameplayTests {
 		Assert.IsNotNull(prefab.GetComponentInChildren<Animation>().GetClip("Attack"));
 #endif
 	}
+
+	[Test]
+	public void RobotLightBrightnessFollowsEnergy() {
+		Assert.AreEqual(0.3f, RobotLights.Brightness(0, 10), 0.001f);
+		Assert.AreEqual(0.65f, RobotLights.Brightness(5, 10), 0.001f);
+		Assert.AreEqual(1f, RobotLights.Brightness(15, 10), 0.001f);
+		Assert.AreEqual(1f, RobotLights.Brightness(0, 0), 0.001f);
+	}
+
+	[UnityTest]
+	public IEnumerator PlayerHasRobotLights() {
+		yield return null;
+		Assert.IsNotNull(GameObject.FindWithTag("Player").GetComponent<RobotLights>());
+	}
 }
