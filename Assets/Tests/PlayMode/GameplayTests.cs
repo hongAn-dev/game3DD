@@ -60,4 +60,20 @@ public class GameplayTests {
 		Assert.AreEqual(0, GameManager.gm.score);
 		StringAssert.StartsWith("0", GameManager.gm.mainScoreDisplay.text);
 	}
+
+	[UnityTest]
+	public IEnumerator PlayerUsesRobotBall() {
+		yield return null;
+		GameObject player = GameObject.FindWithTag("Player");
+		Assert.AreEqual("RoboBall", player.GetComponent<MeshFilter>().sharedMesh.name);
+		Assert.IsNotNull(player.GetComponent<TrailRenderer>());
+	}
+
+	[UnityTest]
+	public IEnumerator CoinsUseEnergyCore() {
+		yield return null;
+		Treasure core = Object.FindObjectOfType<Treasure>();
+		MeshFilter filter = core.GetComponentInChildren<MeshFilter>();
+		Assert.AreEqual("EnergyCore", filter.sharedMesh.name);
+	}
 }

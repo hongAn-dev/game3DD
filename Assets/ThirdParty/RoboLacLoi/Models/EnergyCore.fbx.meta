@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: 866a7e5d48614580d90d60ac7d1925c4
+guid: 773738d6e1655ac47a0a80aead5d7854
 ModelImporter:
   serializedVersion: 20200
   internalIDToNameTable: []
@@ -7,52 +7,42 @@ ModelImporter:
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
-      name: dirt
-    second: {fileID: 2100000, guid: 2985e7b1508beddd29cc17c20f2864ef, type: 2}
+      name: CoreFrame
+    second: {fileID: 2100000, guid: 895ebba5f3973dce1a8f05ff8e465c8a, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
-      name: grass
-    second: {fileID: 2100000, guid: 4f629d7210ac430e4a8410de3232a762, type: 2}
+      name: CoreGlow
+    second: {fileID: 2100000, guid: b3fa2025cf32ab96795de126313388eb, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
-      name: leafsDark
-    second: {fileID: 2100000, guid: 48a20748a2fee619d9a56c6607e11fe7, type: 2}
+      name: RoboEye
+    second: {fileID: 2100000, guid: 7e795e12e75c24a5a9a08d95e019dbe4, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
-      name: leafsGreen
-    second: {fileID: 2100000, guid: becb35820bbf3686eb2116087fc59f03, type: 2}
+      name: RoboLight
+    second: {fileID: 2100000, guid: 75a5fb724d1e0a10da99aa7e1a5d14d5, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
-      name: stone
-    second: {fileID: 2100000, guid: 74402eef038546025aa8a9db7ab4185a, type: 2}
+      name: RoboPanel
+    second: {fileID: 2100000, guid: 659296f9e31d314f598a8308e87c4a91, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
-      name: stoneDark
-    second: {fileID: 2100000, guid: 5eb9a4e966ba39b8aa3dc3b4f307ef38, type: 2}
+      name: RoboRust
+    second: {fileID: 2100000, guid: 13b24469f1ff3bf07a7a1403bb43cdef, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
-      name: woodBark
-    second: {fileID: 2100000, guid: 61d6911ad2f6bcdd5bae31c2e8d6fc6d, type: 2}
-  - first:
-      type: UnityEngine:Material
-      assembly: UnityEngine.CoreModule
-      name: woodBarkDark
-    second: {fileID: 2100000, guid: 3349b471a92cb89cba14f430d6e62e87, type: 2}
-  - first:
-      type: UnityEngine:Material
-      assembly: UnityEngine.CoreModule
-      name: woodInner
-    second: {fileID: 2100000, guid: 66be041f4873caefd8e559fdfcfab158, type: 2}
+      name: RoboShell
+    second: {fileID: 2100000, guid: a2b7e6d0b128ad6a89d2406226eb02c8, type: 2}
   materials:
     materialImportMode: 2
-    materialName: 1
-    materialSearch: 0
+    materialName: 0
+    materialSearch: 1
     materialLocation: 1
   animations:
     legacyGenerateAnimations: 4
@@ -76,7 +66,7 @@ ModelImporter:
     extraExposedTransformPaths: []
     extraUserProperties: []
     clipAnimations: []
-    isReadable: 1
+    isReadable: 0
   meshes:
     lODScreenPercentages: []
     globalScale: 1
@@ -118,7 +108,7 @@ ModelImporter:
     blendShapeNormalImportMode: 1
     normalSmoothingSource: 0
   referencedClips: []
-  importAnimation: 0
+  importAnimation: 1
   humanDescription:
     serializedVersion: 3
     human: []
@@ -137,7 +127,7 @@ ModelImporter:
     skeletonHasParents: 1
   lastHumanDescriptionAvatarSource: {instanceID: 0}
   autoGenerateAvatarMappingIfUnspecified: 1
-  animationType: 0
+  animationType: 2
   humanoidOversampling: 1
   avatarSetup: 0
   addHumanoidExtraRootOnlyWhenUsingAvatar: 1

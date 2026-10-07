@@ -62,6 +62,8 @@ public static class AssetReplacer {
 		RemapKenneyMaterials();
 		ReplaceNaturePrefabs();
 		ReplaceMonsterPrefab();
+		ReplacePlayer();
+		ReplaceCores();
 		ReplaceInScenes();
 		AssetDatabase.SaveAssets();
 		Debug.Log("AssetReplacer: done");
@@ -88,23 +90,107 @@ public static class AssetReplacer {
 		if (!AssetDatabase.IsValidFolder(folder))
 			AssetDatabase.CreateFolder(KenneyModels.TrimEnd('/'), "Materials");
 
-		foreach (KeyValuePair<string, Color32> pair in KenneyColors) {
-			string path = folder + "/" + pair.Key + ".mat";
-			Material material = AssetDatabase.LoadAssetAtPath<Material>(path);
-			if (material == null) {
-				material = new Material(Shader.Find("Standard"));
-				AssetDatabase.CreateAsset(material, path);
-			}
-			material.color = pair.Value;
-			material.SetFloat("_Glossiness", 0.1f);
-			EditorUtility.SetDirty(material);
-		}
-		AssetDatabase.SaveAssets();
+		foreach (KeyValuePair<string, Color32> pair in KenneyColors)
+			EnsureMaterial(folder + "/" + pair.Key + ".mat", pair.Value, Color.black).SetFloat("_Glossiness", 0.1f);
+		RemapMaterials(KenneyModels.TrimEnd('/'), folder);
+	}
 
-		foreach (string guid in AssetDatabase.FindAssets("t:Model", new[] { KenneyModels.TrimEnd('/') })) {
+	public static Material EnsureMaterial(string path, Color color, Color emission) {
+		Material material = AssetDatabase.LoadAssetAtPath<Material>(path);
+		if (material == null) {
+			material = new Material(Shader.Find("Standard"));
+			AssetDatabase.CreateAsset(material, path);
+		}
+		material.color = color;
+		material.SetFloat("_Glossiness", 0.25f);
+		if (emission.maxColorComponent > 0f) {
+			material.EnableKeyword("_EMISSION");
+			material.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+		} else {
+			material.DisableKeyword("_EMISSION");
+		}
+		material.SetColor("_EmissionColor", emission);
+		EditorUtility.SetDirty(material);
+		return material;
+	}
+
+	/// <summary>
+	/// Remaps every model in modelFolder to same-named materials found in materialFolder.
+	/// </summary>
+	public static void RemapMaterials(string modelFolder, string materialFolder) {
+		AssetDatabase.SaveAssets();
+		Material[] materials = AssetDatabase.FindAssets("t:Material", new[] { materialFolder })
+			.Select(guid => AssetDatabase.LoadAssetAtPath<Material>(AssetDatabase.GUIDToAssetPath(guid)))
+			.ToArray();
+		foreach (string guid in AssetDatabase.FindAssets("t:Model", new[] { modelFolder })) {
 			ModelImporter importer = (ModelImporter)AssetImporter.GetAtPath(AssetDatabase.GUIDToAssetPath(guid));
-			importer.SearchAndRemapMaterials(ModelImporterMaterialName.BasedOnMaterialName, ModelImporterMaterialSearch.Local);
+			// A remap for a material name the model does not use is harmless.
+			foreach (Material material in materials)
+				importer.AddRemap(new AssetImporter.SourceAssetIdentifier(typeof(Material), material.name), material);
 			importer.SaveAndReimport();
+		}
+	}
+
+	const string RoboFolder = "Assets/ThirdParty/RoboLacLoi/";
+	static readonly Color Cyan = new Color32(46, 230, 230, 255);
+
+	// Material name -> (albedo, emission). Emission black = not emissive.
+	static readonly Dictionary<string, Color[]> RoboMaterials = new Dictionary<string, Color[]> {
+		{ "RoboShell", new[] { (Color)new Color32(158, 163, 168, 255), Color.black } },
+		{ "RoboPanel", new[] { (Color)new Color32(56, 61, 69, 255), Color.black } },
+		{ "RoboLight", new[] { Cyan, Cyan * 0.3f } },
+		{ "RoboEye", new[] { (Color)new Color32(255, 196, 77, 255), (Color)new Color32(255, 196, 77, 255) * 0.8f } },
+		{ "RoboRust", new[] { (Color)new Color32(115, 64, 31, 255), Color.black } },
+		{ "CoreGlow", new[] { Cyan, Cyan * 1.5f } },
+		{ "CoreFrame", new[] { (Color)new Color32(115, 120, 128, 255), Color.black } },
+	};
+
+	static void ReplacePlayer() {
+		string folder = RoboFolder + "Materials";
+		if (!AssetDatabase.IsValidFolder(folder))
+			AssetDatabase.CreateFolder(RoboFolder.TrimEnd('/'), "Materials");
+		foreach (KeyValuePair<string, Color[]> pair in RoboMaterials)
+			EnsureMaterial(folder + "/" + pair.Key + ".mat", pair.Value[0], pair.Value[1]);
+		RemapMaterials(RoboFolder + "Models", folder);
+
+		string modelPath = RoboFolder + "Models/RoboBall.fbx";
+		Mesh mesh = AssetDatabase.LoadAllAssetsAtPath(modelPath).OfType<Mesh>().First();
+		Material[] materials = AssetDatabase.LoadAssetAtPath<GameObject>(modelPath)
+			.GetComponentInChildren<MeshRenderer>().sharedMaterials;
+
+		GameObject root = PrefabUtility.LoadPrefabContents("Assets/Prefabs/Player.prefab");
+		try {
+			// The ball keeps its rigidbody, sphere collider (radius 0.5) and trail; only the mesh changes.
+			root.GetComponent<MeshFilter>().sharedMesh = mesh;
+			root.GetComponent<MeshRenderer>().sharedMaterials = materials;
+			TrailRenderer trail = root.GetComponent<TrailRenderer>();
+			if (trail != null) {
+				trail.startColor = new Color(Cyan.r, Cyan.g, Cyan.b, 0.8f);
+				trail.endColor = new Color(Cyan.r, Cyan.g, Cyan.b, 0f);
+			}
+			PrefabUtility.SaveAsPrefabAsset(root, "Assets/Prefabs/Player.prefab");
+			Debug.Log("AssetReplacer: Player -> RoboBall");
+		} finally {
+			PrefabUtility.UnloadPrefabContents(root);
+		}
+	}
+
+	static void ReplaceCores() {
+		GameObject model = AssetDatabase.LoadAssetAtPath<GameObject>(RoboFolder + "Models/EnergyCore.fbx");
+		foreach (string name in new[] { "Coin", "Coin Bouncy" }) {
+			string path = "Assets/Prefabs/" + name + ".prefab";
+			GameObject root = PrefabUtility.LoadPrefabContents(path);
+			try {
+				if (root.transform.Find(ModelChildName) != null)
+					continue;
+				GameObject instance = ReplaceVisual(root, model, false);
+				// Spec: about 1.3x the old coin so it reads from the gameplay camera.
+				instance.transform.localScale *= 1.3f;
+				PrefabUtility.SaveAsPrefabAsset(root, path);
+				Debug.Log("AssetReplacer: " + name + " -> EnergyCore");
+			} finally {
+				PrefabUtility.UnloadPrefabContents(root);
+			}
 		}
 	}
 
