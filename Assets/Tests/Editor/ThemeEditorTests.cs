@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using UnityEditor;
@@ -123,13 +124,38 @@ public class ThemeEditorTests {
 		}
 	}
 
+	static IEnumerable<GameObject> UiRoots() {
+		foreach (string guid in AssetDatabase.FindAssets("t:Prefab", new[] { "Assets/Prefabs" }))
+			yield return AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(guid));
+		foreach (EditorBuildSettingsScene scene in EditorBuildSettings.scenes)
+			foreach (GameObject root in EditorSceneManager.OpenScene(scene.path, OpenSceneMode.Single).GetRootGameObjects())
+				yield return root;
+	}
+
 	[Test]
-	public void AllUiTextsUseOpenSans() {
-		foreach (string guid in AssetDatabase.FindAssets("t:Prefab", new[] { "Assets/Prefabs" })) {
-			GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(guid));
-			foreach (UnityEngine.UI.Text text in prefab.GetComponentsInChildren<UnityEngine.UI.Text>(true))
-				StringAssert.StartsWith("OpenSans", text.font.name, prefab.name + "/" + text.name);
+	public void AllUiTextsUseChakraPetch() {
+		foreach (GameObject root in UiRoots())
+			foreach (Text text in root.GetComponentsInChildren<Text>(true))
+				StringAssert.StartsWith("ChakraPetch", text.font.name, root.name + "/" + text.name);
+	}
+
+	[Test]
+	public void ButtonsAndPanelsUseHudFrame() {
+		foreach (GameObject root in UiRoots()) {
+			foreach (Button button in root.GetComponentsInChildren<Button>(true))
+				Assert.IsNotNull(button.transform.Find("HUD Frame"), root.name + "/" + button.name);
+			foreach (Image box in root.GetComponentsInChildren<Image>(true).Where(i => i.name == "BoxBackground"))
+				Assert.AreEqual("hud_fill", box.sprite != null ? box.sprite.name : "", root.name);
 		}
+	}
+
+	[Test]
+	public void MainMenuButtonsAreStackedWithoutGap() {
+		EditorSceneManager.OpenScene("Assets/Scenes/MainMenu.unity", OpenSceneMode.Single);
+		RectTransform play = GameObject.Find("Play Button").GetComponent<RectTransform>();
+		RectTransform quit = GameObject.Find("Quit Button").GetComponent<RectTransform>();
+		float gap = (play.anchoredPosition.y - play.sizeDelta.y / 2f) - (quit.anchoredPosition.y + quit.sizeDelta.y / 2f);
+		Assert.That(gap, Is.InRange(16f, 48f));
 	}
 
 	// Each line fits the rect without wrapping and all lines fit its height (at the best-fit size if enabled).
@@ -215,6 +241,50 @@ public class ThemeEditorTests {
 			Image box = prefab.GetComponentsInChildren<Image>(true).First(i => i.name == "BoxBackground");
 			foreach (Text text in prefab.GetComponentsInChildren<Text>(true).Where(t => t.GetComponentInParent<Button>() == null))
 				Assert.GreaterOrEqual(Mathf.Abs(Luminance(text.color) - Luminance(box.color)), 0.4f, name + "/" + text.name);
+		}
+	}
+
+	[Test]
+	public void ButtonLabelsFitTheirButtons() {
+		foreach (GameObject root in UiRoots())
+			foreach (Button button in root.GetComponentsInChildren<Button>(true))
+				foreach (Text label in button.GetComponentsInChildren<Text>(true)) {
+					RectTransform b = (RectTransform)button.transform;
+					Assert.DoesNotThrow(() => AssertFits(label), root.name + "/" + (button.transform.parent != null ? button.transform.parent.name : "-") + "/" + button.name
+						+ " size " + b.rect.size + " scale " + b.localScale);
+				}
+	}
+
+	static Rect LocalRect(RectTransform rect) {
+		Vector2 size = rect.rect.size;
+		Vector2 min = (Vector2)rect.localPosition - Vector2.Scale(rect.pivot, size);
+		return new Rect(min, size);
+	}
+
+	[Test]
+	public void MessageBoxContentStaysInsideAndApart() {
+		foreach (string name in new[] { "BeatLevelUICanvas", "GameOver Canvas" }) {
+			GameObject root = PrefabUtility.LoadPrefabContents("Assets/Prefabs/" + name + ".prefab");
+			try {
+				Rect box = LocalRect((RectTransform)root.transform.Find("BoxBackground"));
+				var items = root.GetComponentsInChildren<RectTransform>(true)
+					.Where(r => r.parent == root.transform && r.name != "BoxBackground" && r.name != "BoxBorder")
+					.ToList();
+				foreach (Text text in root.GetComponentsInChildren<Text>(true).Where(t => t.transform.parent == root.transform)) {
+					// The score shows "x / y" at runtime; check the widest realistic value.
+					if (text.name == "EndGameScore Text")
+						text.text = "100 / 100";
+					AssertFits(text);
+				}
+				foreach (RectTransform item in items) {
+					Rect r = LocalRect(item);
+					Assert.IsTrue(box.Contains(r.min) && box.Contains(r.max), name + "/" + item.name + " outside the box");
+					foreach (RectTransform other in items.Where(o => o != item))
+						Assert.IsFalse(r.Overlaps(LocalRect(other)), name + ": " + item.name + " overlaps " + other.name);
+				}
+			} finally {
+				PrefabUtility.UnloadPrefabContents(root);
+			}
 		}
 	}
 }

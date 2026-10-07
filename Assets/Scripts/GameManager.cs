@@ -100,7 +100,7 @@ public class GameManager : MonoBehaviour {
 			beatLevelCanvas.SetActive (false);
 			// Show intro level goal message (Only at first level load, doesnt show after a gameover)
 			if (GameSettings.showIntroLevelMessage) {
-				introBeatLevelText.text = Zones.Title (SceneManager.GetActiveScene ().name).ToUpper () + "\nTHU " + beatLevelScore.ToString () + " LÕI NĂNG LƯỢNG";
+				introBeatLevelText.text = "<color=#2EE6E6>" + Zones.Title (SceneManager.GetActiveScene ().name).ToUpperInvariant () + "</color>\nTHU " + beatLevelScore.ToString () + " LÕI NĂNG LƯỢNG";
 				GameSettings.showIntroLevelMessage = false;
 				StartCoroutine (ShowIntroBeatLevelCanvas ());
 			}
