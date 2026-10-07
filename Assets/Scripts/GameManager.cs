@@ -56,6 +56,8 @@ public class GameManager : MonoBehaviour {
 	// The beat score level
 	private int beatLevelScore = 0;
 
+	public int BeatLevelScore { get { return beatLevelScore; } }
+
 	/// <summary>
 	/// Use this for initialization.
 	/// </summary>
@@ -98,7 +100,7 @@ public class GameManager : MonoBehaviour {
 			beatLevelCanvas.SetActive (false);
 			// Show intro level goal message (Only at first level load, doesnt show after a gameover)
 			if (GameSettings.showIntroLevelMessage) {
-				introBeatLevelText.text = "GET " + beatLevelScore.ToString () + " COINS\nTO BEAT THE LEVEL!";
+				introBeatLevelText.text = "<color=#2EE6E6>" + Zones.Title (SceneManager.GetActiveScene ().name).ToUpperInvariant () + "</color>\nTHU " + beatLevelScore.ToString () + " LÕI NĂNG LƯỢNG";
 				GameSettings.showIntroLevelMessage = false;
 				StartCoroutine (ShowIntroBeatLevelCanvas ());
 			}
@@ -199,7 +201,7 @@ public class GameManager : MonoBehaviour {
 	public void Collect(int amount) {
 		score += amount;
 		if (canBeatLevel) {
-			mainScoreDisplay.text = score.ToString () + " of " + beatLevelScore.ToString ();
+			mainScoreDisplay.text = score.ToString () + " / " + beatLevelScore.ToString ();
 		} else {
 			mainScoreDisplay.text = score.ToString ();
 		}

@@ -20,6 +20,18 @@ public class SmoothFollow : MonoBehaviour {
 	[SerializeField]
 	private float heightDamping;
 
+	// Mouse camera controls: wheel zooms, right button drag orbits and tilts.
+	[SerializeField]
+	private float zoomSpeed = 0.5f;
+	[SerializeField]
+	private float orbitSpeed = 3.0f;
+	[SerializeField]
+	private float tiltSpeed = 0.3f;
+	[SerializeField]
+	private float minDistance = 3.0f;
+	[SerializeField]
+	private float maxDistance = 20.0f;
+
 	/// <summary>
 	/// Called every frame, if the Behaviour is enabled. 
 	/// LateUpdate is called after all Update functions have been called.
@@ -42,6 +54,21 @@ public class SmoothFollow : MonoBehaviour {
 
 		// Damp the height
 		currentHeight = Mathf.Lerp(currentHeight, wantedHeight, heightDamping * Time.deltaTime);
+
+		// Zoom with the mouse wheel, keeping the camera angle.
+		float scroll = Input.GetAxis("Mouse ScrollWheel");
+		if (scroll != 0) {
+			float newDistance = Mathf.Clamp(distance * (1 - scroll * zoomSpeed), minDistance, maxDistance);
+			currentHeight = target.position.y + (currentHeight - target.position.y) * newDistance / distance;
+			distance = newDistance;
+		}
+
+		// Orbit and tilt while the right mouse button is held.
+		if (Input.GetMouseButton(1)) {
+			currentRotationAngle += Input.GetAxis("Mouse X") * orbitSpeed;
+			currentHeight = Mathf.Clamp(currentHeight - Input.GetAxis("Mouse Y") * tiltSpeed,
+				target.position.y + 0.5f, target.position.y + maxDistance);
+		}
 
 		// Convert the angle into a rotation
 		var currentRotation = Quaternion.Euler(0, currentRotationAngle, 0);

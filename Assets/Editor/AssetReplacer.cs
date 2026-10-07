@@ -14,7 +14,7 @@ using UnityEngine;
 public static class AssetReplacer {
 
 	const string KenneyModels = "Assets/ThirdParty/KenneyNatureKit/Models/";
-	const string MonsterModel = "Assets/ThirdParty/QuaterniusUltimateMonsters/BlueDemon.fbx";
+	const string MonsterModel = "Assets/ThirdParty/QuaterniusRobotEnemy/RobotEnemy.fbx";
 	const string MonsterPrefab = "Assets/Prefabs/Enemy - Monster.prefab";
 	const string ModelChildName = "Model";
 
@@ -62,6 +62,9 @@ public static class AssetReplacer {
 		RemapKenneyMaterials();
 		ReplaceNaturePrefabs();
 		ReplaceMonsterPrefab();
+		ReplacePlayer();
+		ReplaceCores();
+		ReplaceScrap();
 		ReplaceInScenes();
 		AssetDatabase.SaveAssets();
 		Debug.Log("AssetReplacer: done");
@@ -88,23 +91,128 @@ public static class AssetReplacer {
 		if (!AssetDatabase.IsValidFolder(folder))
 			AssetDatabase.CreateFolder(KenneyModels.TrimEnd('/'), "Materials");
 
-		foreach (KeyValuePair<string, Color32> pair in KenneyColors) {
-			string path = folder + "/" + pair.Key + ".mat";
-			Material material = AssetDatabase.LoadAssetAtPath<Material>(path);
-			if (material == null) {
-				material = new Material(Shader.Find("Standard"));
-				AssetDatabase.CreateAsset(material, path);
-			}
-			material.color = pair.Value;
-			material.SetFloat("_Glossiness", 0.1f);
-			EditorUtility.SetDirty(material);
-		}
-		AssetDatabase.SaveAssets();
+		foreach (KeyValuePair<string, Color32> pair in KenneyColors)
+			EnsureMaterial(folder + "/" + pair.Key + ".mat", pair.Value, Color.black).SetFloat("_Glossiness", 0.1f);
+		RemapMaterials(KenneyModels.TrimEnd('/'), folder);
+	}
 
-		foreach (string guid in AssetDatabase.FindAssets("t:Model", new[] { KenneyModels.TrimEnd('/') })) {
+	public static Material EnsureMaterial(string path, Color color, Color emission) {
+		Material material = AssetDatabase.LoadAssetAtPath<Material>(path);
+		if (material == null) {
+			material = new Material(Shader.Find("Standard"));
+			AssetDatabase.CreateAsset(material, path);
+		}
+		material.color = color;
+		material.SetFloat("_Glossiness", 0.25f);
+		if (emission.maxColorComponent > 0f) {
+			material.EnableKeyword("_EMISSION");
+			material.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+		} else {
+			material.DisableKeyword("_EMISSION");
+		}
+		material.SetColor("_EmissionColor", emission);
+		EditorUtility.SetDirty(material);
+		return material;
+	}
+
+	/// <summary>
+	/// Remaps every model in modelFolder to same-named materials found in materialFolder.
+	/// </summary>
+	public static void RemapMaterials(string modelFolder, string materialFolder) {
+		AssetDatabase.SaveAssets();
+		Material[] materials = AssetDatabase.FindAssets("t:Material", new[] { materialFolder })
+			.Select(guid => AssetDatabase.LoadAssetAtPath<Material>(AssetDatabase.GUIDToAssetPath(guid)))
+			.ToArray();
+		foreach (string guid in AssetDatabase.FindAssets("t:Model", new[] { modelFolder })) {
 			ModelImporter importer = (ModelImporter)AssetImporter.GetAtPath(AssetDatabase.GUIDToAssetPath(guid));
-			importer.SearchAndRemapMaterials(ModelImporterMaterialName.BasedOnMaterialName, ModelImporterMaterialSearch.Local);
+			// A remap for a material name the model does not use is harmless.
+			foreach (Material material in materials)
+				importer.AddRemap(new AssetImporter.SourceAssetIdentifier(typeof(Material), material.name), material);
 			importer.SaveAndReimport();
+		}
+	}
+
+	const string RoboFolder = "Assets/ThirdParty/RoboLacLoi/";
+	static readonly Color Cyan = new Color32(46, 230, 230, 255);
+
+	// Material name -> (albedo, emission). Emission black = not emissive.
+	static readonly Dictionary<string, Color[]> RoboMaterials = new Dictionary<string, Color[]> {
+		{ "RoboShell", new[] { (Color)new Color32(158, 163, 168, 255), Color.black } },
+		{ "RoboPanel", new[] { (Color)new Color32(56, 61, 69, 255), Color.black } },
+		{ "RoboLight", new[] { Cyan, Cyan * 0.3f } },
+		{ "RoboEye", new[] { (Color)new Color32(255, 196, 77, 255), (Color)new Color32(255, 196, 77, 255) * 0.8f } },
+		{ "RoboRust", new[] { (Color)new Color32(115, 64, 31, 255), Color.black } },
+		{ "CoreGlow", new[] { Cyan, Cyan * 1.5f } },
+		{ "CoreFrame", new[] { (Color)new Color32(115, 120, 128, 255), Color.black } },
+	};
+
+	static void ReplacePlayer() {
+		string folder = RoboFolder + "Materials";
+		if (!AssetDatabase.IsValidFolder(folder))
+			AssetDatabase.CreateFolder(RoboFolder.TrimEnd('/'), "Materials");
+		foreach (KeyValuePair<string, Color[]> pair in RoboMaterials)
+			EnsureMaterial(folder + "/" + pair.Key + ".mat", pair.Value[0], pair.Value[1]);
+		RemapMaterials(RoboFolder + "Models", folder);
+
+		string modelPath = RoboFolder + "Models/RoboBall.fbx";
+		Mesh mesh = AssetDatabase.LoadAllAssetsAtPath(modelPath).OfType<Mesh>().First();
+		Material[] materials = AssetDatabase.LoadAssetAtPath<GameObject>(modelPath)
+			.GetComponentInChildren<MeshRenderer>().sharedMaterials;
+
+		GameObject root = PrefabUtility.LoadPrefabContents("Assets/Prefabs/Player.prefab");
+		try {
+			// The ball keeps its rigidbody, sphere collider (radius 0.5) and trail; only the mesh changes.
+			root.GetComponent<MeshFilter>().sharedMesh = mesh;
+			root.GetComponent<MeshRenderer>().sharedMaterials = materials;
+			TrailRenderer trail = root.GetComponent<TrailRenderer>();
+			if (trail != null) {
+				trail.startColor = new Color(Cyan.r, Cyan.g, Cyan.b, 0.8f);
+				trail.endColor = new Color(Cyan.r, Cyan.g, Cyan.b, 0f);
+			}
+			if (root.GetComponent<RobotLights>() == null)
+				root.AddComponent<RobotLights>();
+			PrefabUtility.SaveAsPrefabAsset(root, "Assets/Prefabs/Player.prefab");
+			Debug.Log("AssetReplacer: Player -> RoboBall");
+		} finally {
+			PrefabUtility.UnloadPrefabContents(root);
+		}
+	}
+
+	static void ReplaceCores() {
+		GameObject model = AssetDatabase.LoadAssetAtPath<GameObject>(RoboFolder + "Models/EnergyCore.fbx");
+		foreach (string name in new[] { "Coin", "Coin Bouncy" }) {
+			string path = "Assets/Prefabs/" + name + ".prefab";
+			GameObject root = PrefabUtility.LoadPrefabContents(path);
+			try {
+				if (root.transform.Find(ModelChildName) != null)
+					continue;
+				GameObject instance = ReplaceVisual(root, model, false);
+				// Spec: about 1.3x the old coin so it reads from the gameplay camera.
+				instance.transform.localScale *= 1.3f;
+				PrefabUtility.SaveAsPrefabAsset(root, path);
+				Debug.Log("AssetReplacer: " + name + " -> EnergyCore");
+			} finally {
+				PrefabUtility.UnloadPrefabContents(root);
+			}
+		}
+
+		// "Sil Coins" and "Vin Coins" spell words with plain coin objects (not Coin prefab instances).
+		foreach (string name in new[] { "Sil Coins", "Vin Coins" }) {
+			string path = "Assets/Prefabs/" + name + ".prefab";
+			GameObject root = PrefabUtility.LoadPrefabContents(path);
+			try {
+				int count = 0;
+				foreach (Treasure treasure in root.GetComponentsInChildren<Treasure>(true)) {
+					if (treasure.transform.Find(ModelChildName) != null)
+						continue;
+					ReplaceVisual(treasure.gameObject, model, false).transform.localScale *= 1.3f;
+					count++;
+				}
+				PrefabUtility.SaveAsPrefabAsset(root, path);
+				Debug.Log("AssetReplacer: " + name + " -> EnergyCore x" + count);
+			} finally {
+				PrefabUtility.UnloadPrefabContents(root);
+			}
 		}
 	}
 
@@ -140,7 +248,8 @@ public static class AssetReplacer {
 
 		GameObject root = PrefabUtility.LoadPrefabContents(MonsterPrefab);
 		try {
-			if (root.transform.Find(ModelChildName) != null) {
+			Transform existing = root.transform.Find(ModelChildName);
+			if (existing != null && PrefabUtility.GetCorrespondingObjectFromSource(existing.gameObject) == model) {
 				Debug.Log("AssetReplacer: " + MonsterPrefab + " already replaced, skipping");
 				return;
 			}
@@ -151,14 +260,19 @@ public static class AssetReplacer {
 				Object.DestroyImmediate(oldAnimation);
 
 			// The old skeleton sits next to the mesh, so every child goes.
+			// A previous model's capsule is refitted to the new one.
+			foreach (CapsuleCollider capsule in root.GetComponents<CapsuleCollider>())
+				Object.DestroyImmediate(capsule);
 			GameObject instance = ReplaceVisual(root, model, true);
+			if (root.GetComponent<CapsuleCollider>() == null)
+				AddFittedCapsule(root);
 
 			AnimationClip[] clips = AssetDatabase.LoadAllAssetsAtPath(MonsterModel)
 				.OfType<AnimationClip>()
 				.Where(c => !c.name.StartsWith("__preview__"))
 				.ToArray();
 			AnimationClip run = clips.FirstOrDefault(c => c.name == "Run") ?? clips.FirstOrDefault(c => c.name == "Walk");
-			AnimationClip attack = clips.FirstOrDefault(c => c.name == "Punch") ?? clips.FirstOrDefault(c => c.name == "Weapon");
+			AnimationClip attack = clips.FirstOrDefault(c => c.name == "Attack") ?? clips.FirstOrDefault(c => c.name == "Punch");
 
 			Animation animation = instance.GetComponent<Animation>();
 			if (animation == null)
@@ -211,26 +325,28 @@ public static class AssetReplacer {
 
 	/// <summary>
 	/// Removes the renderers of root (and the children holding them, or every child when
-	/// removeAllChildren is set) and adds the new model as a child named "Model", scaled to the footprint of
-	/// the old model. Mesh colliders are recreated on the new meshes; other colliders that were
+	/// removeAllChildren is set) and adds the new model as a child named "Model", scaled to fit the footprint of
+	/// the old model (optionally a fraction of it). Mesh colliders are recreated on the new meshes; other colliders that were
 	/// on removed children are replaced by a capsule collider on root.
 	/// </summary>
-	static GameObject ReplaceVisual(GameObject root, GameObject model, bool removeAllChildren) {
+	public static GameObject ReplaceVisual(GameObject root, GameObject model, bool removeAllChildren, float footprint = 1f) {
 		Bounds oldBounds;
 		bool hasOldBounds = TryGetLocalBounds(root, out oldBounds);
 		bool hadMeshCollider = root.GetComponentsInChildren<MeshCollider>(true).Length > 0;
+		bool convex = root.GetComponentsInChildren<MeshCollider>(true).Any(c => c.convex);
 		bool hadChildCollider = false;
 
 		// Remove the old visual: components on the root and every child that holds a renderer.
 		foreach (Transform child in root.transform.Cast<Transform>().ToList()) {
-			if (removeAllChildren || child.GetComponentsInChildren<Renderer>(true).Length > 0) {
+			if (removeAllChildren || child.GetComponentsInChildren<Renderer>(true).Any(IsMeshRenderer)) {
 				hadChildCollider |= child.GetComponentsInChildren<Collider>(true).Any(c => !(c is MeshCollider));
 				Object.DestroyImmediate(child.gameObject);
 			}
 		}
 		foreach (MeshCollider collider in root.GetComponents<MeshCollider>())
 			Object.DestroyImmediate(collider);
-		foreach (Renderer renderer in root.GetComponents<Renderer>())
+		// Trails and particle renderers are not part of the visual.
+		foreach (Renderer renderer in root.GetComponents<Renderer>().Where(IsMeshRenderer))
 			Object.DestroyImmediate(renderer);
 		foreach (MeshFilter filter in root.GetComponents<MeshFilter>())
 			Object.DestroyImmediate(filter);
@@ -242,10 +358,13 @@ public static class AssetReplacer {
 
 		Bounds newBounds;
 		if (hasOldBounds && TryGetLocalBounds(root, out newBounds)) {
-			// Match the old footprint, but never more than twice the old height; then sit on the old bottom center.
+			// Stay inside the old footprint on both ground axes (times footprint), and never more than twice
+			// the old height; then sit on the old bottom center.
 			float scale = Mathf.Min(
-				SafeRatio(Mathf.Max(oldBounds.size.x, oldBounds.size.z), Mathf.Max(newBounds.size.x, newBounds.size.z)),
+				Mathf.Min(SafeRatio(oldBounds.size.x, newBounds.size.x), SafeRatio(oldBounds.size.z, newBounds.size.z)) * footprint,
 				2f * SafeRatio(oldBounds.size.y, newBounds.size.y));
+			if (scale == float.MaxValue)
+				scale = 1f;
 
 			Vector3 oldBottom = new Vector3(oldBounds.center.x, oldBounds.min.y, oldBounds.center.z);
 			Vector3 newBottom = new Vector3(newBounds.center.x, newBounds.min.y, newBounds.center.z);
@@ -254,18 +373,45 @@ public static class AssetReplacer {
 		}
 
 		if (hadMeshCollider) {
-			foreach (MeshFilter filter in instance.GetComponentsInChildren<MeshFilter>(true))
-				filter.gameObject.AddComponent<MeshCollider>().sharedMesh = filter.sharedMesh;
+			foreach (MeshFilter filter in instance.GetComponentsInChildren<MeshFilter>(true)) {
+				MeshCollider collider = filter.gameObject.AddComponent<MeshCollider>();
+				collider.sharedMesh = filter.sharedMesh;
+				collider.convex = convex;
+			}
 		}
 
+		if (hadChildCollider)
+			AddFittedCapsule(root);
+		return instance;
+	}
+
+	static void AddFittedCapsule(GameObject root) {
 		Bounds fitted;
-		if (hadChildCollider && TryGetLocalBounds(root, out fitted)) {
+		if (TryGetLocalBounds(root, out fitted)) {
 			CapsuleCollider capsule = root.AddComponent<CapsuleCollider>();
 			capsule.center = fitted.center;
 			capsule.height = fitted.size.y;
 			capsule.radius = Mathf.Min(fitted.size.y * 0.5f, Mathf.Max(fitted.size.x, fitted.size.z) * 0.5f);
 		}
-		return instance;
+	}
+
+	static void ReplaceScrap() {
+		GameObject model = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/ThirdParty/KenneySpaceStationKit/Models/container.fbx");
+		string path = "Assets/Prefabs/Enemy - Crater.prefab";
+		GameObject root = PrefabUtility.LoadPrefabContents(path);
+		try {
+			if (root.transform.Find(ModelChildName) != null)
+				return;
+			ReplaceVisual(root, model, false);
+			PrefabUtility.SaveAsPrefabAsset(root, path);
+			Debug.Log("AssetReplacer: Enemy - Crater -> container");
+		} finally {
+			PrefabUtility.UnloadPrefabContents(root);
+		}
+	}
+
+	static bool IsMeshRenderer(Renderer renderer) {
+		return renderer is MeshRenderer || renderer is SkinnedMeshRenderer;
 	}
 
 	static float SafeRatio(float a, float b) {

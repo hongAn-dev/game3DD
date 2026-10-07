@@ -7,13 +7,48 @@ ModelImporter:
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
+      name: dirt
+    second: {fileID: 2100000, guid: 2985e7b1508beddd29cc17c20f2864ef, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: grass
+    second: {fileID: 2100000, guid: 4f629d7210ac430e4a8410de3232a762, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
       name: leafsDark
     second: {fileID: 2100000, guid: 48a20748a2fee619d9a56c6607e11fe7, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
+      name: leafsGreen
+    second: {fileID: 2100000, guid: becb35820bbf3686eb2116087fc59f03, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: stone
+    second: {fileID: 2100000, guid: 74402eef038546025aa8a9db7ab4185a, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: stoneDark
+    second: {fileID: 2100000, guid: 5eb9a4e966ba39b8aa3dc3b4f307ef38, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: woodBark
+    second: {fileID: 2100000, guid: 61d6911ad2f6bcdd5bae31c2e8d6fc6d, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
       name: woodBarkDark
     second: {fileID: 2100000, guid: 3349b471a92cb89cba14f430d6e62e87, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: woodInner
+    second: {fileID: 2100000, guid: 66be041f4873caefd8e559fdfcfab158, type: 2}
   materials:
     materialImportMode: 2
     materialName: 1

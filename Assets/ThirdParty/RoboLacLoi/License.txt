@@ -1,0 +1,2 @@
+Robo Lac Loi models (RoboBall, EnergyCore, core_icon) were made for this project with Tools/blender/*.py.
+License: same as the project (MIT).

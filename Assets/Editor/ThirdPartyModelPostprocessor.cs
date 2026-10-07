@@ -2,22 +2,37 @@ using UnityEditor;
 using UnityEngine;
 
 /// <summary>
-/// Import settings for the third party model packs (Kenney Nature Kit, Quaternius Ultimate Monsters).
+/// Import settings for the third party model packs (Kenney kits, Quaternius characters).
 /// </summary>
 public class ThirdPartyModelPostprocessor : AssetPostprocessor {
 
-	const string KenneyFolder = "Assets/ThirdParty/KenneyNatureKit/";
-	const string MonstersFolder = "Assets/ThirdParty/QuaterniusUltimateMonsters/";
+	static readonly string[] PropFolders = {
+		"Assets/ThirdParty/KenneyNatureKit/",
+		"Assets/ThirdParty/KenneyCityKitIndustrial/",
+		"Assets/ThirdParty/KenneySurvivalKit/",
+		"Assets/ThirdParty/KenneySpaceStationKit/",
+	};
+	static readonly string[] CharacterFolders = {
+		"Assets/ThirdParty/QuaterniusUltimateMonsters/",
+		"Assets/ThirdParty/QuaterniusRobotEnemy/",
+	};
+
+	static bool In(string path, string[] folders) {
+		foreach (string folder in folders)
+			if (path.StartsWith(folder))
+				return true;
+		return false;
+	}
 
 	void OnPreprocessModel() {
 		ModelImporter importer = (ModelImporter)assetImporter;
 
-		if (assetPath.StartsWith(KenneyFolder)) {
+		if (In(assetPath, PropFolders)) {
 			// Static props: readable meshes so they can be used by mesh colliders.
 			importer.isReadable = true;
 			importer.animationType = ModelImporterAnimationType.None;
 			importer.importAnimation = false;
-		} else if (assetPath.StartsWith(MonstersFolder)) {
+		} else if (In(assetPath, CharacterFolders)) {
 			// The game drives monsters with the legacy Animation component (see MonsterChaser).
 			importer.animationType = ModelImporterAnimationType.Legacy;
 			importer.importAnimation = true;
@@ -25,7 +40,7 @@ public class ThirdPartyModelPostprocessor : AssetPostprocessor {
 	}
 
 	void OnPreprocessAnimation() {
-		if (!assetPath.StartsWith(MonstersFolder))
+		if (!In(assetPath, CharacterFolders))
 			return;
 
 		// Rename "CharacterArmature|Run_CharacterArmature" to "Run" and set the wrap modes.
