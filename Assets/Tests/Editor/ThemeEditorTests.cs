@@ -34,4 +34,20 @@ public class ThemeEditorTests {
 			Assert.IsTrue(collider.convex);
 		Object.DestroyImmediate(root);
 	}
+
+	[Test]
+	public void DecorationFootprintNotLarger() {
+		GameObject root = GameObject.CreatePrimitive(PrimitiveType.Cube);
+		root.transform.localScale = new Vector3(2, 1, 2);
+		Bounds before = root.GetComponent<Renderer>().bounds;
+		GameObject model = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/ThirdParty/KenneyCityKitIndustrial/Models/shipping-container-a.fbx");
+
+		ZoneDresser.SwapDecoration(root, model);
+
+		Bounds after = new Bounds(root.transform.position, Vector3.zero);
+		foreach (Renderer r in root.GetComponentsInChildren<Renderer>())
+			after.Encapsulate(r.bounds);
+		Assert.LessOrEqual(Mathf.Max(after.size.x, after.size.z), Mathf.Max(before.size.x, before.size.z) + 0.01f);
+		Object.DestroyImmediate(root);
+	}
 }
