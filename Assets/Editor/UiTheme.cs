@@ -14,8 +14,11 @@ using UnityEngine.UI;
 public static class UiTheme {
 
 	static readonly Color Panel = new Color32(30, 35, 40, 217);
+	static readonly Color PanelSelected = new Color32(40, 110, 115, 235);
 	static readonly Color Cyan = new Color32(46, 230, 230, 255);
 	static readonly Color TextColor = new Color32(235, 242, 245, 255);
+	// Danger red-orange, lightened to stay readable on the dark panel.
+	static readonly Color LostColor = new Color32(255, 120, 80, 255);
 
 	// Old text (prefix match, case sensitive) -> new text. "Play Again" must come before "Play".
 	static readonly KeyValuePair<string, string>[] Strings = {
@@ -29,7 +32,8 @@ public static class UiTheme {
 		new KeyValuePair<string, string>("Level Victory!", "Đủ năng lượng!"),
 		new KeyValuePair<string, string>("Main Menu", "Menu chính"),
 		new KeyValuePair<string, string>("Next Level", "Khu tiếp theo"),
-		new KeyValuePair<string, string>("CONGRATULATIONS!", "ĐÃ VỀ TỚI CĂN CỨ!\nRobo đã được sạc đầy."),
+		new KeyValuePair<string, string>("CONGRATULATIONS!", "ĐÃ VỀ TỚI CĂN CỨ!"),
+		new KeyValuePair<string, string>("ĐÃ VỀ TỚI CĂN CỨ!", "ĐÃ VỀ TỚI CĂN CỨ!"),
 		new KeyValuePair<string, string>("Thanks for playing", "Cảm ơn bạn đã chơi!"),
 	};
 
@@ -106,8 +110,25 @@ public static class UiTheme {
 		foreach (Text score in root.GetComponentsInChildren<Text>(true).Where(t => t.name == "Score Text").ToList())
 			changed |= DecorateScore(score, font, icon, zoneTitle);
 
-		if (root.name == "GameOver Canvas" && root.transform.Find("Lost Title") == null) {
-			Text title = NewText("Lost Title", root.transform, font, "MẤT KẾT NỐI", 64, new Color32(255, 90, 46, 255));
+		// Message boxes: dark panel with a cyan border so the light text stays readable.
+		foreach (Image image in root.GetComponentsInChildren<Image>(true)) {
+			if (image.name == "BoxBackground") {
+				image.color = new Color(Panel.r, Panel.g, Panel.b, 0.92f);
+				changed = true;
+			} else if (image.name == "BoxBorder") {
+				image.color = Cyan;
+				changed = true;
+			}
+		}
+
+		changed |= FitIntroCard(root);
+		changed |= FitFinalScreen(root);
+
+		Transform lost = root.transform.Find("Lost Title");
+		if (lost != null)
+			lost.GetComponent<Text>().color = LostColor;
+		if (root.name == "GameOver Canvas" && lost == null) {
+			Text title = NewText("Lost Title", root.transform, font, "MẤT KẾT NỐI", 64, LostColor);
 			RectTransform rect = title.rectTransform;
 			rect.anchorMin = new Vector2(0f, 0.62f);
 			rect.anchorMax = new Vector2(1f, 0.82f);
@@ -120,7 +141,8 @@ public static class UiTheme {
 	static void StyleButton(Button button, AudioClip click) {
 		Image image = button.GetComponent<Image>();
 		if (image != null) {
-			image.color = Panel;
+			// The panel color lives in the ColorBlock so the selected state can be told apart.
+			image.color = Color.white;
 			// Unity's fake null breaks '??' on components, so check explicitly.
 			Outline outline = button.GetComponent<Outline>();
 			if (outline == null)
@@ -129,10 +151,10 @@ public static class UiTheme {
 			outline.effectDistance = new Vector2(2, -2);
 		}
 		ColorBlock colors = button.colors;
-		colors.normalColor = Color.white;
-		colors.highlightedColor = new Color(Cyan.r, Cyan.g, Cyan.b, 1f);
-		colors.selectedColor = colors.highlightedColor;
-		colors.pressedColor = new Color(Cyan.r * 0.7f, Cyan.g * 0.7f, Cyan.b * 0.7f, 1f);
+		colors.normalColor = Panel;
+		colors.highlightedColor = PanelSelected;
+		colors.selectedColor = PanelSelected;
+		colors.pressedColor = new Color(Cyan.r * 0.6f, Cyan.g * 0.6f, Cyan.b * 0.6f, 1f);
 		button.colors = colors;
 
 		if (click == null)
@@ -182,6 +204,81 @@ public static class UiTheme {
 			zone.alignment = TextAnchor.UpperRight;
 		}
 		return true;
+	}
+
+	// The intro card shows the zone name and goal on two lines inside a 460x210 box on an 800-wide canvas.
+	static bool FitIntroCard(GameObject root) {
+		Text intro = root.GetComponentsInChildren<Text>(true).FirstOrDefault(t => t.name == "Intro Level Text");
+		if (intro == null)
+			return false;
+		intro.rectTransform.sizeDelta = new Vector2(440f, 190f);
+		intro.lineSpacing = 1f;
+		// The text is set at runtime; size the font for the longest zone name and goal.
+		string runtime = intro.text;
+		intro.text = Zones.Title("Level2").ToUpperInvariant() + "\nTHU 100 LÕI NĂNG LƯỢNG";
+		intro.fontSize = 40;
+		ShrinkToFit(intro);
+		intro.text = runtime;
+		return true;
+	}
+
+	// Final victory screen (Level4): title above the thanks line, both within the canvas width, no overlap.
+	static bool FitFinalScreen(GameObject root) {
+		Text[] texts = root.GetComponentsInChildren<Text>(true);
+		Text title = texts.FirstOrDefault(t => t.text.StartsWith("ĐÃ VỀ"));
+		Text thanks = texts.FirstOrDefault(t => t.text.StartsWith("Cảm ơn"));
+		if (title == null || thanks == null)
+			return false;
+		// In batch mode the canvas rect may not be laid out yet; fall back to the scaler's reference width.
+		// Text.canvas is null inside prefab editing contents, so look the root canvas up directly.
+		Canvas canvas = title.GetComponentsInParent<Canvas>(true).Last();
+		float canvasWidth = ((RectTransform)canvas.transform).rect.width;
+		CanvasScaler scaler = canvas.GetComponent<CanvasScaler>();
+		if (canvasWidth < 100f && scaler != null)
+			canvasWidth = scaler.referenceResolution.x;
+		foreach (Text text in new[] { title, thanks })
+			text.rectTransform.sizeDelta = new Vector2(canvasWidth * 0.9f, text.rectTransform.sizeDelta.y);
+		thanks.rectTransform.sizeDelta = new Vector2(thanks.rectTransform.sizeDelta.x, Mathf.Max(thanks.rectTransform.sizeDelta.y, 150f));
+
+		// Size the title to end just above the thanks text.
+		// Canvas-local tops; world corners are degenerate in batch mode (canvas scale 0 before layout).
+		float height = TopInCanvas(title.rectTransform, canvas.transform) - TopInCanvas(thanks.rectTransform, canvas.transform) - 10f;
+		RectTransform rect = title.rectTransform;
+		float newHeight = Mathf.Max(60f, height);
+		// Keep the title's top edge where it is while changing its height.
+		float top = rect.anchoredPosition.y + (1f - rect.pivot.y) * rect.sizeDelta.y;
+		rect.sizeDelta = new Vector2(rect.sizeDelta.x, newHeight);
+		rect.anchoredPosition = new Vector2(rect.anchoredPosition.x, top - (1f - rect.pivot.y) * newHeight);
+
+		ShrinkToFit(title);
+		ShrinkToFit(thanks);
+		return true;
+	}
+
+	static float TopInCanvas(RectTransform rect, Transform canvas) {
+		float y = rect.rect.yMax;
+		for (Transform t = rect; t != null && t != canvas; t = t.parent)
+			y += t.localPosition.y;
+		return y;
+	}
+
+		// Largest font size (up to the current one) at which every line fits the rect without wrapping.
+	static void ShrinkToFit(Text text) {
+		Vector2 size = text.rectTransform.rect.size;
+		text.resizeTextForBestFit = false;
+		for (int fontSize = text.fontSize; fontSize > 20; fontSize -= 2) {
+			TextGenerationSettings settings = text.GetGenerationSettings(size);
+			settings.fontSize = fontSize;
+			settings.horizontalOverflow = HorizontalWrapMode.Overflow;
+			settings.verticalOverflow = VerticalWrapMode.Overflow;
+			TextGenerator generator = new TextGenerator();
+			if (generator.GetPreferredWidth(text.text, settings) / text.pixelsPerUnit <= size.x
+				&& generator.GetPreferredHeight(text.text, settings) / text.pixelsPerUnit <= size.y) {
+				text.fontSize = fontSize;
+				return;
+			}
+		}
+		text.fontSize = 20;
 	}
 
 	static Text NewText(string name, Transform parent, Font font, string value, int size, Color color) {

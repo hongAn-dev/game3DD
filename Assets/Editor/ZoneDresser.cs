@@ -225,28 +225,35 @@ public static class ZoneDresser {
 	/// <summary>
 	/// Replaces the visual of one decoration with model, keeping position, rotation and footprint.
 	/// </summary>
-	public static void SwapDecoration(GameObject decoration, GameObject model) {
+	// Old trees only block at the trunk, so solid props replacing them use a fraction of the canopy footprint.
+	public const float TreeFootprint = 0.4f;
+
+	public static void SwapDecoration(GameObject decoration, GameObject model, float footprint) {
 		if (PrefabUtility.IsPartOfPrefabInstance(decoration))
 			PrefabUtility.UnpackPrefabInstance(decoration, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
-		AssetReplacer.ReplaceVisual(decoration, model, false);
+		AssetReplacer.ReplaceVisual(decoration, model, false, footprint);
 		decoration.name = model.name;
 	}
 
 	static List<GameObject> SwapDecorations(Zone zone, UnityEngine.SceneManagement.Scene scene) {
 		var swapped = new List<GameObject>();
 		var targets = new List<KeyValuePair<GameObject, string>>();
+		var trees = new HashSet<GameObject>();
 		foreach (GameObject root in scene.GetRootGameObjects()) {
 			foreach (Transform t in root.GetComponentsInChildren<Transform>(true)) {
 				if (!PrefabUtility.IsOutermostPrefabInstanceRoot(t.gameObject))
 					continue;
 				GameObject source = PrefabUtility.GetCorrespondingObjectFromSource(t.gameObject);
 				string model;
-				if (source != null && zone.props.TryGetValue(source.name, out model))
+				if (source != null && zone.props.TryGetValue(source.name, out model)) {
 					targets.Add(new KeyValuePair<GameObject, string>(t.gameObject, model));
+					if (source.name.StartsWith("Tree_"))
+						trees.Add(t.gameObject);
+				}
 			}
 		}
 		foreach (var target in targets) {
-			SwapDecoration(target.Key, LoadProp(target.Value));
+			SwapDecoration(target.Key, LoadProp(target.Value), trees.Contains(target.Key) ? TreeFootprint : 1f);
 			swapped.Add(target.Key);
 		}
 		return swapped;
@@ -276,18 +283,25 @@ public static class ZoneDresser {
 		WinBeacons beacons = manager.GetComponent<WinBeacons>();
 		if (beacons == null)
 			beacons = manager.gameObject.AddComponent<WinBeacons>();
-		var lights = new List<Light>();
-		foreach (GameObject decoration in decorations.Take(8)) {
-			GameObject go = new GameObject("Beacon Light");
-			go.transform.SetParent(decoration.transform, false);
-			go.transform.localPosition = Vector3.up * 2f;
-			Light light = go.AddComponent<Light>();
-			light.type = LightType.Point;
-			light.color = new Color32(46, 230, 230, 255);
-			light.range = 10f;
-			light.intensity = 2.5f;
-			lights.Add(light);
+
+		// Re-runs swap nothing new, so reuse the lights made by the first run.
+		var lights = Object.FindObjectsOfType<Light>(true).Where(l => l.name == "Beacon Light").ToList();
+		if (lights.Count == 0) {
+			foreach (GameObject decoration in decorations.Take(8)) {
+				GameObject go = new GameObject("Beacon Light");
+				go.transform.SetParent(decoration.transform, false);
+				go.transform.localPosition = Vector3.up * 2f;
+				Light light = go.AddComponent<Light>();
+				light.type = LightType.Point;
+				light.color = new Color32(46, 230, 230, 255);
+				light.range = 10f;
+				light.intensity = 2.5f;
+				// Off until the level is beaten (WinBeacons also turns them off at start).
+				light.enabled = false;
+				lights.Add(light);
+			}
 		}
 		beacons.lights = lights.ToArray();
 	}
+
 }

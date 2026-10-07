@@ -325,11 +325,11 @@ public static class AssetReplacer {
 
 	/// <summary>
 	/// Removes the renderers of root (and the children holding them, or every child when
-	/// removeAllChildren is set) and adds the new model as a child named "Model", scaled to the footprint of
-	/// the old model. Mesh colliders are recreated on the new meshes; other colliders that were
+	/// removeAllChildren is set) and adds the new model as a child named "Model", scaled to fit the footprint of
+	/// the old model (optionally a fraction of it). Mesh colliders are recreated on the new meshes; other colliders that were
 	/// on removed children are replaced by a capsule collider on root.
 	/// </summary>
-	public static GameObject ReplaceVisual(GameObject root, GameObject model, bool removeAllChildren) {
+	public static GameObject ReplaceVisual(GameObject root, GameObject model, bool removeAllChildren, float footprint = 1f) {
 		Bounds oldBounds;
 		bool hasOldBounds = TryGetLocalBounds(root, out oldBounds);
 		bool hadMeshCollider = root.GetComponentsInChildren<MeshCollider>(true).Length > 0;
@@ -358,10 +358,13 @@ public static class AssetReplacer {
 
 		Bounds newBounds;
 		if (hasOldBounds && TryGetLocalBounds(root, out newBounds)) {
-			// Match the old footprint, but never more than twice the old height; then sit on the old bottom center.
+			// Stay inside the old footprint on both ground axes (times footprint), and never more than twice
+			// the old height; then sit on the old bottom center.
 			float scale = Mathf.Min(
-				SafeRatio(Mathf.Max(oldBounds.size.x, oldBounds.size.z), Mathf.Max(newBounds.size.x, newBounds.size.z)),
+				Mathf.Min(SafeRatio(oldBounds.size.x, newBounds.size.x), SafeRatio(oldBounds.size.z, newBounds.size.z)) * footprint,
 				2f * SafeRatio(oldBounds.size.y, newBounds.size.y));
+			if (scale == float.MaxValue)
+				scale = 1f;
 
 			Vector3 oldBottom = new Vector3(oldBounds.center.x, oldBounds.min.y, oldBounds.center.z);
 			Vector3 newBottom = new Vector3(newBounds.center.x, newBounds.min.y, newBounds.center.z);
