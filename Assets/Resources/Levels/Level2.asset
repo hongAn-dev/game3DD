@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 53b47744de7155c23927603fd07ff9c5, type: 3}
+  m_Name: Level2
+  m_EditorClassIdentifier: 
+  levelId: Level2
+  order: 2
+  displayName: "Khu c\xF4ng nghi\u1EC7p b\u1ECF hoang"
+  nextScene: Level3
+  energyTarget: 10
+  energyAtStart: 4
+  energyCap: 6
+  energyIntervalMin: 5
+  energyIntervalMax: 7
+  enemyCap: 040000000500000006000000
+  bossCap: 010000000100000001000000
+  hazardDeathMessage: "Robo r\u01A1i xu\u1ED1ng bi\u1EC3n axit"

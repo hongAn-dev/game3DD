@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 53b47744de7155c23927603fd07ff9c5, type: 3}
+  m_Name: Level4
+  m_EditorClassIdentifier: 
+  levelId: Level4
+  order: 4
+  displayName: "Tr\u1EA1m c\u0103n c\u1EE9"
+  nextScene: Ending
+  energyTarget: 18
+  energyAtStart: 6
+  energyCap: 8
+  energyIntervalMin: 4
+  energyIntervalMax: 6
+  enemyCap: 08000000090000000a000000
+  bossCap: 020000000200000002000000
+  hazardDeathMessage: "Robo r\u01A1i xu\u1ED1ng bi\u1EC3n axit"
