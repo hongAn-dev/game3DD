@@ -71,4 +71,42 @@ public class FlowTests {
 		Assert.IsTrue(CampaignProgress.CanPlayEnding);
 		Assert.AreEqual(100, CampaignProgress.FuelPercent);
 	}
+	[Test]
+	public void PauseFreezesTimeAndResumeRestoresIt() {
+		GameFlow.ResetForScene();
+		Assert.IsTrue(GameFlow.Pause());
+		Assert.AreEqual(FlowState.Paused, GameFlow.State);
+		Assert.AreEqual(0f, Time.timeScale);
+		Assert.IsFalse(GameFlow.IsGameplayActive);
+		Assert.IsTrue(GameFlow.Resume());
+		Assert.AreEqual(1f, Time.timeScale);
+		Assert.IsTrue(GameFlow.IsGameplayActive);
+	}
+
+	[Test]
+	public void GameFlowIgnoresCompleteAfterDeath() {
+		GameFlow.ResetForScene();
+		Assert.IsTrue(GameFlow.Die("MẤT KẾT NỐI"));
+		Assert.IsFalse(GameFlow.CompleteLevel());
+		Assert.IsFalse(GameFlow.Die("again"));
+		Assert.AreEqual(FlowState.Dead, GameFlow.State);
+	}
+
+	[Test]
+	public void ReportedHazardCauseWinsOverFallback() {
+		GameFlow.ResetForScene();
+		GameFlow.ReportDeathCause("Robo chạm dung nham");
+		GameFlow.ReportDeathCause("second report ignored");
+		GameFlow.Die("MẤT KẾT NỐI");
+		Assert.AreEqual("Robo chạm dung nham", GameFlow.DeathCause);
+	}
+
+	[Test]
+	public void SceneLoadResetsFlowAndTime() {
+		GameFlow.Pause();
+		GameFlow.ResetForScene();
+		Assert.AreEqual(FlowState.Playing, GameFlow.State);
+		Assert.AreEqual(1f, Time.timeScale);
+		Assert.AreEqual("", GameFlow.DeathCause);
+	}
 }

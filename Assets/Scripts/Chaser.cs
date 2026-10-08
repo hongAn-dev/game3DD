@@ -28,6 +28,8 @@ public class Chaser : MonoBehaviour {
 	/// Update is called once per frame.
 	/// </summary>
 	void Update () {
+		if (!GameFlow.IsGameplayActive)
+			return;
 		if (target == null)
 			return;
 

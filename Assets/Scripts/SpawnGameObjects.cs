@@ -31,6 +31,8 @@ public class SpawnGameObjects : MonoBehaviour {
 	/// Update is called once per frame
 	/// </summary>
 	void Update () {
+		if (!GameFlow.IsGameplayActive)
+			return;
 		// Check if it is the time to spawn again.
 		if (Time.time - savedTime >= secondsBetweenSpawning) 
 		{

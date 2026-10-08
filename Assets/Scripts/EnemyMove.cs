@@ -49,6 +49,8 @@ public class EnemyMove : MonoBehaviour {
 	/// Update is called once per frame.
 	/// </summary>
 	void Update () {
+		if (!GameFlow.IsGameplayActive)
+			return;
 		EnemyMovement();
 	}
 }

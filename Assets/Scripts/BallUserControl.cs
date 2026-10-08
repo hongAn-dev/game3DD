@@ -50,13 +50,21 @@ public class BallUserControl : MonoBehaviour {
 	/// Update is called once per frame.
 	/// </summary>
 	private void Update() {
+		if (!GameFlow.IsGameplayActive) {
+			move = Vector3.zero;
+			jump = false;
+			return;
+		}
+
 		// Get the axis and jump input.
 		float h = CrossPlatformInputManager.GetAxis("Horizontal");
 		float v = CrossPlatformInputManager.GetAxis("Vertical");
 		jump = CrossPlatformInputManager.GetButton("Jump");
 
-		h = (h == 0) ? joystick.Horizontal : h;
-		v = (v == 0) ? joystick.Vertical : v;
+		if (joystick != null) {
+			h = (h == 0) ? joystick.Horizontal : h;
+			v = (v == 0) ? joystick.Vertical : v;
+		}
 
 		// Calculate move direction.
 		if (cam != null)
