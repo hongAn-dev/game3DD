@@ -109,4 +109,65 @@ public class FlowPlayTests {
 		ending.Complete();
 		Assert.IsTrue(ending.completionPanel.activeSelf);
 	}
+
+	static IEnumerator WaitForState(FlowState state, float seconds) {
+		float end = Time.realtimeSinceStartup + seconds;
+		while (GameFlow.State != state && Time.realtimeSinceStartup < end)
+			yield return null;
+	}
+
+	[UnityTest]
+	public IEnumerator TappingIntroCardStartsPlayThroughGameFlow() {
+		GameSettings.showIntroLevelMessage = true;
+		SceneManager.LoadScene("Level1");
+		yield return null;
+		yield return WaitForState(FlowState.Intro, 2f);
+		Assert.AreEqual(FlowState.Intro, GameFlow.State);
+
+		Object.FindObjectOfType<UIButtonResumeGame>(true).resumeGame();
+		yield return null;
+		yield return null;
+
+		Assert.AreEqual(FlowState.Playing, GameFlow.State);
+		Assert.AreEqual(1f, Time.timeScale);
+		Assert.IsFalse(GameManager.gm.introBeatLevelCanvas.activeSelf, "card hides as soon as it is tapped");
+	}
+
+	[UnityTest]
+	public IEnumerator DieWithLivePlayerShowsGameOver() {
+		GameFlow.Die("Robo rơi xuống biển axit");
+		yield return null;
+		yield return null;
+		Assert.IsTrue(GameManager.gm.gameOverCanvas.activeSelf);
+	}
+
+	[UnityTest]
+	public IEnumerator DoubleNextInOneFrameLoadsOnce() {
+		int loads = 0;
+		UnityEngine.Events.UnityAction<Scene, LoadSceneMode> count = (scene, mode) => { if (scene.name == "Level2") loads++; };
+		SceneManager.sceneLoaded += count;
+		SceneRouter.Next();
+		SceneRouter.Next();
+		yield return null;
+		yield return null;
+		yield return new WaitForSecondsRealtime(0.5f);
+		SceneManager.sceneLoaded -= count;
+		Assert.AreEqual(1, loads);
+	}
+
+	[UnityTest]
+	public IEnumerator DirectReloadDuringIntroUnfreezesTime() {
+		GameSettings.showIntroLevelMessage = true;
+		SceneManager.LoadScene("Level1");
+		yield return null;
+		yield return WaitForState(FlowState.Intro, 2f);
+		Assert.AreEqual(0f, Time.timeScale);
+
+		GameSettings.showIntroLevelMessage = false;
+		SceneManager.LoadScene("Level1");
+		yield return null;
+		yield return null;
+		Assert.AreEqual(1f, Time.timeScale);
+		Assert.AreEqual(FlowState.Playing, GameFlow.State);
+	}
 }

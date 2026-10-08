@@ -7,6 +7,9 @@ public static class SceneRouter {
 	public const string EndingScene = "Ending";
 
 	public static void Load(string scene) {
+		// One load per transition: a second click/tap in the same frame is ignored (ResetForScene clears it).
+		if (GameFlow.State == FlowState.Transition)
+			return;
 		GameFlow.Enter(FlowState.Transition);
 		UnityEngine.Time.timeScale = 1f;
 		SceneManager.LoadScene(scene);

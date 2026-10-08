@@ -123,7 +123,10 @@ public class GameManager : MonoBehaviour {
 		introBeatLevelCanvas.SetActive (true);
 		mainCanvas.SetActive (false);
 		GameFlow.Enter (FlowState.Intro);
-		yield return new WaitForSecondsRealtime (introBeatLevelTextDuration);
+		// Ends early when the card is tapped (UIButtonResumeGame moves GameFlow to Playing).
+		float end = Time.realtimeSinceStartup + introBeatLevelTextDuration;
+		while (GameFlow.State == FlowState.Intro && Time.realtimeSinceStartup < end)
+			yield return null;
 		if (GameFlow.State == FlowState.Intro)
 			GameFlow.Enter (FlowState.Playing);
 		introBeatLevelCanvas.SetActive (false);
@@ -166,7 +169,8 @@ public class GameManager : MonoBehaviour {
 	void ResolvePlaying () {
 		if (GameFlow.State != FlowState.Playing && GameFlow.State != FlowState.Dead)
 			return;
-		bool dead = playerHealth == null || !playerHealth.isAlive
+		// GameFlow.Die from a hazard counts too, even before Health reacts.
+		bool dead = GameFlow.State == FlowState.Dead || playerHealth == null || !playerHealth.isAlive
 			|| (playerHealth.healthPoints <= 0 && playerHealth.numberOfLives <= 1);
 		if (dead) {
 			GameFlow.Die ("MẤT KẾT NỐI");

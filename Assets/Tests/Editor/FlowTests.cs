@@ -103,7 +103,9 @@ public class FlowTests {
 
 	[Test]
 	public void SceneLoadResetsFlowAndTime() {
-		GameFlow.Pause();
+		GameFlow.ResetForScene();
+		Assert.IsTrue(GameFlow.Pause());
+		Assert.AreEqual(0f, Time.timeScale);
 		GameFlow.ResetForScene();
 		Assert.AreEqual(FlowState.Playing, GameFlow.State);
 		Assert.AreEqual(1f, Time.timeScale);
