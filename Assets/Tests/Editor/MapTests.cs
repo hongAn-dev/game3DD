@@ -113,4 +113,27 @@ public class MapTests {
 			}
 		}
 	}
+
+	[Test]
+	public void ExpandedLevelsHaveMoreConnectedGround() {
+		// Baseline walkable area (T0, spec §14.1): Level1 1021 m², Level2 2237 m²; targets ~1.5× and ~1.4×.
+		foreach (var target in new[] { new { level = "Level1", area = 1021f * 1.45f }, new { level = "Level2", area = 2237f * 1.35f } }) {
+			Open(LevelCatalog.Get(target.level));
+			int area = WalkableGrid.Reachable(Start()).Count;
+			Debug.Log("MapTests: " + target.level + " connected walkable " + area + " m2");
+			Assert.GreaterOrEqual(area, target.area, target.level);
+		}
+	}
+
+	[Test]
+	public void LandingPointsAreReachableFromStart() {
+		foreach (LevelConfig level in LevelCatalog.All) {
+			Open(level);
+			var reachable = WalkableGrid.Reachable(Start());
+			foreach (Transform point in Object.FindObjectOfType<EnergySpawnDirector>().landingPoints) {
+				var cell = new Vector2Int(Mathf.RoundToInt(point.position.x), Mathf.RoundToInt(point.position.z));
+				Assert.IsTrue(reachable.ContainsKey(cell), level.levelId + " " + point.name + " at " + point.position + " cannot be reached");
+			}
+		}
+	}
 }

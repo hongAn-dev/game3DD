@@ -83,7 +83,7 @@ public class EnergyTests {
 				RaycastHit hit;
 				Assert.IsTrue(Physics.Raycast(point.position + Vector3.up, Vector3.down, out hit, 4f, ~0, QueryTriggerInteraction.Ignore),
 					level.levelId + " " + point.name + " has no ground");
-				StringAssert.DoesNotContain("Water", hit.collider.name, level.levelId);
+				Assert.IsFalse(WalkableGrid.InHazard(hit.point + Vector3.up * 0.2f), level.levelId + " " + point.name + " is in a hazard");
 			}
 		}
 	}
@@ -99,8 +99,9 @@ public class EnergyTests {
 				Assert.IsTrue(Physics.Raycast(point.position + Vector3.up, Vector3.down, out hit, 4f, ~0, QueryTriggerInteraction.Ignore), point.name);
 				foreach (Vector3 side in new[] { Vector3.forward, Vector3.back, Vector3.left, Vector3.right }) {
 					RaycastHit near;
-					Assert.IsTrue(Physics.Raycast(point.position + side * 2.5f + Vector3.up * 50f, Vector3.down, out near, 200f, ~0, QueryTriggerInteraction.Ignore)
-						&& Mathf.Abs(near.point.y - hit.point.y) <= 1.5f, level.levelId + " " + point.name + " sits on a ledge/prop top");
+					Vector3 p = point.position + side * 2.5f;
+					Assert.IsTrue(WalkableGrid.Ground(p.x, p.z, out near) && Mathf.Abs(near.point.y - hit.point.y) <= 1.5f,
+						level.levelId + " " + point.name + " sits on a ledge/prop top");
 				}
 			}
 		}

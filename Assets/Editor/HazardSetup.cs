@@ -22,7 +22,7 @@ public static class HazardSetup {
 			bool lava = level.hazardDeathMessage.Contains("dung nham");
 			Material material = lava
 				? HazardMaterial("Lava", new Color(0.55f, 0.08f, 0.02f), new Color(1f, 0.55f, 0.1f), 1.2f, noise)
-				: HazardMaterial("Acid", new Color(0.36f, 0.52f, 0.06f), new Color(0.8f, 0.95f, 0.25f), 0.5f, noise);
+				: HazardMaterial("Acid", new Color(0.24f, 0.36f, 0.05f), new Color(0.62f, 0.82f, 0.18f), 0.35f, noise);
 			Transform sea = Sea();
 			sea.Find("HazardVisual").GetComponent<Renderer>().sharedMaterial = material;
 			foreach (HazardVolume hazard in sea.GetComponentsInChildren<HazardVolume>())
@@ -96,6 +96,7 @@ public static class HazardSetup {
 		material.SetColor("_FoamColor", foam);
 		material.SetFloat("_Glow", glow);
 		material.SetTexture("_NoiseTex", noise);
+		material.SetFloat("_Scale", 0.04f);
 		EditorUtility.SetDirty(material);
 		return material;
 	}

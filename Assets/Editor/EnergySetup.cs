@@ -6,8 +6,8 @@ using UnityEngine;
 
 /// <summary>
 /// Adds the EnergySpawnDirector to each level (on the GameManager object) and authors its landing points under
-/// "Energy Landing Points": ground points (authored core spots and a 3 m grid) that are flat, away from drops and free
-/// of obstacles, spread out and seeded near the robot start (spec §4.2). Authored cores are then removed: the
+/// "Energy Landing Points": points on a 3 m grid over ground reachable from the robot start (WalkableGrid) that are
+/// flat, away from drops and hazards and free of obstacles, spread out and seeded near the start (spec §4.2). Authored cores are then removed: the
 /// director creates every core. Re-running rebuilds the points. Run per map change.
 /// </summary>
 public static class EnergySetup {
@@ -36,9 +36,7 @@ public static class EnergySetup {
 	}
 
 	static bool Ground(Vector3 from, out RaycastHit hit) {
-		if (!Physics.Raycast(from, Vector3.down, out hit, 200f, ~0, QueryTriggerInteraction.Ignore))
-			return false;
-		return hit.collider.name.IndexOf("Water", System.StringComparison.OrdinalIgnoreCase) < 0 && hit.normal.y > 0.85f;
+		return WalkableGrid.Ground(from.x, from.z, out hit);
 	}
 
 	// Flat, at least 2.5 m from any drop on every side, and nothing solid within 0.7 m above the ground.
@@ -60,26 +58,15 @@ public static class EnergySetup {
 			Object.DestroyImmediate(old);
 		Transform root = new GameObject("Energy Landing Points").transform;
 
+		// Only ground the robot can roll to from the start, sampled every 3 m.
 		var candidates = new List<Vector3>();
-		foreach (Treasure t in Object.FindObjectsOfType<Treasure>()) {
+		foreach (Vector2Int cell in WalkableGrid.Reachable(WalkableGrid.PlayerStart()).Keys) {
+			if (cell.x % 3 != 0 || cell.y % 3 != 0)
+				continue;
 			RaycastHit hit;
-			Vector3 top = t.transform.position + Vector3.up * 2f;
+			Vector3 top = new Vector3(cell.x, 0f, cell.y);
 			if (Ground(top, out hit) && Valid(top, hit))
 				candidates.Add(hit.point + Vector3.up * CoreLift);
-		}
-
-		Collider[] solids = Object.FindObjectsOfType<Collider>().Where(c => !c.isTrigger).ToArray();
-		Bounds area = solids[0].bounds;
-		foreach (Collider c in solids)
-			if (c.name.IndexOf("Water", System.StringComparison.OrdinalIgnoreCase) < 0)
-				area.Encapsulate(c.bounds);
-		for (float x = area.min.x; x <= area.max.x; x += 3f) {
-			for (float z = area.min.z; z <= area.max.z; z += 3f) {
-				RaycastHit hit;
-				Vector3 top = new Vector3(x, area.max.y + 5f, z);
-				if (Ground(top, out hit) && Valid(top, hit))
-					candidates.Add(hit.point + Vector3.up * CoreLift);
-			}
 		}
 
 		// Seed with the candidate closest to 12 m from the robot start (so the first core is near), then add the

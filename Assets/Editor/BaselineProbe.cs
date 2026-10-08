@@ -30,6 +30,17 @@ public static class BaselineProbe {
 		Debug.Log("PROBE done");
 	}
 
+	/// <summary>T4 result: connected walkable area (WalkableGrid) and top-down images of the expanded levels.</summary>
+	public static void After() {
+		Directory.CreateDirectory(OutDir);
+		foreach (string level in new[] { "Level1", "Level2" }) {
+			EditorSceneManager.OpenScene("Assets/Scenes/" + level + ".unity", OpenSceneMode.Single);
+			Debug.Log("PROBE walkable after " + level + " = " + WalkableGrid.Reachable(WalkableGrid.PlayerStart()).Count + " m2 (connected to start)");
+			TopDown(level, OutDir + "/" + level + "_topdown_after.png");
+		}
+		Debug.Log("PROBE done");
+	}
+
 	static void EnemySize(string prefabName) {
 		GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/" + prefabName + ".prefab");
 		GameObject instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
