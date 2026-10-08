@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 54207012678726852}
   - component: {fileID: 6862473001446772657}
   - component: {fileID: 2414031052333854771}
-  - component: {fileID: 3986598376115620891}
+  - component: {fileID: 6439179647068520698}
   m_Layer: 0
   m_Name: Enemy - Monster
   m_TagString: Untagged
@@ -32,7 +32,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 8283650503624551220}
-  - {fileID: 4479003801130494067}
+  - {fileID: 1820153140552277601}
   m_Father: {fileID: 0}
   m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 180, z: 0}
@@ -103,12 +103,12 @@ MonoBehaviour:
   strike: 0.15
   recover: 0.8
   hitCause: "Robo b\u1ECB qu\xE1i v\u1EADt \u0111\xE1nh tr\xFAng"
-  telegraph: {fileID: 5581762025264368066}
+  telegraph: {fileID: 2247596192363838026}
   idleClip: Idle
   runClip: Run
   attackClip: Attack
   target: {fileID: 0}
---- !u!136 &3986598376115620891
+--- !u!136 &6439179647068520698
 CapsuleCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -122,7 +122,7 @@ CapsuleCollider:
   m_Height: 2.4
   m_Direction: 1
   m_Center: {x: 0, y: 1.2, z: 0}
---- !u!1 &918234321916725964
+--- !u!1 &2247596192363838026
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -130,9 +130,40 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 5244586827342919924}
-  - component: {fileID: 5259891154860227994}
-  - component: {fileID: 3346910999009177840}
+  - component: {fileID: 1820153140552277601}
+  m_Layer: 0
+  m_Name: Telegraph
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!4 &1820153140552277601
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2247596192363838026}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0.04, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_Children:
+  - {fileID: 1558193932103407844}
+  m_Father: {fileID: 4101076655730502}
+  m_RootOrder: 1
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &6074812086264409601
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1558193932103407844}
+  - component: {fileID: 166853207931520118}
+  - component: {fileID: 2853410844551925860}
   m_Layer: 0
   m_Name: Disc
   m_TagString: Untagged
@@ -140,35 +171,35 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &5244586827342919924
+--- !u!4 &1558193932103407844
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 918234321916725964}
+  m_GameObject: {fileID: 6074812086264409601}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 4.3617077, y: 0.005, z: 4.3617077}
   m_Children: []
-  m_Father: {fileID: 4479003801130494067}
+  m_Father: {fileID: 1820153140552277601}
   m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!33 &5259891154860227994
+--- !u!33 &166853207931520118
 MeshFilter:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 918234321916725964}
+  m_GameObject: {fileID: 6074812086264409601}
   m_Mesh: {fileID: 10206, guid: 0000000000000000e000000000000000, type: 0}
---- !u!23 &3346910999009177840
+--- !u!23 &2853410844551925860
 MeshRenderer:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 918234321916725964}
+  m_GameObject: {fileID: 6074812086264409601}
   m_Enabled: 1
   m_CastShadows: 0
   m_ReceiveShadows: 1
@@ -203,37 +234,6 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!1 &5581762025264368066
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 4479003801130494067}
-  m_Layer: 0
-  m_Name: Telegraph
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 0
---- !u!4 &4479003801130494067
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5581762025264368066}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.04, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_Children:
-  - {fileID: 5244586827342919924}
-  m_Father: {fileID: 4101076655730502}
-  m_RootOrder: 1
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &8466707118085082335
 PrefabInstance:
   m_ObjectHideFlags: 0

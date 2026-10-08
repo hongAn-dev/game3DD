@@ -9,6 +9,8 @@ using UnityEngine;
 /// an acid channel crossed by three land bridges, machinery to circle around), spec §5. Each patch is a generated
 /// flat-shaded low-poly mesh (zone ground colour, rock-coloured shore sloping under the acid) with a MeshCollider,
 /// tucked under the old terrain where they overlap. Re-running rebuilds the patch and its props.
+/// Order after a map change: Dress All Zones → Apply Hazard Setup → Apply Map Expansion → Apply Hazard Setup (kill plane)
+/// → Apply Energy Setup → Apply Enemy Setup.
 /// </summary>
 public static class MapExpansion {
 
@@ -32,6 +34,7 @@ public static class MapExpansion {
 	const float Cell = 2f;
 	const float Shore = 2.5f;      // width of the slope from land down under the acid
 	const float Depth = 1.5f;      // shore bottom under the sea surface
+	const float Blend = 5f;        // seam blend width on the attached side
 	const string MeshFolder = "Assets/ThirdParty/RoboLacLoi/Models/Expansion";
 
 	static readonly Patch[] Patches = {
@@ -51,10 +54,10 @@ public static class MapExpansion {
 		},
 		new Patch {
 			scene = "Level2", area = Rect.MinMaxRect(-55f, -27f, -23f, 27f), attachedWest = false, seed = 22,
-			// Channel x -31..-27 with bridges centred on z -15, 0, 15 (8 m gaps).
+			// Channel x -31..-27 with bridges centred on z -15, 0, 15 (10 m gaps, ~5 m dry after the shore slopes).
 			channels = new[] {
-				Rect.MinMaxRect(-31f, -30f, -27f, -19f), Rect.MinMaxRect(-31f, -11f, -27f, -4f),
-				Rect.MinMaxRect(-31f, 4f, -27f, 11f), Rect.MinMaxRect(-31f, 19f, -27f, 30f),
+				Rect.MinMaxRect(-31f, -30f, -27f, -20f), Rect.MinMaxRect(-31f, -10f, -27f, -5f),
+				Rect.MinMaxRect(-31f, 5f, -27f, 10f), Rect.MinMaxRect(-31f, 20f, -27f, 30f),
 			},
 			props = new[] {
 				new Prop("KenneyCityKitIndustrial/detail-tank-large", -42f, 0f, 5f),
@@ -89,7 +92,10 @@ public static class MapExpansion {
 			Object.DestroyImmediate(old.gameObject);
 		Physics.SyncTransforms();
 
-		float sea = Object.FindObjectsOfType<HazardVolume>().First(h => h.name == "DeathZone").GetComponent<Collider>().bounds.max.y;
+		HazardVolume zone = Object.FindObjectsOfType<HazardVolume>().FirstOrDefault(h => h.name == "DeathZone");
+		if (zone == null)
+			throw new System.Exception("MapExpansion: " + patch.scene + " has no Hazard Sea; run Tools > Robo Lac Loi > Apply Hazard Setup first");
+		float sea = zone.GetComponent<Collider>().bounds.max.y;
 		float baseHeight = BaseHeight(patch, sea);
 
 		Transform root = new GameObject("Expansion").transform;
@@ -103,9 +109,11 @@ public static class MapExpansion {
 		AssetDatabase.CreateAsset(mesh, path);
 		ground.AddComponent<MeshFilter>().sharedMesh = mesh;
 		string zones = "Assets/ThirdParty/RoboLacLoi/Materials/Zones/" + patch.scene;
-		ground.AddComponent<MeshRenderer>().sharedMaterials = new[] {
-			AssetDatabase.LoadAssetAtPath<Material>(zones + "_Ground.mat"), AssetDatabase.LoadAssetAtPath<Material>(zones + "_Rock.mat"),
-		};
+		Material groundMaterial = AssetDatabase.LoadAssetAtPath<Material>(zones + "_Ground.mat");
+		Material rockMaterial = AssetDatabase.LoadAssetAtPath<Material>(zones + "_Rock.mat");
+		if (groundMaterial == null || rockMaterial == null)
+			throw new System.Exception("MapExpansion: zone materials missing for " + patch.scene + "; run Tools > Robo Lac Loi > Dress All Zones first");
+		ground.AddComponent<MeshRenderer>().sharedMaterials = new[] { groundMaterial, rockMaterial };
 		ground.AddComponent<MeshCollider>().sharedMesh = mesh;
 		Physics.SyncTransforms();
 
@@ -124,7 +132,8 @@ public static class MapExpansion {
 					heights.Add(h);
 			}
 		heights.Sort();
-		return heights.Count > 0 ? heights[heights.Count / 2] : sea + 1.2f;
+		// At least 0.9 m above the acid so the terrain noise never dips under the surface.
+		return Mathf.Max(heights.Count > 0 ? heights[heights.Count / 2] : sea + 1.2f, sea + 0.9f);
 	}
 
 	static bool OldTerrain(float x, float z, out float height) {
@@ -157,6 +166,11 @@ public static class MapExpansion {
 	static float Height(Patch patch, float sea, float baseHeight, float x, float z) {
 		float land = baseHeight + (Mathf.PerlinNoise(x * 0.07f + patch.seed, z * 0.07f) - 0.5f) * 1.0f
 			+ (Mathf.PerlinNoise(x * 0.23f, z * 0.23f + patch.seed) - 0.5f) * 0.3f;
+		// Within Blend metres of the attached side, ease from the old terrain height at that side into the new land,
+		// so the robot rolls across the seam without a ledge.
+		float edge, attached = patch.attachedWest ? x - patch.area.xMin : patch.area.xMax - x;
+		if (attached < Blend && OldTerrain(patch.attachedWest ? patch.area.xMin : patch.area.xMax, z, out edge) && edge > sea)
+			land = Mathf.Lerp(edge, land, Mathf.SmoothStep(0f, 1f, attached / Blend));
 		float s = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(ToSea(patch, x, z) / Shore));
 		float h = Mathf.Lerp(sea - Depth, land, s);
 		// Tuck under the old terrain where it is higher, so the old surface stays on top at the seam.
