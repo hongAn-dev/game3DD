@@ -4,7 +4,8 @@ using UnityEngine;
 /// <summary>
 /// Places at most one Overdrive pickup at a time (spec §9), every intervalMin..intervalMax seconds of gameplay after
 /// the last one was taken, on an energy landing point (safe ground, away from the shore) at least minPlayerDistance
-/// from the robot and minCoreDistance from any core. Separate from the energy budget. Added from Level2 on.
+/// from the robot and minCoreDistance from any core, including cores still falling. EnergySpawnDirector in turn
+/// never drops a core on the live pickup. Separate from the energy budget. Added from Level2 on.
 /// </summary>
 public class OverdriveDirector : MonoBehaviour {
 
@@ -48,14 +49,14 @@ public class OverdriveDirector : MonoBehaviour {
 	}
 
 	bool PickPoint(out Vector3 point) {
-		Treasure[] cores = FindObjectsOfType<Treasure>();
+		List<Vector3> cores = energy.Occupied();   // alive and still falling (their landing point)
 		var options = new List<Vector3>();
 		foreach (Transform t in energy.landingPoints) {
 			if (t == null || (player != null && Vector3.Distance(t.position, player.position) < minPlayerDistance))
 				continue;
 			bool clear = true;
-			foreach (Treasure core in cores)
-				clear &= Vector3.Distance(core.transform.position, t.position) >= minCoreDistance;
+			foreach (Vector3 core in cores)
+				clear &= Vector3.Distance(core, t.position) >= minCoreDistance;
 			if (clear)
 				options.Add(t.position);
 		}

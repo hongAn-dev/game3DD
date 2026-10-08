@@ -36,6 +36,7 @@ public class EnergySpawnDirector : MonoBehaviour {
 	private float staleTimer;
 	private int lastScore = -1;
 	private Transform player;
+	private OverdriveDirector boost;
 
 	/// <summary>Cores on the map plus cores being dropped.</summary>
 	public int AliveCount {
@@ -103,6 +104,7 @@ public class EnergySpawnDirector : MonoBehaviour {
 
 	void Start() {
 		config = LevelCatalog.Get(SceneManager.GetActiveScene().name);
+		boost = GetComponent<OverdriveDirector>();
 		GameObject playerObject = GameObject.FindWithTag("Player");
 		player = playerObject != null ? playerObject.transform : null;
 		if (config == null) {
@@ -157,11 +159,14 @@ public class EnergySpawnDirector : MonoBehaviour {
 		return points;
 	}
 
-	List<Vector3> Occupied() {
+	/// <summary>Cores alive, cores being dropped, and the Overdrive pickup: no new core goes on any of them.</summary>
+	public List<Vector3> Occupied() {
 		var occupied = new List<Vector3>(pendingPoints);
 		foreach (Treasure t in alive)
 			if (t != null)
 				occupied.Add(t.transform.position);
+		if (boost != null && boost.Current != null)
+			occupied.Add(boost.Current.transform.position);
 		return occupied;
 	}
 

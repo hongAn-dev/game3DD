@@ -72,7 +72,7 @@ public static class OverdriveSetup {
 		GameObject go = new GameObject("Overdrive Indicator", typeof(RectTransform));
 		go.transform.SetParent(panel, false);
 		RectTransform rect = (RectTransform)go.transform;
-		rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(1f, 0f);
+		rect.anchorMin = rect.anchorMax = new Vector2(1f, 0f);
 		rect.pivot = new Vector2(1f, 1f);
 		rect.anchoredPosition = new Vector2(-4f, -34f);
 		rect.sizeDelta = new Vector2(110f, 44f);
