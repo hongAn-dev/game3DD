@@ -87,4 +87,30 @@ public class EnergyTests {
 			}
 		}
 	}
+
+	[Test]
+	public void LandingPointsAreValidatedAndSpread() {
+		foreach (LevelConfig level in LevelCatalog.All) {
+			EditorSceneManager.OpenScene("Assets/Scenes/" + level.levelId + ".unity", OpenSceneMode.Single);
+			EnergySpawnDirector director = Object.FindObjectOfType<EnergySpawnDirector>();
+			Assert.LessOrEqual(director.landingPoints.Length, level.energyCap * 2 + 6, level.levelId);
+			foreach (Transform point in director.landingPoints) {
+				RaycastHit hit;
+				Assert.IsTrue(Physics.Raycast(point.position + Vector3.up, Vector3.down, out hit, 4f, ~0, QueryTriggerInteraction.Ignore), point.name);
+				foreach (Vector3 side in new[] { Vector3.forward, Vector3.back, Vector3.left, Vector3.right }) {
+					RaycastHit near;
+					Assert.IsTrue(Physics.Raycast(point.position + side * 2.5f + Vector3.up * 50f, Vector3.down, out near, 200f, ~0, QueryTriggerInteraction.Ignore)
+						&& Mathf.Abs(near.point.y - hit.point.y) <= 1.5f, level.levelId + " " + point.name + " sits on a ledge/prop top");
+				}
+			}
+		}
+	}
+
+	[Test]
+	public void ScenesHoldNoAuthoredCores() {
+		foreach (LevelConfig level in LevelCatalog.All) {
+			EditorSceneManager.OpenScene("Assets/Scenes/" + level.levelId + ".unity", OpenSceneMode.Single);
+			Assert.AreEqual(0, Object.FindObjectsOfType<Treasure>(true).Length, level.levelId + ": cores come from the director only");
+		}
+	}
 }

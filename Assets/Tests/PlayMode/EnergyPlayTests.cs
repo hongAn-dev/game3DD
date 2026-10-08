@@ -99,4 +99,35 @@ public class EnergyPlayTests {
 		yield return new WaitForSeconds(2.5f);
 		Assert.GreaterOrEqual(Object.FindObjectsOfType<Treasure>().Length, 1);
 	}
+
+	static float NearestCoreToPlayer() {
+		Vector3 player = GameObject.FindWithTag("Player").transform.position;
+		return Object.FindObjectsOfType<Treasure>().Select(t => Vector3.Distance(t.transform.position, player)).DefaultIfEmpty(float.MaxValue).Min();
+	}
+
+	[UnityTest]
+	public IEnumerator FirstCoreIsCloseToTheStart() {
+		foreach (string level in new[] { "Level1", "Level2", "Level3", "Level4" }) {
+			yield return Load(level, GameSettings.gameDifficulties.Normal);
+			Assert.LessOrEqual(NearestCoreToPlayer(), 25f, level);
+		}
+	}
+
+	[UnityTest]
+	public IEnumerator StaleCoreIsReplacedNearThePlayer() {
+		yield return Load("Level4", GameSettings.gameDifficulties.Normal);
+		director.intervalOverride = 1000f;
+		director.staleDelay = 1f;
+		// Leave a single core, far away (stands in for one the robot cannot reach).
+		Vector3 player = GameObject.FindWithTag("Player").transform.position;
+		Treasure[] cores = Object.FindObjectsOfType<Treasure>().OrderBy(t => Vector3.Distance(t.transform.position, player)).ToArray();
+		for (int i = 0; i < cores.Length - 1; i++)
+			Object.Destroy(cores[i].gameObject);
+		Treasure far = cores[cores.Length - 1];
+		GameManager.gm.Collect(GameManager.gm.BeatLevelScore - 1);
+		yield return new WaitForSeconds(3f);
+		Assert.IsTrue(far == null, "the stale core is removed");
+		Assert.LessOrEqual(NearestCoreToPlayer(), 25f);
+		Assert.AreEqual(1, Object.FindObjectsOfType<Treasure>().Length);
+	}
 }

@@ -6,8 +6,9 @@ using UnityEngine;
 
 /// <summary>
 /// Adds the EnergySpawnDirector to each level (on the GameManager object) and authors its landing points under
-/// "Energy Landing Points": every authored core position plus sampled ground points that are flat, away from the
-/// water edge and free of obstacles, spread out (spec §4.2). Re-running rebuilds the points. Run per map change.
+/// "Energy Landing Points": ground points (authored core spots and a 3 m grid) that are flat, away from drops and free
+/// of obstacles, spread out and seeded near the robot start (spec §4.2). Authored cores are then removed: the
+/// director creates every core. Re-running rebuilds the points. Run per map change.
 /// </summary>
 public static class EnergySetup {
 
@@ -25,7 +26,8 @@ public static class EnergySetup {
 				director = manager.gameObject.AddComponent<EnergySpawnDirector>();
 			director.corePrefab = core;
 			director.markerMaterial = marker;
-			director.landingPoints = LandingPoints(Mathf.Max(level.energyCap * 2 + 4, 14)).ToArray();
+			director.landingPoints = LandingPoints(level.energyCap * 2 + 4).ToArray();
+			RemoveAuthoredCores();
 			EditorSceneManager.MarkSceneDirty(scene);
 			EditorSceneManager.SaveScene(scene);
 			Debug.Log("EnergySetup: " + level.levelId + " landing points " + director.landingPoints.Length);
@@ -36,8 +38,7 @@ public static class EnergySetup {
 	static bool Ground(Vector3 from, out RaycastHit hit) {
 		if (!Physics.Raycast(from, Vector3.down, out hit, 200f, ~0, QueryTriggerInteraction.Ignore))
 			return false;
-		return hit.collider.name.IndexOf("Water", System.StringComparison.OrdinalIgnoreCase) < 0 && hit.normal.y > 0.85f
-			&& hit.collider.GetComponentInParent<Treasure>() == null;
+		return hit.collider.name.IndexOf("Water", System.StringComparison.OrdinalIgnoreCase) < 0 && hit.normal.y > 0.85f;
 	}
 
 	// Flat, at least 2.5 m from any drop on every side, and nothing solid within 0.7 m above the ground.
@@ -62,10 +63,10 @@ public static class EnergySetup {
 		var candidates = new List<Vector3>();
 		foreach (Treasure t in Object.FindObjectsOfType<Treasure>()) {
 			RaycastHit hit;
-			if (Ground(t.transform.position + Vector3.up * 2f, out hit))
+			Vector3 top = t.transform.position + Vector3.up * 2f;
+			if (Ground(top, out hit) && Valid(top, hit))
 				candidates.Add(hit.point + Vector3.up * CoreLift);
 		}
-		int authored = candidates.Count;
 
 		Collider[] solids = Object.FindObjectsOfType<Collider>().Where(c => !c.isTrigger).ToArray();
 		Bounds area = solids[0].bounds;
@@ -81,9 +82,17 @@ public static class EnergySetup {
 			}
 		}
 
-		// Authored core spots first, then the sampled points farthest from everything chosen so far.
-		var chosen = candidates.Take(authored).ToList();
-		var rest = candidates.Skip(authored).ToList();
+		// Seed with the candidate closest to 12 m from the robot start (so the first core is near), then add the
+		// candidates farthest from everything chosen so far.
+		var chosen = new List<Vector3>();
+		var rest = candidates.Distinct().ToList();
+		GameObject player = GameObject.FindWithTag("Player");
+		if (player != null && rest.Count > 0) {
+			Vector3 start = player.transform.position;
+			Vector3 seed = rest.OrderBy(c => Mathf.Abs(Vector3.Distance(c, start) - 12f)).First();
+			chosen.Add(seed);
+			rest.Remove(seed);
+		}
 		while (chosen.Count < count && rest.Count > 0) {
 			int best = 0;
 			float bestDistance = -1f;
@@ -106,5 +115,22 @@ public static class EnergySetup {
 			points.Add(point);
 		}
 		return points;
+	}
+
+	// Cores inside prefab instances (Sil/Vin Coins groups) need the instance unpacked before they can be removed;
+	// groups left empty go too.
+	static void RemoveAuthoredCores() {
+		foreach (Treasure t in Object.FindObjectsOfType<Treasure>()) {
+			GameObject root = PrefabUtility.GetOutermostPrefabInstanceRoot(t.gameObject);
+			if (root != null && root != t.gameObject)
+				PrefabUtility.UnpackPrefabInstance(root, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
+			Transform parent = t.transform.parent;
+			Object.DestroyImmediate(t.gameObject);
+			while (parent != null && parent.childCount == 0 && parent.GetComponents<Component>().Length == 1) {
+				Transform up = parent.parent;
+				Object.DestroyImmediate(parent.gameObject);
+				parent = up;
+			}
+		}
 	}
 }
