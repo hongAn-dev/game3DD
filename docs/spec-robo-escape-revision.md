@@ -334,10 +334,10 @@ Baseline cần Unity **2020.3.19f1**. Mở project bằng Unity Hub sau khi cài
 
 Teammate bổ sung quy trình Android đã chạy thành công, không yêu cầu người nhận tra README:
 
-- Unity Android Build Support, SDK/NDK/JDK và đường dẫn/cách cấu hình: Chưa xác nhận.
-- Minimum/target API, scripting backend, architecture, graphics API: Chưa xác nhận.
-- Cách build bằng Editor và tên entry point nếu bổ sung build script: Chưa triển khai.
-- Package ID/version, vị trí APK development và APK chơi thử: Chưa ghi.
+- Unity Android Build Support, SDK/NDK/JDK và đường dẫn/cách cấu hình: cài bằng `unityhub --headless install-modules -v 2020.3.19f1 -m android android-sdk-ndk-tools android-open-jdk --cm` (Hub đã đăng ký editor 2020.3.19f1). Kết quả: OpenJDK 1.8 (adoptopenjdk), SDK platforms android-29/30 + build-tools 30.0.2 + platform-tools, NDK r19 (19.0.5232133) trong `<Unity>/Editor/Data/PlaybackEngines/AndroidPlayer/{OpenJDK,SDK,NDK}`; Unity tự nhận, không cần EditorPrefs.
+- Minimum/target API, scripting backend, architecture, graphics API: min API 28 (Android 9), target Auto, IL2CPP, ARM64, graphics API mặc định (Auto). Màn hình ngang (landscape left/right).
+- Cách build bằng Editor và tên entry point nếu bổ sung build script: Tools > Robo Lac Loi > Build Android (development/test), hoặc batch `unity -batchmode -quit -projectPath . -buildTarget Android -executeMethod BuildScript.BuildAndroidDevelopment` (hoặc `BuildAndroidTest`). KHÔNG dùng `-nographics`. Ký APK: đặt biến môi trường `ANDROID_KEYSTORE`, `ANDROID_KEYSTORE_PASS`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASS`; không đặt thì dùng `~/.android/debug.keystore` (phải là JKS đọc được bởi JDK 8). BuildScript xoá thiết lập ký sau khi build để không lưu đường dẫn/mật khẩu vào ProjectSettings. Sau khi build Android, chuyển lại desktop bằng `-buildTarget Linux64 -executeMethod BuildScript.BuildLinux`.
+- Package ID/version, vị trí APK development và APK chơi thử: com.hongandev.game3dd, bundleVersion hiện tại; `Builds/Android/RoboLacLoi-dev.apk` (development, ~51 MB, build baseline 08/10/2026 OK) và `Builds/Android/RoboLacLoi.apk` (chơi thử). Thư mục `Builds/` không commit.
 - Cách chạy EditMode/PlayMode tests và nơi lấy report: Chưa ghi.
 - Không ghi keystore password, token hoặc thông tin bí mật vào tài liệu/repository.
 
