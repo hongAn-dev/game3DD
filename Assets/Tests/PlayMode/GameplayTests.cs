@@ -119,10 +119,10 @@ public class GameplayTests {
 
 	[Test]
 	public void ZoneTitlesAreVietnamese() {
-		Assert.AreEqual("Bãi phế liệu", LevelCatalog.Get("Level1").displayName);
-		Assert.AreEqual("Khu công nghiệp bỏ hoang", LevelCatalog.Get("Level2").displayName);
-		Assert.AreEqual("Vùng hoang hóa", LevelCatalog.Get("Level3").displayName);
-		Assert.AreEqual("Trạm căn cứ", LevelCatalog.Get("Level4").displayName);
+		Assert.AreEqual("Bãi đáp hỏng", LevelCatalog.Get("Level1").displayName);
+		Assert.AreEqual("Trạm khai thác bỏ hoang", LevelCatalog.Get("Level2").displayName);
+		Assert.AreEqual("Vùng địa nhiệt", LevelCatalog.Get("Level3").displayName);
+		Assert.AreEqual("Bãi phóng cũ", LevelCatalog.Get("Level4").displayName);
 		Assert.IsNull(LevelCatalog.Get("MainMenu"));
 	}
 }

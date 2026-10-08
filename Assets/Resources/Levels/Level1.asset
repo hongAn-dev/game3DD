@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   levelId: Level1
   order: 1
-  displayName: "B\xE3i ph\u1EBF li\u1EC7u"
+  displayName: "B\xE3i \u0111\xE1p h\u1ECFng"
   nextScene: Level2
   energyTarget: 6
   energyAtStart: 3

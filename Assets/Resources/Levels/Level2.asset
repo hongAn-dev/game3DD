@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   levelId: Level2
   order: 2
-  displayName: "Khu c\xF4ng nghi\u1EC7p b\u1ECF hoang"
+  displayName: "Tr\u1EA1m khai th\xE1c b\u1ECF hoang"
   nextScene: Level3
   energyTarget: 10
   energyAtStart: 4

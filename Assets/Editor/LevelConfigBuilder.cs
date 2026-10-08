@@ -13,11 +13,11 @@ public static class LevelConfigBuilder {
 		if (!AssetDatabase.IsValidFolder(Folder))
 			AssetDatabase.CreateFolder("Assets/Resources", "Levels");
 
-		// Names stay the current zone names until Plan 4 re-themes the maps.
-		Write("Level1", 1, "Bãi phế liệu", "Level2", 6, 3, 5, 5f, 7f, new[] { 2, 3, 4 }, new[] { 1, 1, 1 }, "Robo rơi xuống biển axit");
-		Write("Level2", 2, "Khu công nghiệp bỏ hoang", "Level3", 10, 4, 6, 5f, 7f, new[] { 4, 5, 6 }, new[] { 1, 1, 1 }, "Robo rơi xuống biển axit");
-		Write("Level3", 3, "Vùng hoang hóa", "Level4", 14, 5, 7, 4f, 6f, new[] { 6, 7, 8 }, new[] { 2, 2, 2 }, "Robo chạm dung nham");
-		Write("Level4", 4, "Trạm căn cứ", SceneRouter.EndingScene, 18, 6, 8, 4f, 6f, new[] { 8, 9, 10 }, new[] { 2, 2, 2 }, "Robo rơi xuống biển axit");
+		// Zone names and hazards follow spec §5.
+		Write("Level1", 1, "Bãi đáp hỏng", "Level2", 6, 3, 5, 5f, 7f, new[] { 2, 3, 4 }, new[] { 1, 1, 1 }, "Robo rơi xuống biển axit");
+		Write("Level2", 2, "Trạm khai thác bỏ hoang", "Level3", 10, 4, 6, 5f, 7f, new[] { 4, 5, 6 }, new[] { 1, 1, 1 }, "Robo rơi xuống biển axit");
+		Write("Level3", 3, "Vùng địa nhiệt", "Level4", 14, 5, 7, 4f, 6f, new[] { 6, 7, 8 }, new[] { 2, 2, 2 }, "Robo chạm dung nham");
+		Write("Level4", 4, "Bãi phóng cũ", SceneRouter.EndingScene, 18, 6, 8, 4f, 6f, new[] { 8, 9, 10 }, new[] { 2, 2, 2 }, "Robo rơi xuống biển axit");
 		AssetDatabase.SaveAssets();
 		Debug.Log("LevelConfigBuilder: done");
 	}
