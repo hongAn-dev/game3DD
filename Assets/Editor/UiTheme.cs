@@ -16,6 +16,7 @@ public static class UiTheme {
 	static readonly Color Panel = new Color32(14, 19, 26, 230);
 	static readonly Color PanelSelected = new Color32(22, 92, 98, 240);
 	static readonly Color Cyan = new Color32(46, 230, 230, 255);
+	static readonly Color OverdriveYellow = new Color32(255, 214, 40, 255);
 	static readonly Color TextColor = new Color32(240, 246, 250, 255);
 	// Light slate: readable over the bright menu terrain with a drop shadow.
 	static readonly Color Muted = new Color32(203, 213, 225, 255);
@@ -89,7 +90,7 @@ public static class UiTheme {
 			var scene = EditorSceneManager.OpenScene(buildScene.path, OpenSceneMode.Single);
 			bool changed = false;
 			foreach (GameObject root in scene.GetRootGameObjects()) {
-				changed |= Style(root, theme, Zones.Title(scene.name));
+				changed |= Style(root, theme, LevelCatalog.Get(scene.name) != null ? LevelCatalog.Get(scene.name).displayName : "");
 				// Values set from script on prefab instances only stick once recorded as overrides.
 				foreach (Component component in root.GetComponentsInChildren<Component>(true))
 					if (component != null && PrefabUtility.IsPartOfPrefabInstance(component))
@@ -243,6 +244,8 @@ public static class UiTheme {
 			color = DifficultyColors[difficulty];
 		else if (text.name == "Zone Text")
 			color = Cyan;
+		else if (text.transform.parent != null && text.transform.parent.parent != null && text.transform.parent.parent.name == "Overdrive Indicator")
+			color = OverdriveYellow;
 		else if (text.name == "Subtitle")
 			color = Muted;
 		else if (text.name == "Lost Title")
@@ -442,6 +445,9 @@ public static class UiTheme {
 			zoneT = zone.transform;
 		}
 		if (zoneT != null) {
+			// Re-runs keep the label in step with LevelConfig (zone names changed in T4).
+			if (zoneTitle.Length > 0)
+				zoneT.GetComponent<Text>().text = zoneTitle.ToUpperInvariant();
 			RectTransform zoneRect = (RectTransform)zoneT;
 			zoneRect.anchorMin = zoneRect.anchorMax = new Vector2(1f, 0f);
 			zoneRect.pivot = new Vector2(1f, 1f);
@@ -462,7 +468,7 @@ public static class UiTheme {
 		intro.supportRichText = true;
 		// The text is set at runtime; size the font for the longest zone name and goal.
 		string runtime = intro.text;
-		intro.text = Zones.Title("Level2").ToUpperInvariant() + "\nTHU 100 LÕI NĂNG LƯỢNG";
+		intro.text = LevelCatalog.All.OrderByDescending(l => l.displayName.Length).First().displayName.ToUpperInvariant() + "\nTHU 100 LÕI NĂNG LƯỢNG";
 		intro.fontSize = 40;
 		ShrinkToFit(intro);
 		intro.text = runtime;

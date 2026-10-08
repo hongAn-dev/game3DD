@@ -29,8 +29,9 @@ public static class ZoneDresser {
 	public static readonly Zone[] Zones = {
 		new Zone {
 			scene = "Level1",
-			ground = C(168, 132, 84), accent = C(122, 74, 44), rock = C(110, 104, 96),
-			skyTint = C(214, 178, 120), ground_sky = C(120, 98, 70), fog = C(204, 176, 128), sun = C(255, 226, 180),
+			// Crashed landing site on an alien rock island: mauve rock, rust, yellow-green acid haze.
+			ground = C(150, 124, 138), accent = C(118, 72, 56), rock = C(96, 90, 104),
+			skyTint = C(196, 196, 140), ground_sky = C(96, 86, 92), fog = C(186, 190, 140), sun = C(255, 236, 196),
 			fogDensity = 0.012f, sunIntensity = 0.9f,
 			ambient = "Assets/ThirdParty/KenneyAudio/computerNoise_000.ogg",
 			props = new Dictionary<string, string> {
@@ -45,8 +46,9 @@ public static class ZoneDresser {
 		},
 		new Zone {
 			scene = "Level2",
+			// Abandoned mining station: industrial grey, rust, the same acid haze as Level1.
 			ground = C(112, 116, 120), accent = C(112, 66, 52), rock = C(84, 88, 94),
-			skyTint = C(150, 165, 180), ground_sky = C(70, 74, 80), fog = C(150, 158, 166), sun = C(220, 230, 240),
+			skyTint = C(160, 170, 150), ground_sky = C(70, 74, 80), fog = C(156, 164, 138), sun = C(226, 232, 230),
 			fogDensity = 0.014f, sunIntensity = 0.95f,
 			ambient = "Assets/ThirdParty/KenneyAudio/spaceEngineLow_000.ogg",
 			props = new Dictionary<string, string> {
@@ -61,18 +63,21 @@ public static class ZoneDresser {
 		new Zone {
 			scene = "Level3",
 			extraTerrain = new[] { "Mounting_1", "Mounting_2", "Mounting_3" },
-			ground = C(86, 112, 58), accent = C(112, 100, 84), rock = C(120, 122, 116),
-			skyTint = C(160, 190, 170), ground_sky = C(80, 96, 70), fog = C(170, 190, 168), sun = C(250, 244, 220),
-			fogDensity = 0.010f, sunIntensity = 1.05f,
+			// Geothermal field: basalt, scorched red-brown cliffs, orange heat haze over the lava.
+			ground = C(66, 60, 58), accent = C(96, 62, 46), rock = C(84, 78, 76),
+			skyTint = C(214, 130, 84), ground_sky = C(64, 42, 32), fog = C(160, 98, 66), sun = C(255, 206, 160),
+			fogDensity = 0.011f, sunIntensity = 1.0f,
 			ambient = null,
 			props = new Dictionary<string, string> {
 				{ "Stone_1", "KenneySurvivalKit/metal-panel-screws-half" },
 				{ "Rock_4", "KenneySurvivalKit/structure-metal-wall" },
 				{ "Rock_6", "KenneySpaceStationKit/skip-rocks" },
+				{ "Tree_3", "KenneyNatureKit/stone_tallA" },   // basalt spires instead of green trees
 			},
 		},
 		new Zone {
 			scene = "Level4",
+			// Old launch pad: steel blue, the spaceship's visual language (Ending).
 			ground = C(78, 94, 106), accent = C(60, 70, 82), rock = C(108, 118, 126),
 			skyTint = C(110, 140, 170), ground_sky = C(50, 60, 72), fog = C(120, 140, 160), sun = C(200, 220, 255),
 			fogDensity = 0.012f, sunIntensity = 0.9f,

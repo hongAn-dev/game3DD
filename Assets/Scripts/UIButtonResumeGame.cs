@@ -12,6 +12,10 @@ public class UIButtonResumeGame : MonoBehaviour {
 	public void resumeGame()
 	{
 		// Closes the game.
-		Time.timeScale = 1;
+		// Through GameFlow so state and timeScale stay in sync (tapping the intro card starts play).
+		if (GameFlow.State == FlowState.Intro)
+			GameFlow.Enter(FlowState.Playing);
+		else
+			GameFlow.Resume();
 	}
 }

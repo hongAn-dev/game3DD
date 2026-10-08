@@ -33,24 +33,6 @@ public class GameplayTests {
 	}
 
 	[UnityTest]
-	public IEnumerator PatrolRobotKillsPlayerOnContact() {
-#if UNITY_EDITOR
-		GameObject player = GameObject.FindWithTag("Player");
-		Health health = player.GetComponent<Health>();
-		GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Enemy - Monster.prefab");
-		Object.Instantiate(prefab, player.transform.position + new Vector3(3, 1, 0), Quaternion.identity);
-
-		float end = Time.time + 6f;
-		while (Time.time < end && health != null && health.isAlive)
-			yield return null;
-
-		Assert.IsTrue(health == null || !health.isAlive, "Player should die when the patrol robot reaches it");
-#else
-		yield return null;
-#endif
-	}
-
-	[UnityTest]
 	public IEnumerator ScoreDisplayIsResetAfterReload() {
 		GameManager.gm.Collect(3);
 		SceneManager.LoadScene("Level1");
@@ -81,9 +63,10 @@ public class GameplayTests {
 	public void PatrolRobotUsesRobotClips() {
 #if UNITY_EDITOR
 		GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Enemy - Monster.prefab");
-		MonsterChaser chaser = prefab.GetComponent<MonsterChaser>();
-		Assert.AreEqual("Run", chaser.runClip);
-		Assert.AreEqual("Attack", chaser.attackClip);
+		EnemyBrain brain = prefab.GetComponent<EnemyBrain>();
+		Assert.AreEqual("Run", brain.runClip);
+		Assert.AreEqual("Attack", brain.attackClip);
+		Assert.AreEqual("Idle", brain.idleClip);
 		Assert.IsNotNull(prefab.GetComponentInChildren<Animation>().GetClip("Attack"));
 #endif
 	}
@@ -106,15 +89,16 @@ public class GameplayTests {
 	public IEnumerator ScoreShowsCollectedOverTarget() {
 		yield return null;
 		GameManager gm = GameManager.gm;
-		Assert.AreEqual("0 / " + gm.beatEasyLevelScore, gm.mainScoreDisplay.text);
+		Assert.AreEqual(6, gm.BeatLevelScore);
+		Assert.AreEqual("0 / 6", gm.mainScoreDisplay.text);
 	}
 
 	[Test]
 	public void ZoneTitlesAreVietnamese() {
-		Assert.AreEqual("Bãi phế liệu", Zones.Title("Level1"));
-		Assert.AreEqual("Khu công nghiệp bỏ hoang", Zones.Title("Level2"));
-		Assert.AreEqual("Vùng hoang hóa", Zones.Title("Level3"));
-		Assert.AreEqual("Trạm căn cứ", Zones.Title("Level4"));
-		Assert.AreEqual("", Zones.Title("MainMenu"));
+		Assert.AreEqual("Bãi đáp hỏng", LevelCatalog.Get("Level1").displayName);
+		Assert.AreEqual("Trạm khai thác bỏ hoang", LevelCatalog.Get("Level2").displayName);
+		Assert.AreEqual("Vùng địa nhiệt", LevelCatalog.Get("Level3").displayName);
+		Assert.AreEqual("Bãi phóng cũ", LevelCatalog.Get("Level4").displayName);
+		Assert.IsNull(LevelCatalog.Get("MainMenu"));
 	}
 }

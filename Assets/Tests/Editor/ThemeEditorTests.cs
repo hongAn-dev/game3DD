@@ -181,7 +181,7 @@ public class ThemeEditorTests {
 		GameObject prefab = PrefabUtility.LoadPrefabContents("Assets/Prefabs/IntroBeatLevelCanvas.prefab");
 		try {
 			Text intro = prefab.GetComponentsInChildren<Text>(true).First(t => t.name == "Intro Level Text");
-			intro.text = Zones.Title("Level2").ToUpperInvariant() + "\nTHU 100 LÕI NĂNG LƯỢNG";
+			intro.text = LevelCatalog.All.OrderByDescending(l => l.displayName.Length).First().displayName.ToUpperInvariant() + "\nTHU 100 LÕI NĂNG LƯỢNG";
 			AssertFits(intro);
 		} finally {
 			PrefabUtility.UnloadPrefabContents(prefab);

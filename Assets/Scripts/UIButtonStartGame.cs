@@ -11,27 +11,21 @@ public class UIButtonStartGame : MonoBehaviour {
 	/// Load a level (scene) by name..
 	/// </summary>
 	public void loadLevelEasy() {
-		GameSettings.difficulty = GameSettings.gameDifficulties.Easy;
-		GameSettings.showIntroLevelMessage = true;
-		SceneManager.LoadScene ("Level1");
+		SceneRouter.StartCampaign(GameSettings.gameDifficulties.Easy);
 	}
 
 	/// <summary>
 	/// Load a level (scene) by name..
 	/// </summary>
 	public void loadLevelNormal() {
-		GameSettings.difficulty = GameSettings.gameDifficulties.Normal;
-		GameSettings.showIntroLevelMessage = true;
-		SceneManager.LoadScene ("Level1");
+		SceneRouter.StartCampaign(GameSettings.gameDifficulties.Normal);
 	}
 
 	/// <summary>
 	/// Load a level (scene) by name..
 	/// </summary>
 	public void loadLevelHard() {
-		GameSettings.difficulty = GameSettings.gameDifficulties.Hard;
-		GameSettings.showIntroLevelMessage = true;
-		SceneManager.LoadScene ("Level1");
+		SceneRouter.StartCampaign(GameSettings.gameDifficulties.Hard);
 	}
 
 }
