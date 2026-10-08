@@ -79,7 +79,10 @@ public class FlowPlayTests {
 			yield return null;
 		Assert.AreEqual(SceneRouter.EndingScene, SceneManager.GetActiveScene().name);
 		Assert.AreEqual(100, CampaignProgress.FuelPercent);
-		Assert.IsTrue(Object.FindObjectOfType<EndingController>().completionPanel.activeSelf);
+		EndingController ending = Object.FindObjectOfType<EndingController>();
+		Assert.IsFalse(ending.completionPanel.activeSelf, "the cinematic plays first");
+		ending.Skip();
+		Assert.IsTrue(ending.completionPanel.activeSelf);
 	}
 
 	[UnityTest]
@@ -100,14 +103,14 @@ public class FlowPlayTests {
 		SceneManager.LoadScene(SceneRouter.EndingScene);
 		yield return null;
 		yield return null;
-		var labels = new System.Collections.Generic.List<string>();
-		foreach (UnityEngine.UI.Button b in Object.FindObjectsOfType<UnityEngine.UI.Button>())
-			labels.Add(b.GetComponentInChildren<UnityEngine.UI.Text>().text);
-		CollectionAssert.AreEquivalent(new[] { "CHƠI LẠI TỪ ĐẦU", "VỀ MENU" }, labels);
 		EndingController ending = Object.FindObjectOfType<EndingController>();
 		ending.Complete();
 		ending.Complete();
 		Assert.IsTrue(ending.completionPanel.activeSelf);
+		var labels = new System.Collections.Generic.List<string>();
+		foreach (UnityEngine.UI.Button b in Object.FindObjectsOfType<UnityEngine.UI.Button>())
+			labels.Add(b.GetComponentInChildren<UnityEngine.UI.Text>().text);
+		CollectionAssert.AreEquivalent(new[] { "CHƠI LẠI TỪ ĐẦU", "VỀ MENU" }, labels);
 	}
 
 	static IEnumerator WaitForState(FlowState state, float seconds) {
