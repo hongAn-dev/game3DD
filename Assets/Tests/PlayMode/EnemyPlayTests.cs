@@ -101,20 +101,32 @@ public class EnemyPlayTests {
 		Assert.AreEqual(0, Hits);
 	}
 
+	// The boss starts inside its windup range (1.7 m < 0.85 × 2.18 m) and facing the robot, with a thin wall between
+	// them: only the line-of-sight check can stop the attack. The wall is long, so walking around takes longer.
 	[UnityTest]
 	public IEnumerator NoStrikeThroughWall() {
-		// A long wall: walking around it takes longer than the test, so any hit would be through the wall.
-		yield return Arena(new[] { new Vector3(0f, 1.5f, 1.2f), new Vector3(50f, 3f, 0.3f) });
-		EnemyBrain boss = Spawn("Enemy - Monster", new Vector3(0f, 0f, 2.6f));
+		yield return Arena(new[] { new Vector3(0f, 1.5f, 0.55f), new Vector3(50f, 3f, 0.1f) });
+		EnemyBrain boss = Spawn("Enemy - Monster", new Vector3(0f, 0f, 1.7f));
+		yield return null;   // the agent snaps onto the NavMesh edge
+		Assert.Less(Vector3.Distance(Flat(boss.transform.position), Flat(player.transform.position)), boss.attackRange * 0.85f, "starts inside the windup range");
 		float end = Time.time + 2f;
-		bool woundUp = false;
 		while (Time.time < end) {
-			woundUp |= boss.State == EnemyState.Windup && Vector3.Distance(Flat(boss.transform.position), Flat(player.transform.position)) < 2.6f
-				&& boss.transform.position.z > 1.2f;
+			Assert.AreNotEqual(EnemyState.Windup, boss.State, "no windup while the wall is in between");
 			yield return null;
 		}
-		Assert.IsFalse(woundUp, "no windup while the wall is in between");
 		Assert.AreEqual(0, Hits);
+	}
+
+	[UnityTest]
+	public IEnumerator DeathDisablesEnemies() {
+		yield return Arena();
+		EnemyBrain boss = Spawn("Enemy - Monster", new Vector3(0f, 0f, 1.6f));
+		yield return WaitFor(boss, EnemyState.Windup, 2f);
+		Object.Destroy(player);   // what Health does when the robot's last life is gone
+		yield return null;
+		yield return null;
+		Assert.AreEqual(EnemyState.Disabled, boss.State);
+		Assert.IsFalse(boss.telegraph.activeSelf, "no attack warning behind the game over screen");
 	}
 
 	[UnityTest]

@@ -101,6 +101,9 @@ public class EnemyTests {
 				foreach (Transform point in Object.FindObjectOfType<EnemyDirector>().spawnPoints) {
 					Assert.IsTrue(NavMesh.SamplePosition(point.position, out hit, 1f, NavMesh.AllAreas), level.levelId + " " + point.name);
 					Assert.GreaterOrEqual(Vector3.Distance(point.position, WalkableGrid.PlayerStart()), 10f, level.levelId + " " + point.name);
+					NavMeshHit startHit;
+					NavMesh.SamplePosition(ground.point, out startHit, 2.5f, NavMesh.AllAreas);
+					Assert.IsTrue(EnemySetup.AgentsReach(startHit.position, point.position), level.levelId + " " + point.name + " is on a NavMesh island");
 				}
 				Assert.GreaterOrEqual(Object.FindObjectOfType<EnemyDirector>().spawnPoints.Length, 4, level.levelId);
 			} finally {

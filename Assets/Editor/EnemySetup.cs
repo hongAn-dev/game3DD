@@ -85,7 +85,7 @@ public static class EnemySetup {
 		capsule.direction = 1;
 		capsule.radius = radius;
 		capsule.height = Mathf.Max(height, radius * 2f);
-		capsule.center = new Vector3(0f, centreY, 0f);
+		capsule.center = new Vector3(0f, Mathf.Max(centreY, capsule.height / 2f), 0f);   // never below the feet
 		NavMeshAgent agent = root.GetComponent<NavMeshAgent>();
 		if (agent == null)
 			agent = root.AddComponent<NavMeshAgent>();
@@ -234,6 +234,12 @@ public static class EnemySetup {
 			Object.DestroyImmediate(old);
 	}
 
+	/// <summary>An enemy spawned at point can walk all the way to the robot's start (no NavMesh islands).</summary>
+	public static bool AgentsReach(Vector3 from, Vector3 to) {
+		var path = new NavMeshPath();
+		return NavMesh.CalculatePath(from, to, NavMesh.AllAreas, path) && path.status == NavMeshPathStatus.PathComplete;
+	}
+
 	public static Bounds LevelArea() {
 		Collider[] solid = Object.FindObjectsOfType<Collider>().Where(c => !c.isTrigger && c.attachedRigidbody == null).ToArray();
 		Bounds area = solid[0].bounds;
@@ -263,6 +269,11 @@ public static class EnemySetup {
 		NavMeshDataInstance instance = NavMesh.AddNavMeshData(data);
 		var candidates = new List<Vector3>();
 		Vector3 start = WalkableGrid.PlayerStart();
+		RaycastHit startGround;
+		NavMeshHit startHit;
+		WalkableGrid.Ground(start.x, start.z, out startGround);
+		NavMesh.SamplePosition(startGround.point, out startHit, 3f, NavMesh.AllAreas);
+		Vector3 startOnMesh = startHit.position;
 		try {
 			foreach (Vector2Int cell in WalkableGrid.Reachable(start).Keys) {
 				if (cell.x % 4 != 0 || cell.y % 4 != 0)
@@ -272,7 +283,8 @@ public static class EnemySetup {
 				RaycastHit ground;
 				if (!WalkableGrid.Ground(p.x, p.z, out ground))
 					continue;
-				if (NavMesh.SamplePosition(ground.point, out hit, 0.6f, NavMesh.AllAreas) && Vector3.Distance(hit.position, start) >= 12f)
+				if (NavMesh.SamplePosition(ground.point, out hit, 0.6f, NavMesh.AllAreas) && Vector3.Distance(hit.position, start) >= 12f
+					&& AgentsReach(startOnMesh, hit.position))
 					candidates.Add(hit.position);
 			}
 		} finally {

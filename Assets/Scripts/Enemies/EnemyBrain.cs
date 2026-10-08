@@ -50,6 +50,8 @@ public class EnemyBrain : MonoBehaviour {
 	Vector3 home, goal, lockedForward, lastCheckPosition, patrolPoint;
 	float stateTime, repathTimer, stuckCheckTimer, stuckTime;
 	bool hitDone;
+	string currentClip = "";
+	static readonly RaycastHit[] SightHits = new RaycastHit[16];
 
 	public static float Speed(float[] factor, GameSettings.gameDifficulties difficulty, float robotTopSpeed) {
 		return factor[(int)difficulty] * robotTopSpeed;
@@ -109,7 +111,7 @@ public class EnemyBrain : MonoBehaviour {
 	}
 
 	void Update() {
-		if (target == null || State == EnemyState.Disabled)
+		if (State == EnemyState.Disabled)
 			return;
 		if (!GameFlow.IsGameplayActive) {
 			// Paused/intro freeze time; a finished level stops every enemy and drops any pending strike.
@@ -117,7 +119,20 @@ public class EnemyBrain : MonoBehaviour {
 				Enter(EnemyState.Disabled);
 			return;
 		}
+		if (target == null || !target.gameObject.activeInHierarchy) {
+			Enter(EnemyState.Disabled);   // the robot was destroyed (death) or hidden (win)
+			return;
+		}
+		if (!agent.isOnNavMesh) {
+			NavMeshHit near;
+			if (NavMesh.SamplePosition(transform.position, out near, 2f, NavMesh.AllAreas))
+				agent.Warp(near.position);
+			else
+				Enter(EnemyState.Disabled);
+			return;
+		}
 		stateTime += Time.deltaTime;
+		UpdateRunSpeed();
 		float distance = FlatDistance(target.position);
 
 		switch (State) {
@@ -143,7 +158,7 @@ public class EnemyBrain : MonoBehaviour {
 				Enter(EnemyState.Return);
 				break;
 			}
-			Repath(TargetGround());
+			Repath(true);
 			CheckStuck();
 			if (distance <= attackRange * 0.85f && Vector3.Angle(transform.forward, FlatTo(target.position)) <= attackAngle && Clear())
 				Enter(EnemyState.Windup);
@@ -167,8 +182,9 @@ public class EnemyBrain : MonoBehaviour {
 				Enter(distance <= loseRadius ? EnemyState.Chase : EnemyState.Return);
 			break;
 		case EnemyState.Return:
-			Repath(home);
-			if (distance <= detectRadius && stateTime > 1f)
+			Repath(false);
+			// Back home, or at least 3 s of retreat, before chasing again (no chase/retreat flapping when stuck).
+			if (distance <= detectRadius && stateTime > 3f)
 				Enter(EnemyState.Chase);
 			else if (!agent.pathPending && agent.remainingDistance < 1f)
 				Enter(EnemyState.Idle);
@@ -184,12 +200,13 @@ public class EnemyBrain : MonoBehaviour {
 		return goal;
 	}
 
-	void Repath(Vector3 destination) {
+	// The robot's ground point (chase) or home (return), refreshed every repathInterval only.
+	void Repath(bool chase) {
 		repathTimer -= Time.deltaTime;
-		if (repathTimer > 0f || !agent.isOnNavMesh)
+		if (repathTimer > 0f)
 			return;
 		repathTimer = repathInterval;
-		agent.SetDestination(destination);
+		agent.SetDestination(chase ? TargetGround() : home);
 	}
 
 	void CheckStuck() {
@@ -216,8 +233,10 @@ public class EnemyBrain : MonoBehaviour {
 	bool Clear() {
 		Vector3 from = transform.position + Vector3.up * 0.6f;
 		Vector3 to = target.position;
-		foreach (RaycastHit hit in Physics.RaycastAll(from, to - from, Vector3.Distance(from, to), ~0, QueryTriggerInteraction.Ignore)) {
-			if (hit.collider.transform.IsChildOf(transform) || hit.collider.attachedRigidbody != null)
+		int count = Physics.RaycastNonAlloc(from, to - from, SightHits, Vector3.Distance(from, to), ~0, QueryTriggerInteraction.Ignore);
+		for (int i = 0; i < count; i++) {
+			Collider c = SightHits[i].collider;
+			if (c.transform.IsChildOf(transform) || c.attachedRigidbody != null)
 				continue;
 			return false;
 		}
@@ -244,8 +263,22 @@ public class EnemyBrain : MonoBehaviour {
 		return d.magnitude;
 	}
 
+	// Cross-fades only when the clip changes (spec §6.3).
 	void PlayClip(string clip) {
-		if (anim != null && !string.IsNullOrEmpty(clip) && anim.GetClip(clip) != null)
-			anim.CrossFade(clip, 0.15f);
+		if (anim == null || string.IsNullOrEmpty(clip) || clip == currentClip || anim.GetClip(clip) == null)
+			return;
+		currentClip = clip;
+		anim.CrossFade(clip, 0.15f);
+	}
+
+	// While moving states play the run clip, its speed follows the real velocity; standing still shows idle.
+	void UpdateRunSpeed() {
+		if (anim == null || (State != EnemyState.Chase && State != EnemyState.Patrol && State != EnemyState.Return))
+			return;
+		float speed = agent.velocity.magnitude;
+		PlayClip(speed < 0.3f && !string.IsNullOrEmpty(idleClip) ? idleClip : runClip);
+		AnimationState run = string.IsNullOrEmpty(runClip) ? null : anim[runClip];
+		if (run != null)
+			run.speed = Mathf.Clamp(speed / Mathf.Max(agent.speed, 0.1f), 0.3f, 1.5f);
 	}
 }

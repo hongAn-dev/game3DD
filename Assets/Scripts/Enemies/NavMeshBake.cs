@@ -5,14 +5,14 @@ using UnityEngine.AI;
 /// <summary>
 /// NavMesh bake shared by EnemySetup (levels) and tests (arenas): static solid colliders are the sources, and every
 /// HazardVolume is a NotWalkable box reaching half a metre above its surface, so agents never path into acid/lava.
-/// One agent size fits both the creep and the boss paths.
+/// One bake sized for the boss also keeps the creep's paths valid.
 /// </summary>
 public static class NavMeshBake {
 
 	public static NavMeshBuildSettings Settings() {
 		NavMeshBuildSettings settings = NavMesh.GetSettingsByID(0);
-		settings.agentRadius = 0.5f;
-		settings.agentHeight = 1.2f;
+		settings.agentRadius = 0.8f;   // the boss (capsule radius 0.78); the creep gets slightly wider berths
+		settings.agentHeight = 2.4f;
 		settings.agentSlope = 40f;
 		settings.agentClimb = 0.4f;
 		settings.minRegionArea = 2f;

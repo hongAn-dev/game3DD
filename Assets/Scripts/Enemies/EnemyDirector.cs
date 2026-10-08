@@ -30,6 +30,7 @@ public class EnemyDirector : MonoBehaviour {
 
 	readonly List<EnemyBrain> bosses = new List<EnemyBrain>();
 	readonly List<EnemyBrain> creeps = new List<EnemyBrain>();
+	readonly List<GameObject> markers = new List<GameObject>();
 	int pendingBosses, pendingCreeps;
 	int cap, bossCap;
 	float elapsed, timer, nextInterval;
@@ -103,6 +104,7 @@ public class EnemyDirector : MonoBehaviour {
 	IEnumerator Spawn(bool boss, Vector3 point) {
 		if (boss) pendingBosses++; else pendingCreeps++;
 		GameObject marker = Marker(point);
+		markers.Add(marker);
 		float t = 0f;
 		while (t < telegraphTime) {
 			t += Time.deltaTime;   // frozen while paused
@@ -111,9 +113,13 @@ public class EnemyDirector : MonoBehaviour {
 				marker.transform.localScale = new Vector3(size, 0.01f, size);
 			yield return null;
 		}
+		markers.Remove(marker);
 		Destroy(marker);
 		if (boss) pendingBosses--; else pendingCreeps--;
 		if (!GameFlow.IsGameplayActive)
+			yield break;
+		// The robot may have rolled onto the point during the telegraph: use another point or give up this time.
+		if (player != null && Vector3.Distance(point, player.position) < minPlayerDistance && !PickPoint(out point))
 			yield break;
 		GameObject enemy = Instantiate(boss ? bossPrefab : creepPrefab, point, Quaternion.LookRotation(player != null ? Flat(player.position - point) : Vector3.forward));
 		EnemyBrain brain = enemy.GetComponent<EnemyBrain>();
@@ -138,6 +144,10 @@ public class EnemyDirector : MonoBehaviour {
 
 	void OnDisable() {
 		StopAllCoroutines();
+		foreach (GameObject marker in markers)
+			if (marker != null)
+				Destroy(marker);
+		markers.Clear();
 		pendingBosses = pendingCreeps = 0;
 	}
 }
