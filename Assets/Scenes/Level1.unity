@@ -1969,8 +1969,8 @@ RectTransform:
   m_Father: {fileID: 1113785224}
   m_RootOrder: 1
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0.25}
-  m_AnchorMax: {x: 1, y: 0.75}
+  m_AnchorMin: {x: 0, y: 0.4}
+  m_AnchorMax: {x: 1, y: 0.6}
   m_AnchoredPosition: {x: -5, y: 0}
   m_SizeDelta: {x: -20, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
@@ -3072,7 +3072,7 @@ RectTransform:
   m_AnchorMin: {x: 0.33333334, y: 0}
   m_AnchorMax: {x: 0.33333334, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 20, y: 0}
+  m_SizeDelta: {x: 64, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &974335041
 CanvasRenderer:
@@ -3095,7 +3095,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Color: {r: 0.9411765, g: 0.9647059, b: 0.98039216, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -3144,8 +3144,8 @@ RectTransform:
   m_Father: {fileID: 1113785224}
   m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0.25}
-  m_AnchorMax: {x: 1, y: 0.75}
+  m_AnchorMin: {x: 0, y: 0.4}
+  m_AnchorMax: {x: 1, y: 0.6}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
@@ -3162,7 +3162,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Color: {r: 0.15686275, g: 0.1882353, b: 0.22745098, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -3612,7 +3612,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 80}
-  m_SizeDelta: {x: 600, y: 30}
+  m_SizeDelta: {x: 600, y: 80}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &1138752735
 GameObject:
@@ -3769,10 +3769,10 @@ RectTransform:
   m_Father: {fileID: 1609564987}
   m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0.5}
-  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchorMin: {x: 0.29, y: 0.29}
+  m_AnchorMax: {x: 0.71, y: 0.71}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 56, y: 56}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1335619412
 MonoBehaviour:
@@ -4694,6 +4694,7 @@ GameObject:
   - component: {fileID: 1609564989}
   - component: {fileID: 1609564988}
   - component: {fileID: 388905873}
+  - component: {fileID: 1609564990}
   m_Layer: 5
   m_Name: Fixed Joystick
   m_TagString: MobileJostick
@@ -4762,6 +4763,19 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1609564986}
   m_CullTransparentMesh: 1
+--- !u!114 &1609564990
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1609564986}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 10225dc107a591a1e8bf88daec75f9c9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  heightShare: 0.22
 --- !u!1001 &1646800989
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -5253,7 +5267,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Color: {r: 0.18039216, g: 0.9019608, b: 0.9019608, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1

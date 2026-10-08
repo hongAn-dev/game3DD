@@ -138,7 +138,7 @@ MonoBehaviour:
   m_MaxAngularVelocity: 25
   m_JumpPower: 0
   m_MaxSpeed: 9
-  m_Acceleration: 25
+  m_AccelerationRate: 14
   m_Brake: 8
 --- !u!114 &114783153963234758
 MonoBehaviour:

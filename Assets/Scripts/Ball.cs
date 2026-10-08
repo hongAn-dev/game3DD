@@ -20,8 +20,8 @@ public class Ball : MonoBehaviour {
 	// Horizontal speed cap (m/s); vertical speed is never clamped so falling and jumping stay physical.
 	[SerializeField] private float m_MaxSpeed = 9f;
 
-	// Force applied per unit of stick input when not using torque.
-	[SerializeField] private float m_Acceleration = 25f;
+	// Rate (m/s²) at which the horizontal velocity moves towards stick × MaxSpeed when not using torque.
+	[SerializeField] private float m_AccelerationRate = 14f;
 
 	// Deceleration (m/s²) applied when the stick is released, so the ball stops instead of sliding.
 	[SerializeField] private float m_Brake = 8f;
@@ -42,26 +42,23 @@ public class Ball : MonoBehaviour {
 	}
 
 	/// <summary>
-	/// Update is called once per frame.
-	/// </summary>
-	/// <summary>
 	/// Moves the ball. moveDirection keeps the analog magnitude (0..1) of the stick.
 	/// </summary>
 	public void Move(Vector3 moveDirection, bool jump) {
 		float input = Mathf.Clamp01(moveDirection.magnitude);
 		Vector3 velocity = m_Rigidbody.velocity;
 		Vector3 horizontal = new Vector3(velocity.x, 0f, velocity.z);
+		bool grounded = Physics.Raycast(transform.position, -Vector3.up, k_GroundRayLength);
 
-		if (input < 0.1f) {
-			// Brake towards rest without reversing direction.
-			float step = Mathf.Min(m_Brake * Time.fixedDeltaTime, horizontal.magnitude);
-			if (step > 0f)
-				m_Rigidbody.AddForce(-horizontal.normalized * step, ForceMode.VelocityChange);
-		} else if (m_UseTorque) {
+		if (m_UseTorque && input >= 0.1f) {
 			// Add torque around the axis defined by the move direction.
 			m_Rigidbody.AddTorque(new Vector3(moveDirection.z, 0, -moveDirection.x)*m_MovePower);
-		} else {
-			m_Rigidbody.AddForce(moveDirection.normalized * m_Acceleration * input);
+		} else if (input >= 0.1f || grounded) {
+			// The stick sets the target speed (light push = slow roll); released on the ground it brakes to rest.
+			// In the air with the stick released the arc is left alone.
+			Vector3 desired = input >= 0.1f ? Vector3.ClampMagnitude(new Vector3(moveDirection.x, 0f, moveDirection.z), 1f) * m_MaxSpeed : Vector3.zero;
+			float rate = (input >= 0.1f ? m_AccelerationRate : m_Brake) * Time.fixedDeltaTime;
+			m_Rigidbody.AddForce(Vector3.MoveTowards(horizontal, desired, rate) - horizontal, ForceMode.VelocityChange);
 		}
 
 		// Clamp only the horizontal part of the velocity.

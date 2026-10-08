@@ -25,15 +25,27 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
 
 	/// <summary>Look sensitivity multiplier (0.5..2), saved on the device.</summary>
 	public static float Sensitivity {
-		get { return Mathf.Clamp(PlayerPrefs.GetFloat(SensitivityKey, 1f), 0.5f, 2f); }
-		set { PlayerPrefs.SetFloat(SensitivityKey, Mathf.Clamp(value, 0.5f, 2f)); }
+		get {
+			// Cached: PlayerPrefs reads go through JNI on Android.
+			if (cachedSensitivity < 0f)
+				cachedSensitivity = Mathf.Clamp(PlayerPrefs.GetFloat(SensitivityKey, 1f), 0.5f, 2f);
+			return cachedSensitivity;
+		}
+		set {
+			cachedSensitivity = Mathf.Clamp(value, 0.5f, 2f);
+			PlayerPrefs.SetFloat(SensitivityKey, cachedSensitivity);
+		}
 	}
 
 	private Vector2 pendingLook;
+	private float currentDistance = -1f;
+	private float distanceVelocity;
+	private readonly RaycastHit[] hits = new RaycastHit[16];
+	private static float cachedSensitivity = -1f;
 
 	/// <summary>
 	/// New (yaw, pitch) after a look drag of deltaPixels on an area areaWidth pixels wide: the full width turns 180
-	/// degrees (times sensitivity); dragging up looks down onto the robot. Pitch is clamped.
+	/// degrees (times sensitivity); dragging up lowers the pitch (the view tilts up). Pitch is clamped.
 	/// </summary>
 	public static Vector2 ApplyLook(float yaw, float pitch, Vector2 deltaPixels, float areaWidth, float sensitivity,
 		float minPitch, float maxPitch) {
@@ -63,7 +75,13 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
 		Vector3 pivot = target.position + Vector3.up * pivotHeight;
 		Quaternion rotation = Quaternion.Euler(pitch, yaw, 0f);
 		Vector3 back = rotation * Vector3.back;
-		transform.position = pivot + back * VisibleDistance(pivot, back);
+		// Snap in front of obstacles at once, ease back out so the view does not pump.
+		float visible = VisibleDistance(pivot, back);
+		if (currentDistance < 0f || visible < currentDistance)
+			currentDistance = visible;
+		else
+			currentDistance = Mathf.SmoothDamp(currentDistance, visible, ref distanceVelocity, 0.25f);
+		transform.position = pivot + back * currentDistance;
 		transform.rotation = Quaternion.LookRotation(pivot - transform.position);
 	}
 
@@ -89,11 +107,14 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
 			distance = Mathf.Clamp(distance * (1f - scroll * zoomSpeed), minDistance, maxDistance);
 	}
 
-	// Distance along 'back' that stays in front of the nearest obstacle, ignoring the target and triggers.
+	// Distance along 'back' that stays in front of the nearest static obstacle. Ignores triggers, the target and
+	// anything with a Rigidbody (enemies, falling scrap) so actors passing behind the ball do not yank the view.
 	float VisibleDistance(Vector3 pivot, Vector3 back) {
 		float nearest = distance;
-		foreach (RaycastHit hit in Physics.SphereCastAll(pivot, collisionRadius, back, distance, obstacleMask, QueryTriggerInteraction.Ignore)) {
-			if (hit.transform == target || hit.transform.IsChildOf(target))
+		int count = Physics.SphereCastNonAlloc(pivot, collisionRadius, back, hits, distance, obstacleMask, QueryTriggerInteraction.Ignore);
+		for (int i = 0; i < count; i++) {
+			RaycastHit hit = hits[i];
+			if (hit.collider.attachedRigidbody != null || hit.transform == target || hit.transform.IsChildOf(target))
 				continue;
 			if (hit.distance > 0f && hit.distance < nearest)
 				nearest = hit.distance;

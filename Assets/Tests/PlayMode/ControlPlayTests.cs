@@ -124,4 +124,28 @@ public class ControlPlayTests {
 		Assert.AreEqual(0f, orbit.yaw, 0.001f);
 		GameFlow.Resume();
 	}
+
+	[UnityTest]
+	public IEnumerator HalfStickGivesHalfSpeed() {
+		yield return FlatGround();
+		yield return Push(Vector3.forward * 0.5f, 5f);
+		Assert.AreEqual(ball.MaxSpeed * 0.5f, Horizontal(), ball.MaxSpeed * 0.5f * 0.15f);
+	}
+
+	[UnityTest]
+	public IEnumerator OrbitCameraIgnoresMovingActors() {
+		Transform target;
+		ThirdPersonOrbitCamera orbit = OrbitRig(out target);
+		yield return null;
+		float free = Vector3.Distance(orbit.transform.position, target.position + Vector3.up * 0.5f);
+
+		// An enemy-like body (kinematic rigidbody) passing behind the ball must not yank the camera in.
+		GameObject enemy = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+		enemy.transform.position = Vector3.Lerp(target.position + Vector3.up * 0.5f, orbit.transform.position, 0.5f);
+		enemy.transform.localScale = Vector3.one * 2f;
+		enemy.AddComponent<Rigidbody>().isKinematic = true;
+		yield return new WaitForFixedUpdate();
+		yield return null;
+		Assert.AreEqual(free, Vector3.Distance(orbit.transform.position, target.position + Vector3.up * 0.5f), 0.3f);
+	}
 }

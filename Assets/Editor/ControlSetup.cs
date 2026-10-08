@@ -14,7 +14,6 @@ public static class ControlSetup {
 
 	[MenuItem("Tools/Robo Lac Loi/Apply Control Setup")]
 	public static void Apply() {
-		GameObject player = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Player.prefab");
 		GameObject contents = PrefabUtility.LoadPrefabContents("Assets/Prefabs/Player.prefab");
 		try {
 			contents.GetComponent<Rigidbody>().interpolation = RigidbodyInterpolation.Interpolate;
@@ -26,6 +25,7 @@ public static class ControlSetup {
 		foreach (LevelConfig level in LevelCatalog.All) {
 			var scene = EditorSceneManager.OpenScene("Assets/Scenes/" + level.levelId + ".unity", OpenSceneMode.Single);
 			PauseController pause = PauseCanvas();
+			StyleSlider(pause.sensitivitySlider);
 			OrbitCamera();
 			MobileCanvas(pause);
 			EditorSceneManager.MarkSceneDirty(scene);
@@ -110,7 +110,11 @@ public static class ControlSetup {
 		stick.pivot = new Vector2(0.5f, 0.5f);
 		stick.sizeDelta = new Vector2(132f, 132f);
 		stick.anchoredPosition = new Vector2(96f, 96f);
-		joystick.handle.sizeDelta = new Vector2(56f, 56f);
+		// Sized at runtime to ~22 % of the real canvas height (it varies with the aspect ratio); the handle follows.
+		GetOrAdd<ScreenShareSizer>(stick.gameObject).heightShare = 0.22f;
+		joystick.handle.anchorMin = new Vector2(0.29f, 0.29f);
+		joystick.handle.anchorMax = new Vector2(0.71f, 0.71f);
+		joystick.handle.sizeDelta = Vector2.zero;
 
 		RectTransform buttonRect = Child(safe, "Pause Button");
 		buttonRect.anchorMin = buttonRect.anchorMax = new Vector2(0f, 1f);
@@ -185,6 +189,21 @@ public static class ControlSetup {
 		UnityEventTools.AddPersistentListener(MenuButton(overlay, "Main Menu Button", "MENU CHÍNH", -170f).onClick, pause.ToMenu);
 		overlay.gameObject.SetActive(false);
 		return pause;
+	}
+
+	// Touch-sized slider (80 tall, 64 px handle) with a visible cyan fill; DefaultControls gives plain white parts.
+	static void StyleSlider(Slider slider) {
+		((RectTransform)slider.transform).sizeDelta = new Vector2(600f, 80f);
+		Image background = slider.transform.Find("Background").GetComponent<Image>();
+		background.color = new Color32(40, 48, 58, 255);
+		RectTransform backgroundRect = background.rectTransform;
+		backgroundRect.anchorMin = new Vector2(0f, 0.4f);
+		backgroundRect.anchorMax = new Vector2(1f, 0.6f);
+		slider.fillRect.GetComponent<Image>().color = new Color32(46, 230, 230, 255);
+		((RectTransform)slider.fillRect.parent).anchorMin = new Vector2(0f, 0.4f);
+		((RectTransform)slider.fillRect.parent).anchorMax = new Vector2(1f, 0.6f);
+		slider.handleRect.sizeDelta = new Vector2(64f, 0f);
+		slider.handleRect.GetComponent<Image>().color = new Color32(240, 246, 250, 255);
 	}
 
 	static void Place(RectTransform rect, float y, Vector2 size) {

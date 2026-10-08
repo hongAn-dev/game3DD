@@ -148,4 +148,28 @@ public class ControlTests {
 		GameObject player = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Player.prefab");
 		Assert.AreEqual(RigidbodyInterpolation.Interpolate, player.GetComponent<Rigidbody>().interpolation);
 	}
+
+	[Test]
+	public void JoystickIsAboutAFifthOfScreenHeight() {
+		// Canvas height differs per aspect ratio (800-wide reference, width-matched): 450 at 16:9, 360 at 20:9.
+		Assert.AreEqual(99f, ScreenShareSizer.Size(450f, 0.22f), 0.01f);
+		foreach (string level in Levels) {
+			EditorSceneManager.OpenScene("Assets/Scenes/" + level + ".unity", OpenSceneMode.Single);
+			FixedJoystick joystick = Object.FindObjectsOfType<FixedJoystick>(true).Single();
+			ScreenShareSizer sizer = joystick.GetComponent<ScreenShareSizer>();
+			Assert.IsNotNull(sizer, level);
+			Assert.That(sizer.heightShare, Is.InRange(0.20f, 0.25f), level);
+		}
+	}
+
+	[Test]
+	public void SensitivitySliderIsTouchSized() {
+		foreach (string level in Levels) {
+			EditorSceneManager.OpenScene("Assets/Scenes/" + level + ".unity", OpenSceneMode.Single);
+			UnityEngine.UI.Slider slider = Object.FindObjectsOfType<PauseController>(true).Single().sensitivitySlider;
+			Assert.GreaterOrEqual(((RectTransform)slider.transform).sizeDelta.y, 70f, level);
+			Assert.GreaterOrEqual(slider.handleRect.sizeDelta.x, 60f, level);
+			Assert.AreNotEqual(Color.white, slider.fillRect.GetComponent<UnityEngine.UI.Image>().color, level);
+		}
+	}
 }
