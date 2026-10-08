@@ -41,9 +41,7 @@ public class SetupLevel : MonoBehaviour {
 						float random = Random.Range (0.0f, 3.0f);
 						if (random <= 1.5) {
 							// Create a new CoinSpawner game object.
-							GameObject clone = Instantiate (coinSpawnerPrefab, new Vector3 (i * averageDistanceBetweenPrefabs, 15, j * averageDistanceBetweenPrefabs), Quaternion.identity) as GameObject;
-							clone.gameObject.GetComponent<SpawnGameObjects>().minSecondsBetweenSpawning = 1.0f;
-							clone.gameObject.GetComponent<SpawnGameObjects>().maxSecondsBetweenSpawning = 5.0f;
+							// Energy now comes only from EnergySpawnDirector (spec §4.2); this slot stays empty.
 						} else {
 							// Create a new EnemySpawner game object.
 							GameObject clone = Instantiate (enemySpawnerPrefab, new Vector3(i * averageDistanceBetweenPrefabs, 15, j * averageDistanceBetweenPrefabs), Quaternion.identity) as GameObject;
@@ -61,9 +59,7 @@ public class SetupLevel : MonoBehaviour {
 						float random = Random.Range (0.0f, 3.0f);
 						if (random <= 2.0) {
 							// Create a new CoinSpawner game object.
-							GameObject clone = Instantiate (coinSpawnerPrefab, new Vector3 (i * averageDistanceBetweenPrefabs, 15, j * averageDistanceBetweenPrefabs), Quaternion.identity) as GameObject;
-							clone.gameObject.GetComponent<SpawnGameObjects>().minSecondsBetweenSpawning = 1.0f;
-							clone.gameObject.GetComponent<SpawnGameObjects>().maxSecondsBetweenSpawning = 3.0f;
+							// Energy now comes only from EnergySpawnDirector (spec §4.2); this slot stays empty.
 						} else {
 							// Create a new EnemySpawner game object.
 							GameObject clone = Instantiate (enemySpawnerPrefab, new Vector3(i * averageDistanceBetweenPrefabs, 15, j * averageDistanceBetweenPrefabs), Quaternion.identity) as GameObject;
@@ -97,9 +93,7 @@ public class SetupLevel : MonoBehaviour {
 						float random = Random.Range (0.0f, 3.0f);
 						if (random <= 1.5) {
 							// Create a new CoinSpawner game object.
-							GameObject clone = Instantiate (coinSpawnerPrefab, new Vector3 (i * averageDistanceBetweenPrefabs, 15, j * averageDistanceBetweenPrefabs), Quaternion.identity) as GameObject;
-							clone.gameObject.GetComponent<SpawnGameObjects>().minSecondsBetweenSpawning = 1.0f;
-							clone.gameObject.GetComponent<SpawnGameObjects>().maxSecondsBetweenSpawning = 5.0f;
+							// Energy now comes only from EnergySpawnDirector (spec §4.2); this slot stays empty.
 						} else {
 							// Create a new EnemySpawner game object.
 							GameObject clone = Instantiate (enemySpawnerPrefab, new Vector3(i * averageDistanceBetweenPrefabs, 15, j * averageDistanceBetweenPrefabs), Quaternion.identity) as GameObject;
@@ -117,9 +111,7 @@ public class SetupLevel : MonoBehaviour {
 						float random = Random.Range (0.0f, 3.0f);
 						if (random <= 2.0) {
 							// Create a new CoinSpawner game object.
-							GameObject clone = Instantiate (coinSpawnerPrefab, new Vector3 (i * averageDistanceBetweenPrefabs, 15, j * averageDistanceBetweenPrefabs), Quaternion.identity) as GameObject;
-							clone.gameObject.GetComponent<SpawnGameObjects>().minSecondsBetweenSpawning = 1.0f;
-							clone.gameObject.GetComponent<SpawnGameObjects>().maxSecondsBetweenSpawning = 3.0f;
+							// Energy now comes only from EnergySpawnDirector (spec §4.2); this slot stays empty.
 						} else {
 							// Create a new EnemySpawner game object.
 							GameObject clone = Instantiate (enemySpawnerPrefab, new Vector3(i * averageDistanceBetweenPrefabs, 15, j * averageDistanceBetweenPrefabs), Quaternion.identity) as GameObject;
@@ -152,9 +144,7 @@ public class SetupLevel : MonoBehaviour {
 						float random = Random.Range (0.0f, 3.0f);
 						if (random <= 1.5) {
 							// Create a new CoinSpawner game object.
-							GameObject clone = Instantiate (coinSpawnerPrefab, new Vector3 (i * averageDistanceBetweenPrefabs, 30, j * averageDistanceBetweenPrefabs), Quaternion.identity) as GameObject;
-							clone.gameObject.GetComponent<SpawnGameObjects>().minSecondsBetweenSpawning = 1.0f;
-							clone.gameObject.GetComponent<SpawnGameObjects>().maxSecondsBetweenSpawning = 5.0f;
+							// Energy now comes only from EnergySpawnDirector (spec §4.2); this slot stays empty.
 						} else {
 							// Create a new EnemySpawner game object.
 							GameObject clone = Instantiate (enemySpawnerPrefab, new Vector3(i * averageDistanceBetweenPrefabs, 30, j * averageDistanceBetweenPrefabs), Quaternion.identity) as GameObject;
@@ -172,9 +162,7 @@ public class SetupLevel : MonoBehaviour {
 						float random = Random.Range (0.0f, 3.0f);
 						if (random <= 2.0) {
 							// Create a new CoinSpawner game object.
-							GameObject clone = Instantiate (coinSpawnerPrefab, new Vector3 (i * averageDistanceBetweenPrefabs, 30, j * averageDistanceBetweenPrefabs), Quaternion.identity) as GameObject;
-							clone.gameObject.GetComponent<SpawnGameObjects>().minSecondsBetweenSpawning = 1.0f;
-							clone.gameObject.GetComponent<SpawnGameObjects>().maxSecondsBetweenSpawning = 3.0f;
+							// Energy now comes only from EnergySpawnDirector (spec §4.2); this slot stays empty.
 						} else {
 							// Create a new EnemySpawner game object.
 							GameObject clone = Instantiate (enemySpawnerPrefab, new Vector3(i * averageDistanceBetweenPrefabs, 30, j * averageDistanceBetweenPrefabs), Quaternion.identity) as GameObject;
@@ -206,9 +194,7 @@ public class SetupLevel : MonoBehaviour {
 						float random = Random.Range (0.0f, 3.0f);
 						if (random <= 1.5) {
 							// Create a new CoinSpawner game object.
-							GameObject clone = Instantiate (coinSpawnerPrefab, new Vector3 (i * averageDistanceBetweenPrefabs, 30, j * averageDistanceBetweenPrefabs), Quaternion.identity) as GameObject;
-							clone.gameObject.GetComponent<SpawnGameObjects>().minSecondsBetweenSpawning = 1.0f;
-							clone.gameObject.GetComponent<SpawnGameObjects>().maxSecondsBetweenSpawning = 5.0f;
+							// Energy now comes only from EnergySpawnDirector (spec §4.2); this slot stays empty.
 						} else {
 							// Create a new EnemySpawner game object.
 							GameObject clone = Instantiate (enemySpawnerPrefab, new Vector3(i * averageDistanceBetweenPrefabs, 30, j * averageDistanceBetweenPrefabs), Quaternion.identity) as GameObject;
@@ -226,9 +212,7 @@ public class SetupLevel : MonoBehaviour {
 						float random = Random.Range (0.0f, 3.0f);
 						if (random <= 2.0) {
 							// Create a new CoinSpawner game object.
-							GameObject clone = Instantiate (coinSpawnerPrefab, new Vector3 (i * averageDistanceBetweenPrefabs, 30, j * averageDistanceBetweenPrefabs), Quaternion.identity) as GameObject;
-							clone.gameObject.GetComponent<SpawnGameObjects>().minSecondsBetweenSpawning = 1.0f;
-							clone.gameObject.GetComponent<SpawnGameObjects>().maxSecondsBetweenSpawning = 3.0f;
+							// Energy now comes only from EnergySpawnDirector (spec §4.2); this slot stays empty.
 						} else {
 							// Create a new EnemySpawner game object.
 							GameObject clone = Instantiate (enemySpawnerPrefab, new Vector3(i * averageDistanceBetweenPrefabs, 30, j * averageDistanceBetweenPrefabs), Quaternion.identity) as GameObject;
