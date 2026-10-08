@@ -26,7 +26,15 @@ public class Ball : MonoBehaviour {
 	// Deceleration (m/s²) applied when the stick is released, so the ball stops instead of sliding.
 	[SerializeField] private float m_Brake = 8f;
 
+	// Base top speed (enemy speeds are tuned against it; Overdrive does not change it).
 	public float MaxSpeed { get { return m_MaxSpeed; } }
+
+	// Temporary multipliers (Overdrive). They scale the base values each frame and are never written back into them,
+	// so they cannot compound.
+	[System.NonSerialized] public float SpeedMultiplier = 1f;
+	[System.NonSerialized] public float AccelMultiplier = 1f;
+
+	public float CurrentMaxSpeed { get { return m_MaxSpeed * SpeedMultiplier; } }
 
 	// The length of the ray to check if the ball is grounded.
 	private const float k_GroundRayLength = 1f;
@@ -46,6 +54,7 @@ public class Ball : MonoBehaviour {
 	/// </summary>
 	public void Move(Vector3 moveDirection, bool jump) {
 		float input = Mathf.Clamp01(moveDirection.magnitude);
+		float maxSpeed = CurrentMaxSpeed;
 		Vector3 velocity = m_Rigidbody.velocity;
 		Vector3 horizontal = new Vector3(velocity.x, 0f, velocity.z);
 		bool grounded = Physics.Raycast(transform.position, -Vector3.up, k_GroundRayLength);
@@ -56,16 +65,16 @@ public class Ball : MonoBehaviour {
 		} else if (input >= 0.1f || grounded) {
 			// The stick sets the target speed (light push = slow roll); released on the ground it brakes to rest.
 			// In the air with the stick released the arc is left alone.
-			Vector3 desired = input >= 0.1f ? Vector3.ClampMagnitude(new Vector3(moveDirection.x, 0f, moveDirection.z), 1f) * m_MaxSpeed : Vector3.zero;
-			float rate = (input >= 0.1f ? m_AccelerationRate : m_Brake) * Time.fixedDeltaTime;
+			Vector3 desired = input >= 0.1f ? Vector3.ClampMagnitude(new Vector3(moveDirection.x, 0f, moveDirection.z), 1f) * maxSpeed : Vector3.zero;
+			float rate = (input >= 0.1f ? m_AccelerationRate * AccelMultiplier : m_Brake) * Time.fixedDeltaTime;
 			m_Rigidbody.AddForce(Vector3.MoveTowards(horizontal, desired, rate) - horizontal, ForceMode.VelocityChange);
 		}
 
 		// Clamp only the horizontal part of the velocity.
 		velocity = m_Rigidbody.velocity;
 		horizontal = new Vector3(velocity.x, 0f, velocity.z);
-		if (horizontal.magnitude > m_MaxSpeed) {
-			horizontal = horizontal.normalized * m_MaxSpeed;
+		if (horizontal.magnitude > maxSpeed) {
+			horizontal = horizontal.normalized * maxSpeed;
 			m_Rigidbody.velocity = new Vector3(horizontal.x, velocity.y, horizontal.z);
 		}
 
