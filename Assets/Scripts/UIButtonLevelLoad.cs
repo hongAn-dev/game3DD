@@ -11,20 +11,23 @@ public class UIButtonLevelLoad : MonoBehaviour {
 	/// Load a level (scene) by name..
 	/// </summary>
 	public void loadLevel(string levelName) {
-		SceneManager.LoadScene(levelName);
+		if (levelName == SceneRouter.MainMenuScene)
+			SceneRouter.ToMenu();
+		else
+			SceneRouter.Load(levelName);
 	}
 
 	/// <summary>
 	/// Load the next level based on the build index of the active scene.
 	/// </summary>
 	public void loadNextLevel() {
-		SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex + 1);
+		SceneRouter.Next();
 	}
 
 	/// <summary>
 	/// Reload the current active level.
 	/// </summary>
 	public void reloadLevel() {
-		SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+		SceneRouter.Retry();
 	}
 }

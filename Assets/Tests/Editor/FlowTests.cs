@@ -109,4 +109,21 @@ public class FlowTests {
 		Assert.AreEqual(1f, Time.timeScale);
 		Assert.AreEqual("", GameFlow.DeathCause);
 	}
+	[Test]
+	public void EndingSceneAndAllRouteTargetsAreInTheBuild() {
+		string[] inBuild = EditorBuildSettings.scenes.Where(s => s.enabled)
+			.Select(s => Path.GetFileNameWithoutExtension(s.path)).ToArray();
+		CollectionAssert.Contains(inBuild, SceneRouter.MainMenuScene);
+		CollectionAssert.Contains(inBuild, SceneRouter.EndingScene);
+		foreach (LevelConfig c in LevelCatalog.All) {
+			CollectionAssert.Contains(inBuild, c.levelId);
+			CollectionAssert.Contains(inBuild, c.nextScene);
+		}
+	}
+
+	[Test]
+	public void NoBuildIndexRouting() {
+		foreach (string file in Directory.GetFiles("Assets/Scripts", "*.cs", SearchOption.AllDirectories))
+			StringAssert.DoesNotContain("buildIndex + 1", File.ReadAllText(file), file);
+	}
 }

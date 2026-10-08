@@ -53,6 +53,8 @@ public class GameManager : MonoBehaviour {
 
 	private Health playerHealth;
 
+	private LevelConfig config;
+
 	// The beat score level
 	private int beatLevelScore = 0;
 
@@ -62,8 +64,7 @@ public class GameManager : MonoBehaviour {
 	/// Use this for initialization.
 	/// </summary>
 	void Start () {
-		if (gm == null) 
-			gm = gameObject.GetComponent<GameManager>();
+		gm = this;
 
 		if (player == null) {
 			player = GameObject.FindWithTag("Player");
@@ -97,10 +98,14 @@ public class GameManager : MonoBehaviour {
 					break;
 			}
 
+			config = LevelCatalog.Get (SceneManager.GetActiveScene ().name);
+			if (config != null)
+				beatLevelScore = config.energyTarget;
+
 			beatLevelCanvas.SetActive (false);
 			// Show intro level goal message (Only at first level load, doesnt show after a gameover)
 			if (GameSettings.showIntroLevelMessage) {
-				introBeatLevelText.text = "<color=#2EE6E6>" + Zones.Title (SceneManager.GetActiveScene ().name).ToUpperInvariant () + "</color>\nTHU " + beatLevelScore.ToString () + " LÕI NĂNG LƯỢNG";
+				introBeatLevelText.text = "<color=#2EE6E6>" + (config != null ? config.displayName : "").ToUpperInvariant () + "</color>\nTHU " + beatLevelScore.ToString () + " LÕI NĂNG LƯỢNG";
 				GameSettings.showIntroLevelMessage = false;
 				StartCoroutine (ShowIntroBeatLevelCanvas ());
 			}
@@ -115,16 +120,13 @@ public class GameManager : MonoBehaviour {
 	/// Show intro level message with information about the coins that needs to be collected by the user to beat the level.
 	/// </summary>
 	public IEnumerator ShowIntroBeatLevelCanvas() {
-		// Show intro beat message canvas canvas
 		introBeatLevelCanvas.SetActive (true);
-		// Hide main canvas
 		mainCanvas.SetActive (false);
-		Time.timeScale = 0.000001f;
-		yield return new WaitForSeconds (introBeatLevelTextDuration * Time.timeScale);
-		Time.timeScale = 1;
-		// Hide intro beat message canvas canvas
+		GameFlow.Enter (FlowState.Intro);
+		yield return new WaitForSecondsRealtime (introBeatLevelTextDuration);
+		if (GameFlow.State == FlowState.Intro)
+			GameFlow.Enter (FlowState.Playing);
 		introBeatLevelCanvas.SetActive (false);
-		// Show main canvas
 		mainCanvas.SetActive (true);
 	}
 
@@ -135,42 +137,7 @@ public class GameManager : MonoBehaviour {
 		switch (gameState)
 		{
 			case gameStates.Playing:
-				if (playerHealth.isAlive == false) {
-					// Update gameState.
-					gameState = gameStates.Death;
-
-					// Set the end game score.
-					gameOverScoreDisplay.text = mainScoreDisplay.text;
-
-					// Show Game Over Canvas.		
-					mainCanvas.SetActive (false);
-					gameOverCanvas.SetActive (true);
-
-					// Set Play Again Button as selected.
-					GameObject myEventSystem = GameObject.Find("EventSystem");
-					myEventSystem.GetComponent<UnityEngine.EventSystems.EventSystem>().SetSelectedGameObject(GameObject.Find("Play Again Button"));
-				}
-				else if (canBeatLevel && score>=beatLevelScore) {
-					// Update gameState.
-					gameState = gameStates.BeatLevel;
-
-					// Hide the player so game doesn't continue playing.
-					player.SetActive(false);
-
-					// Show Beat Level Canvas.
-					mainCanvas.SetActive (false);
-					beatLevelCanvas.SetActive (true);
-
-					GameObject myEventSystem = GameObject.Find("EventSystem");
-					if (!isFinalLevel) {
-						// Set Play Again Button as selected.
-						myEventSystem.GetComponent<UnityEngine.EventSystems.EventSystem> ().SetSelectedGameObject (GameObject.Find ("Next Level Button"));
-					} else {
-						// Set Main Menu Button as selected.
-						myEventSystem.GetComponent<UnityEngine.EventSystems.EventSystem> ().SetSelectedGameObject (GameObject.Find ("Main Menu Button"));
-					}
-					
-				}
+				ResolvePlaying ();
 				break;
 			case gameStates.Death:
 				backgroundMusic.volume -= 0.01f;
@@ -195,10 +162,57 @@ public class GameManager : MonoBehaviour {
 
 	}
 
+	// Death and win are decided here only, death first (spec §3), independent of Health/GameManager Update order.
+	void ResolvePlaying () {
+		if (GameFlow.State != FlowState.Playing && GameFlow.State != FlowState.Dead)
+			return;
+		bool dead = playerHealth == null || !playerHealth.isAlive
+			|| (playerHealth.healthPoints <= 0 && playerHealth.numberOfLives <= 1);
+		if (dead) {
+			GameFlow.Die ("MẤT KẾT NỐI");
+			gameState = gameStates.Death;
+			gameOverScoreDisplay.text = mainScoreDisplay.text;
+			Transform cause = gameOverCanvas.transform.Find ("Lost Title");
+			if (cause != null)
+				cause.GetComponent<Text> ().text = GameFlow.DeathCause.ToUpperInvariant ();
+			mainCanvas.SetActive (false);
+			gameOverCanvas.SetActive (true);
+			SelectButton ("Play Again Button");
+			return;
+		}
+		if (canBeatLevel && score >= beatLevelScore && GameFlow.CompleteLevel ()) {
+			gameState = gameStates.BeatLevel;
+			if (config != null)
+				CampaignProgress.CompleteLevel (config.levelId);
+			player.SetActive (false);
+			mainCanvas.SetActive (false);
+			if (config != null && config.IsFinal) {
+				StartCoroutine (GoToEnding ());
+			} else {
+				beatLevelCanvas.SetActive (true);
+				SelectButton (isFinalLevel ? "Main Menu Button" : "Next Level Button");
+			}
+		}
+	}
+
+	IEnumerator GoToEnding () {
+		yield return new WaitForSecondsRealtime (0.75f);
+		SceneRouter.ToEnding ();
+	}
+
+	void SelectButton (string name) {
+		GameObject eventSystem = GameObject.Find ("EventSystem");
+		GameObject button = GameObject.Find (name);
+		if (eventSystem != null && button != null)
+			eventSystem.GetComponent<UnityEngine.EventSystems.EventSystem> ().SetSelectedGameObject (button);
+	}
+
 	/// <summary>
 	/// Update the score text.
 	/// </summary>
 	public void Collect(int amount) {
+		if (amount != 0 && GameFlow.State != FlowState.Playing)
+			return;
 		score += amount;
 		if (canBeatLevel) {
 			mainScoreDisplay.text = score.ToString () + " / " + beatLevelScore.ToString ();

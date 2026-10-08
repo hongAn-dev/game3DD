@@ -89,7 +89,7 @@ public static class UiTheme {
 			var scene = EditorSceneManager.OpenScene(buildScene.path, OpenSceneMode.Single);
 			bool changed = false;
 			foreach (GameObject root in scene.GetRootGameObjects()) {
-				changed |= Style(root, theme, Zones.Title(scene.name));
+				changed |= Style(root, theme, LevelCatalog.Get(scene.name) != null ? LevelCatalog.Get(scene.name).displayName : "");
 				// Values set from script on prefab instances only stick once recorded as overrides.
 				foreach (Component component in root.GetComponentsInChildren<Component>(true))
 					if (component != null && PrefabUtility.IsPartOfPrefabInstance(component))
@@ -462,7 +462,7 @@ public static class UiTheme {
 		intro.supportRichText = true;
 		// The text is set at runtime; size the font for the longest zone name and goal.
 		string runtime = intro.text;
-		intro.text = Zones.Title("Level2").ToUpperInvariant() + "\nTHU 100 LÕI NĂNG LƯỢNG";
+		intro.text = LevelCatalog.All.OrderByDescending(l => l.displayName.Length).First().displayName.ToUpperInvariant() + "\nTHU 100 LÕI NĂNG LƯỢNG";
 		intro.fontSize = 40;
 		ShrinkToFit(intro);
 		intro.text = runtime;

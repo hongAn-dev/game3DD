@@ -106,15 +106,16 @@ public class GameplayTests {
 	public IEnumerator ScoreShowsCollectedOverTarget() {
 		yield return null;
 		GameManager gm = GameManager.gm;
-		Assert.AreEqual("0 / " + gm.beatEasyLevelScore, gm.mainScoreDisplay.text);
+		Assert.AreEqual(6, gm.BeatLevelScore);
+		Assert.AreEqual("0 / 6", gm.mainScoreDisplay.text);
 	}
 
 	[Test]
 	public void ZoneTitlesAreVietnamese() {
-		Assert.AreEqual("Bãi phế liệu", Zones.Title("Level1"));
-		Assert.AreEqual("Khu công nghiệp bỏ hoang", Zones.Title("Level2"));
-		Assert.AreEqual("Vùng hoang hóa", Zones.Title("Level3"));
-		Assert.AreEqual("Trạm căn cứ", Zones.Title("Level4"));
-		Assert.AreEqual("", Zones.Title("MainMenu"));
+		Assert.AreEqual("Bãi phế liệu", LevelCatalog.Get("Level1").displayName);
+		Assert.AreEqual("Khu công nghiệp bỏ hoang", LevelCatalog.Get("Level2").displayName);
+		Assert.AreEqual("Vùng hoang hóa", LevelCatalog.Get("Level3").displayName);
+		Assert.AreEqual("Trạm căn cứ", LevelCatalog.Get("Level4").displayName);
+		Assert.IsNull(LevelCatalog.Get("MainMenu"));
 	}
 }
