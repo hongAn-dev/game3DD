@@ -17,6 +17,11 @@ ModelImporter:
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
+      name: CoreShard
+    second: {fileID: 2100000, guid: f94889af12e08224c972dfa7d93925cd, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
       name: Level1_Accent
     second: {fileID: 2100000, guid: fecd6ba3aeadf3ea29d987c255f18ffc, type: 2}
   - first:

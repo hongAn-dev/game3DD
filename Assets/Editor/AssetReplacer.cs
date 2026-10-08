@@ -143,7 +143,7 @@ public static class AssetReplacer {
 		{ "RoboEye", new[] { (Color)new Color32(255, 196, 77, 255), (Color)new Color32(255, 196, 77, 255) * 0.8f } },
 		{ "RoboRust", new[] { (Color)new Color32(115, 64, 31, 255), Color.black } },
 		{ "CoreGlow", new[] { Cyan, Cyan * 1.5f } },
-		{ "CoreFrame", new[] { (Color)new Color32(115, 120, 128, 255), Color.black } },
+		{ "CoreShard", new[] { (Color)new Color32(140, 250, 255, 255), (Color)new Color32(140, 250, 255, 255) * 1.2f } },
 	};
 
 	static void ReplacePlayer() {
@@ -178,34 +178,18 @@ public static class AssetReplacer {
 		}
 	}
 
+	const float CoreHeight = 0.6f;   // world units; the robot is 1.0 across (spec §4.1: 0.5–0.7)
+
 	static void ReplaceCores() {
 		GameObject model = AssetDatabase.LoadAssetAtPath<GameObject>(RoboFolder + "Models/EnergyCore.fbx");
-		foreach (string name in new[] { "Coin", "Coin Bouncy" }) {
-			string path = "Assets/Prefabs/" + name + ".prefab";
-			GameObject root = PrefabUtility.LoadPrefabContents(path);
-			try {
-				if (root.transform.Find(ModelChildName) != null)
-					continue;
-				GameObject instance = ReplaceVisual(root, model, false);
-				// Spec: about 1.3x the old coin so it reads from the gameplay camera.
-				instance.transform.localScale *= 1.3f;
-				PrefabUtility.SaveAsPrefabAsset(root, path);
-				Debug.Log("AssetReplacer: " + name + " -> EnergyCore");
-			} finally {
-				PrefabUtility.UnloadPrefabContents(root);
-			}
-		}
-
 		// "Sil Coins" and "Vin Coins" spell words with plain coin objects (not Coin prefab instances).
-		foreach (string name in new[] { "Sil Coins", "Vin Coins" }) {
+		foreach (string name in new[] { "Coin", "Coin Bouncy", "Sil Coins", "Vin Coins" }) {
 			string path = "Assets/Prefabs/" + name + ".prefab";
 			GameObject root = PrefabUtility.LoadPrefabContents(path);
 			try {
 				int count = 0;
 				foreach (Treasure treasure in root.GetComponentsInChildren<Treasure>(true)) {
-					if (treasure.transform.Find(ModelChildName) != null)
-						continue;
-					ReplaceVisual(treasure.gameObject, model, false).transform.localScale *= 1.3f;
+					CoreVisual(treasure.gameObject, model);
 					count++;
 				}
 				PrefabUtility.SaveAsPrefabAsset(root, path);
@@ -214,6 +198,25 @@ public static class AssetReplacer {
 				PrefabUtility.UnloadPrefabContents(root);
 			}
 		}
+	}
+
+	// Rebuilds the core's visual every run (a newer model must not be skipped as "already replaced"): crystal in a
+	// "Model" child that spins and bobs, a still trigger on the root, CoreHeight tall and centred on the root.
+	static void CoreVisual(GameObject core, GameObject model) {
+		foreach (Rotate spin in core.GetComponents<Rotate>())
+			Object.DestroyImmediate(spin);
+		GameObject instance = ReplaceVisual(core, model, false);
+		instance.transform.localRotation = Quaternion.identity;
+
+		Bounds bounds;
+		if (TryGetLocalBounds(core, out bounds) && bounds.size.y > 0f) {
+			float worldHeight = bounds.size.y * core.transform.lossyScale.y;
+			instance.transform.localScale *= CoreHeight / worldHeight;
+			TryGetLocalBounds(core, out bounds);
+			instance.transform.localPosition -= bounds.center;
+		}
+		if (instance.GetComponent<EnergyBob>() == null)
+			instance.AddComponent<EnergyBob>();
 	}
 
 	static GameObject LoadKenney(string name) {
