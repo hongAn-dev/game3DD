@@ -65,6 +65,10 @@ public class EndingController : MonoBehaviour {
 		if (skipButton != null)
 			skipButton.SetActive(false);
 		completionPanel.SetActive(true);
+		// Keyboard/gamepad players start on the first button (Play Again).
+		UnityEngine.UI.Button first = completionPanel.GetComponentInChildren<UnityEngine.UI.Button>();
+		if (first != null && UnityEngine.EventSystems.EventSystem.current != null)
+			UnityEngine.EventSystems.EventSystem.current.SetSelectedGameObject(first.gameObject);
 	}
 
 	void OnApplicationFocus(bool focus) {

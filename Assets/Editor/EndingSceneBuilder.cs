@@ -29,6 +29,8 @@ public static class EndingSceneBuilder {
 
 	[MenuItem("Tools/Robo Lac Loi/Build Ending Scene")]
 	public static void Build() {
+		if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+			return;
 		var scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
 		if (!AssetDatabase.IsValidFolder(Folder))
 			AssetDatabase.CreateFolder("Assets/Scenes", "Ending");
@@ -75,10 +77,21 @@ public static class EndingSceneBuilder {
 		Vector3 hinge = door.position;
 		float doorLength = Child(ship, "Door").GetComponent<Renderer>().bounds.size.y;
 		float drop = Mathf.Asin(Mathf.Clamp01((hinge.y - 0.05f) / doorLength)) * Mathf.Rad2Deg;
-		Vector3 rampFoot = hinge + rear * doorLength * Mathf.Cos(drop * Mathf.Deg2Rad);
-		rampFoot.y = 0.5f;
-		Vector3 inside = hinge - rear * 2f + Vector3.up * 0.5f;
-		Vector3 corner = new Vector3(charge.x, 0.5f, charge.z) + rear * Vector3.Dot(rampFoot - charge, rear);
+		// Robo rides the open ramp: its centre stays 0.5 m above the ramp surface (along the ramp normal), then rolls
+		// onto the cabin floor (level with the hinge) and further in.
+		Vector3 footGround = hinge + rear * doorLength * Mathf.Cos(drop * Mathf.Deg2Rad);
+		footGround.y = 0f;
+		Vector3 up = (hinge - footGround).normalized;
+		Vector3 normal = Vector3.Cross(up, Vector3.Cross(Vector3.up, up)).normalized;
+		if (normal.y < 0f)
+			normal = -normal;
+		const float onRamp = 0.58f;   // ball radius + half the door thickness
+		Vector3 rampFoot = footGround + up * 0.3f + normal * onRamp;
+		Vector3 rampTop = hinge + normal * onRamp;
+		Vector3 cabin = hinge - rear * 0.8f + Vector3.up * 0.55f;
+		Vector3 inside = hinge - rear * 2.5f + Vector3.up * 0.55f;
+		Vector3 behind = footGround + rear * 2.2f + Vector3.up * 0.5f;
+		Vector3 corner = new Vector3(charge.x, 0.5f, charge.z) + rear * Vector3.Dot(behind - charge, rear);
 
 		// Energy beam from Robo to the port, glows over the four light pods, engine flames.
 		GameObject beam = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
@@ -179,9 +192,16 @@ public static class EndingSceneBuilder {
 		controller.skipButton = skip.gameObject;
 
 		// ---------- timeline ----------
-		AssetDatabase.DeleteAsset(TimelinePath);
-		TimelineAsset timeline = ScriptableObject.CreateInstance<TimelineAsset>();
-		AssetDatabase.CreateAsset(timeline, TimelinePath);
+		// Reuse the asset (stable GUID, small diffs): drop its old tracks and clips, then rebuild them.
+		TimelineAsset timeline = AssetDatabase.LoadAssetAtPath<TimelineAsset>(TimelinePath);
+		if (timeline == null) {
+			timeline = ScriptableObject.CreateInstance<TimelineAsset>();
+			AssetDatabase.CreateAsset(timeline, TimelinePath);
+		}
+		foreach (TrackAsset old in timeline.GetRootTracks().ToList())
+			timeline.DeleteTrack(old);
+		foreach (AnimationClip old in AssetDatabase.LoadAllAssetsAtPath(TimelinePath).OfType<AnimationClip>().ToList())
+			AssetDatabase.RemoveObjectFromAsset(old);
 		timeline.durationMode = TimelineAsset.DurationMode.FixedLength;
 		timeline.fixedDuration = Duration;
 
@@ -195,7 +215,7 @@ public static class EndingSceneBuilder {
 		// Robo: still, roll to the port, wait, round the ship to the ramp foot, up the ramp; hidden once inside.
 		Robo(timeline, director, robo, new[] {
 			K(0f, start), K(3.2f, start), K(5.5f, Vector3.Lerp(start, charge, 0.55f)), K(8f, charge), K(13.2f, charge),
-			K(13.9f, corner), K(14.5f, rampFoot), K(15.6f, inside) });
+			K(13.8f, corner), K(14.3f, behind), K(14.6f, rampFoot), K(15.15f, rampTop), K(15.4f, cabin), K(15.7f, inside) });
 		Activation(timeline, director, "Robo visible", robo, 0f, 15.8f);
 		robo.SetActive(true);
 
@@ -255,6 +275,7 @@ public static class EndingSceneBuilder {
 		fadeClip.SetCurve("", typeof(CanvasGroup), "m_Alpha", new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(1.5f, 0f), new Keyframe(Duration, 0f)));
 		AssetDatabase.AddObjectToAsset(fadeClip, timeline);
 		Animate(timeline, director, "Fade", fade.GetComponent<Animator>(), fadeClip);
+		Activation(timeline, director, "Fade visible", fade, 0f, 1.6f);   // no full-screen overdraw once it is clear
 		Activation(timeline, director, "Caption charging", charging, 8.5f, 3.5f);
 		Activation(timeline, director, "Caption fuel", fuel, 12f, 2f);
 		Activation(timeline, director, "Caption escaped", escaped, 23.5f, Duration - 23.5f);
@@ -286,6 +307,7 @@ public static class EndingSceneBuilder {
 		disc.transform.position = position + Vector3.down * 0.05f;
 		disc.transform.localScale = new Vector3(diameter, 0.05f, diameter);
 		disc.GetComponent<Renderer>().sharedMaterial = material;
+		Object.DestroyImmediate(disc.GetComponent<Collider>());   // no physics in the Ending
 	}
 
 	static void Prop(string packAndModel, Vector3 position, float size, float yaw) {
@@ -304,13 +326,17 @@ public static class EndingSceneBuilder {
 	// The robot ball's look (mesh + materials of the Player prefab) without any gameplay component.
 	static GameObject Robo(Vector3 position) {
 		GameObject player = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Player.prefab");
+		// The timeline's Animator owns the parent's whole transform (it rewrites rotation every frame), so the mesh and
+		// RollVisual live on a child.
 		GameObject robo = new GameObject("Robo");
-		robo.AddComponent<MeshFilter>().sharedMesh = player.GetComponent<MeshFilter>().sharedMesh;
-		robo.AddComponent<MeshRenderer>().sharedMaterials = player.GetComponent<MeshRenderer>().sharedMaterials;
-		robo.transform.localScale = player.transform.localScale;
 		robo.transform.position = position;
-		robo.AddComponent<RollVisual>();
 		robo.AddComponent<Animator>();
+		GameObject visual = new GameObject("Robo Visual");
+		visual.transform.SetParent(robo.transform, false);
+		visual.AddComponent<MeshFilter>().sharedMesh = player.GetComponent<MeshFilter>().sharedMesh;
+		visual.AddComponent<MeshRenderer>().sharedMaterials = player.GetComponent<MeshRenderer>().sharedMaterials;
+		visual.transform.localScale = player.transform.localScale;
+		visual.AddComponent<RollVisual>();
 		return robo;
 	}
 
@@ -326,11 +352,15 @@ public static class EndingSceneBuilder {
 			vertices.AddRange(new[] { c - a - b, c - a + b, c + a + b, c + a - b });
 			triangles.AddRange(new[] { n, n + 1, n + 2, n, n + 2, n + 3 });
 		}
-		Mesh mesh = new Mesh { name = "Starfield" };
+		Mesh mesh = AssetDatabase.LoadAssetAtPath<Mesh>(Folder + "/Starfield.asset");
+		if (mesh == null) {
+			mesh = new Mesh { name = "Starfield" };
+			AssetDatabase.CreateAsset(mesh, Folder + "/Starfield.asset");
+		}
+		mesh.Clear();
 		mesh.SetVertices(vertices);
 		mesh.SetTriangles(triangles, 0);
-		AssetDatabase.DeleteAsset(Folder + "/Starfield.asset");
-		AssetDatabase.CreateAsset(mesh, Folder + "/Starfield.asset");
+		EditorUtility.SetDirty(mesh);
 		GameObject stars = new GameObject("Stars", typeof(MeshFilter), typeof(MeshRenderer));
 		stars.transform.position = origin;
 		stars.GetComponent<MeshFilter>().sharedMesh = mesh;
@@ -385,21 +415,22 @@ public static class EndingSceneBuilder {
 		return keys[keys.Count - 1].Value;
 	}
 
-	static AnimationCurve Curve(IEnumerable<KeyValuePair<float, float>> keys) {
+	static AnimationCurve Curve(IEnumerable<KeyValuePair<float, float>> keys, bool linear = false) {
 		var curve = new AnimationCurve(keys.Select(k => new Keyframe(k.Key, k.Value)).ToArray());
+		var mode = linear ? AnimationUtility.TangentMode.Linear : AnimationUtility.TangentMode.ClampedAuto;
 		for (int i = 0; i < curve.length; i++)
-			AnimationUtility.SetKeyLeftTangentMode(curve, i, AnimationUtility.TangentMode.ClampedAuto);
+			AnimationUtility.SetKeyLeftTangentMode(curve, i, mode);
 		for (int i = 0; i < curve.length; i++)
-			AnimationUtility.SetKeyRightTangentMode(curve, i, AnimationUtility.TangentMode.ClampedAuto);
+			AnimationUtility.SetKeyRightTangentMode(curve, i, mode);
 		return curve;
 	}
 
-	static void PositionCurve(AnimationClip clip, string path, IList<KeyValuePair<float, Vector3>> keys) {
+	static void PositionCurve(AnimationClip clip, string path, IList<KeyValuePair<float, Vector3>> keys, bool linear = false) {
 		string[] axes = { "x", "y", "z" };
 		for (int a = 0; a < 3; a++) {
 			int axis = a;
 			AnimationUtility.SetEditorCurve(clip, EditorCurveBinding.FloatCurve(path, typeof(Transform), "m_LocalPosition." + axes[a]),
-				Curve(keys.Select(k => new KeyValuePair<float, float>(k.Key, k.Value[axis]))));
+				Curve(keys.Select(k => new KeyValuePair<float, float>(k.Key, k.Value[axis])), linear));
 		}
 	}
 
@@ -429,7 +460,7 @@ public static class EndingSceneBuilder {
 
 	static void Robo(TimelineAsset timeline, PlayableDirector director, GameObject robo, KeyValuePair<float, Vector3>[] keys) {
 		var clip = new AnimationClip { name = "Robo" };
-		PositionCurve(clip, "", keys);
+		PositionCurve(clip, "", keys, true);   // linear: Robo follows the ramp surface exactly
 		Animate(timeline, director, "Robo", robo.GetComponent<Animator>(), clip);
 	}
 

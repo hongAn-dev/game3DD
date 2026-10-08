@@ -3,7 +3,7 @@ rear ramp door (origin on its hinge), a charging port on the left side, four lig
 flames. Door, Port, Pod_1..4 and Flame_L/R are separate objects so the Ending timeline can drive them.
 Blender front is -Y (Unity +Z after export).
 Usage: blender -b --python Tools/blender/make_ship.py -- <out.fbx>"""
-import bpy, math, sys
+import bpy, bmesh, math, sys
 
 out_fbx = sys.argv[sys.argv.index('--') + 1]
 bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -44,10 +44,24 @@ def join(objects, name):
     return o
 
 parts = []
-# Fuselage: octagonal body lying along Y, nose cone at the front (-Y), raised 2 m on legs.
-bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=1.8, depth=8.0, location=(0, 0.5, 3.0), rotation=(math.radians(90), 0, math.radians(22.5)))
+# Fuselage: octagonal body lying along Y (turned 22.5° about its own axis for a flat floor), nose cone at the front (-Y).
+# Open tube (the nose cone closes the front); the rear is a thin bulkhead with a doorway cut right through it
+# (1.3 m wide, floor level with the ramp hinge). Cutting a thin plate, not the solid tube, leaves no hidden wall.
+bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=1.8, depth=8.0, end_fill_type='NOTHING', location=(0, 0.5, 3.0), rotation=(math.radians(90), math.radians(22.5), 0))
 parts.append(obj('Body', hull_mat))
-bpy.ops.mesh.primitive_cone_add(vertices=8, radius1=1.8, radius2=0.35, depth=3.2, location=(0, -5.1, 3.0), rotation=(math.radians(90), 0, math.radians(22.5)))
+bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=1.8, depth=0.06, location=(0, 4.47, 3.0), rotation=(math.radians(90), math.radians(22.5), 0))
+bulkhead = obj('Bulkhead', hull_mat)
+bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 4.47, 2.83))
+cutter = bpy.context.active_object
+cutter.scale = (1.3, 1.0, 2.94)
+cut = bulkhead.modifiers.new('Doorway', 'BOOLEAN')
+cut.operation = 'DIFFERENCE'
+cut.object = cutter
+bpy.context.view_layer.objects.active = bulkhead
+bpy.ops.object.modifier_apply(modifier='Doorway')
+bpy.data.objects.remove(cutter, do_unlink=True)
+parts.append(bulkhead)
+bpy.ops.mesh.primitive_cone_add(vertices=8, radius1=1.8, radius2=0.35, depth=3.2, location=(0, -5.1, 3.0), rotation=(math.radians(90), math.radians(22.5), 0))
 parts.append(obj('Nose', hull_mat))
 # Wings with orange tips.
 for sx in (-1, 1):
@@ -81,12 +95,25 @@ for sx, side in ((-1, 'L'), (1, 'R')):
     bpy.ops.mesh.primitive_cone_add(vertices=8, radius1=0.6, radius2=0.0, depth=2.4, location=(sx * 2.3, 6.7, 3.0), rotation=(math.radians(-90), 0, 0))
     obj('Flame_' + side, flame_mat)
 
-# Rear ramp door, hinged at its bottom edge (y = 4.5, z = 1.2); closed it stands up against the rear opening.
-bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 4.55, 2.6))
-door = obj('Door', dark_mat)
-door.scale = (2.2, 0.15, 2.8)
+# Dark cabin behind the doorway: a box with inward faces and no rear wall, narrow enough to stay inside the octagon;
+# its floor (z 1.36) is level with the hinge.
+bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0.6, 2.83))
+interior = obj('Interior', dark_mat)
+interior.scale = (1.3, 7.7, 2.94)
 bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-bpy.context.scene.cursor.location = (0, 4.55, 1.2)
+bm = bmesh.new()
+bm.from_mesh(interior.data)
+bmesh.ops.delete(bm, geom=[f for f in bm.faces if f.normal.y > 0.9], context='FACES')
+bmesh.ops.reverse_faces(bm, faces=bm.faces)
+bm.to_mesh(interior.data)
+bm.free()
+
+# Rear ramp door, hinged at its bottom edge (y = 4.55, z = 1.33); closed it covers the whole octagonal rear opening.
+bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 4.55, 3.005))
+door = obj('Door', dark_mat)
+door.scale = (3.4, 0.15, 3.35)
+bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+bpy.context.scene.cursor.location = (0, 4.55, 1.33)
 bpy.ops.object.origin_set(type='ORIGIN_CURSOR')
 
 # Charging port on the left side and four light pods along the spine.
@@ -97,7 +124,7 @@ for i in range(4):
     obj('Pod_%d' % (i + 1), pod_mat)
 
 names = sorted(o.name for o in bpy.data.objects)
-expected = sorted(['Hull', 'Cockpit', 'Engine_L', 'Engine_R', 'Flame_L', 'Flame_R', 'Door', 'Port', 'Pod_1', 'Pod_2', 'Pod_3', 'Pod_4'])
+expected = sorted(['Hull', 'Interior', 'Cockpit', 'Engine_L', 'Engine_R', 'Flame_L', 'Flame_R', 'Door', 'Port', 'Pod_1', 'Pod_2', 'Pod_3', 'Pod_4'])
 assert names == expected, names
 bpy.ops.object.select_all(action='SELECT')
 bpy.ops.export_scene.fbx(filepath=out_fbx, apply_scale_options='FBX_SCALE_ALL',

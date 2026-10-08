@@ -199,8 +199,19 @@ public class GameManager : MonoBehaviour {
 		}
 	}
 
+	// Fades Level4 to black before the Ending (which fades in from black), spec §8 "Fade từ L4".
 	IEnumerator GoToEnding () {
-		yield return new WaitForSecondsRealtime (0.75f);
+		GameObject overlay = new GameObject ("Ending Fade", typeof (Canvas), typeof (UnityEngine.UI.Image));
+		Canvas canvas = overlay.GetComponent<Canvas> ();
+		canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+		canvas.sortingOrder = 1000;
+		UnityEngine.UI.Image black = overlay.GetComponent<UnityEngine.UI.Image> ();
+		black.raycastTarget = false;
+		for (float t = 0f; t < 0.75f; t += Time.unscaledDeltaTime) {
+			black.color = new Color (0f, 0f, 0f, t / 0.75f);
+			yield return null;
+		}
+		black.color = Color.black;
 		SceneRouter.ToEnding ();
 	}
 
