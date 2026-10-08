@@ -33,7 +33,7 @@ public class ThirdPartyModelPostprocessor : AssetPostprocessor {
 			importer.animationType = ModelImporterAnimationType.None;
 			importer.importAnimation = false;
 		} else if (In(assetPath, CharacterFolders)) {
-			// The game drives monsters with the legacy Animation component (see MonsterChaser).
+			// The game drives monsters with the legacy Animation component (see EnemyBrain).
 			importer.animationType = ModelImporterAnimationType.Legacy;
 			importer.importAnimation = true;
 		}

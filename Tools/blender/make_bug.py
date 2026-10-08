@@ -18,7 +18,7 @@ def material(name, rgb, emit=0.0):
 
 shell = material('BugShell', (0.20, 0.22, 0.26))
 joint = material('BugJoint', (0.55, 0.57, 0.60))
-eye = material('BugEye', (1.0, 0.28, 0.05), emit=4.0)
+eye = material('BugEye', (1.0, 0.12, 0.03), emit=1.5)
 
 def finish(obj, name, mat):
     obj.name = obj.data.name = name

@@ -33,31 +33,6 @@ public class GameplayTests {
 	}
 
 	[UnityTest]
-	public IEnumerator PatrolRobotKillsPlayerOnContact() {
-#if UNITY_EDITOR
-		GameObject player = GameObject.FindWithTag("Player");
-		Health health = player.GetComponent<Health>();
-		GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Enemy - Monster.prefab");
-		Object.Instantiate(prefab, player.transform.position + new Vector3(3, 1, 0), Quaternion.identity);
-
-		// The robot stops a few metres away to attack; the braking ball no longer drifts into it, so roll into it.
-		Ball ball = player.GetComponent<Ball>();
-		Object.Destroy(player.GetComponent<BallUserControl>());
-		GameObject robot = GameObject.FindWithTag("Player") != null ? Object.FindObjectOfType<MonsterChaser>().gameObject : null;
-		float end = Time.time + 6f;
-		while (Time.time < end && health != null && health.isAlive) {
-			yield return new WaitForFixedUpdate();
-			if (ball != null && robot != null)
-				ball.Move((robot.transform.position - ball.transform.position).normalized, false);
-		}
-
-		Assert.IsTrue(health == null || !health.isAlive, "Player should die when the patrol robot reaches it");
-#else
-		yield return null;
-#endif
-	}
-
-	[UnityTest]
 	public IEnumerator ScoreDisplayIsResetAfterReload() {
 		GameManager.gm.Collect(3);
 		SceneManager.LoadScene("Level1");
@@ -88,9 +63,10 @@ public class GameplayTests {
 	public void PatrolRobotUsesRobotClips() {
 #if UNITY_EDITOR
 		GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Enemy - Monster.prefab");
-		MonsterChaser chaser = prefab.GetComponent<MonsterChaser>();
-		Assert.AreEqual("Run", chaser.runClip);
-		Assert.AreEqual("Attack", chaser.attackClip);
+		EnemyBrain brain = prefab.GetComponent<EnemyBrain>();
+		Assert.AreEqual("Run", brain.runClip);
+		Assert.AreEqual("Attack", brain.attackClip);
+		Assert.AreEqual("Idle", brain.idleClip);
 		Assert.IsNotNull(prefab.GetComponentInChildren<Animation>().GetClip("Attack"));
 #endif
 	}

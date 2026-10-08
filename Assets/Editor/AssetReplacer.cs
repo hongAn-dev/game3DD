@@ -284,10 +284,10 @@ public static class AssetReplacer {
 			animation.clip = run;
 			animation.playAutomatically = true;
 
-			MonsterChaser chaser = root.GetComponent<MonsterChaser>();
-			if (chaser != null) {
-				chaser.runClip = run != null ? run.name : "";
-				chaser.attackClip = attack != null ? attack.name : "";
+			EnemyBrain brain = root.GetComponent<EnemyBrain>();
+			if (brain != null) {
+				brain.runClip = run != null ? run.name : "";
+				brain.attackClip = attack != null ? attack.name : "";
 			}
 
 			PrefabUtility.SaveAsPrefabAsset(root, MonsterPrefab);
