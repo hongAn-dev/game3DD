@@ -56,7 +56,9 @@ public class EndingController : MonoBehaviour {
 		Completed = true;
 		CompletionCount++;
 		if (director != null) {
-			director.time = director.duration;
+			// Just before the end: Timeline clips are active while start <= t < end, so exactly at the end the
+			// space camera would switch off and nothing would render behind the completion panel.
+			director.time = director.duration - 0.001;
 			director.Evaluate();
 			director.Pause();
 		}

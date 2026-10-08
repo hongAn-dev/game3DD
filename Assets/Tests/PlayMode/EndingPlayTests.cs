@@ -85,6 +85,7 @@ public class EndingPlayTests {
 		Assert.IsTrue(controller.completionPanel.activeSelf);
 		Assert.IsFalse(controller.skipButton.activeSelf);
 		Assert.AreEqual(director.duration, director.time, 0.05, "skip jumps to the last frame");
+		Assert.IsTrue(Find("Space Camera").activeSelf, "a camera still renders behind the completion panel");
 	}
 
 	[UnityTest]
@@ -94,6 +95,7 @@ public class EndingPlayTests {
 		yield return new WaitForSeconds(1f);
 		Assert.AreEqual(1, controller.CompletionCount);
 		Assert.IsTrue(controller.completionPanel.activeSelf);
+		Assert.Greater(Camera.allCamerasCount, 0, "a camera still renders behind the completion panel");
 	}
 
 	[UnityTest]
