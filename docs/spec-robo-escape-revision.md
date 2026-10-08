@@ -319,7 +319,7 @@ Không để trống các phần liên quan khi đánh dấu bản sửa hoàn t
 | Gói | Trạng thái | Owner | Commit/file chính | Bằng chứng, lỗi còn lại |
 |---|---|---|---|---|
 | T0 Baseline | Đang làm | Claude | BuildScript.cs, BaselineProbe.cs, BaselineProbes.cs | APK dev baseline build OK; số đo ở 14.1. Chưa có: video baseline 4 màn, thiết bị Android (cần chủ dự án). |
-| T1 Flow/config | Chưa làm | — | — | — |
+| T1 Flow/config | Xong | Claude | Assets/Scripts/Flow/*, GameManager.cs, Treasure.cs, Resources/Levels, Scenes/Ending.unity | EditMode 30/30, PlayMode 17/17 (gồm chết-trước-thắng, nhặt 1 lần, route đủ 4 màn → Ending, Level4 mở trực tiếp → menu). Ending hiện chỉ có màn hoàn thành (cinematic ở T6); pause UI/nút ở T2. |
 | T2 Android/control | Chưa làm | — | — | — |
 | T3 Energy | Chưa làm | — | — | — |
 | T4 Map/theme | Chưa làm | — | — | — |
@@ -338,7 +338,7 @@ Teammate bổ sung quy trình Android đã chạy thành công, không yêu cầ
 - Minimum/target API, scripting backend, architecture, graphics API: min API 28 (Android 9), target Auto, IL2CPP, ARM64, graphics API mặc định (Auto). Màn hình ngang (landscape left/right).
 - Cách build bằng Editor và tên entry point nếu bổ sung build script: Tools > Robo Lac Loi > Build Android (development/test), hoặc batch `unity -batchmode -quit -projectPath . -buildTarget Android -executeMethod BuildScript.BuildAndroidDevelopment` (hoặc `BuildAndroidTest`). KHÔNG dùng `-nographics`. Ký APK: đặt biến môi trường `ANDROID_KEYSTORE`, `ANDROID_KEYSTORE_PASS`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASS`; không đặt thì dùng `~/.android/debug.keystore` (phải là JKS đọc được bởi JDK 8). BuildScript xoá thiết lập ký sau khi build để không lưu đường dẫn/mật khẩu vào ProjectSettings. Sau khi build Android, chuyển lại desktop bằng `-buildTarget Linux64 -executeMethod BuildScript.BuildLinux`.
 - Package ID/version, vị trí APK development và APK chơi thử: com.hongandev.game3dd, bundleVersion hiện tại; `Builds/Android/RoboLacLoi-dev.apk` (development, ~51 MB, build baseline 08/10/2026 OK) và `Builds/Android/RoboLacLoi.apk` (chơi thử). Thư mục `Builds/` không commit.
-- Cách chạy EditMode/PlayMode tests và nơi lấy report: Chưa ghi.
+- Cách chạy EditMode/PlayMode tests và nơi lấy report: đóng Unity Editor, chạy `unity -batchmode -projectPath . -runTests -testPlatform EditMode -testResults <file>.xml` (hoặc `PlayMode`); report là file XML NUnit tại đường dẫn `-testResults`. Probe baseline T0: thêm `-testFilter BaselineProbes` (PlayMode) và `-executeMethod BaselineProbe.Run` (không `-nographics`).
 - Không ghi keystore password, token hoặc thông tin bí mật vào tài liệu/repository.
 
 ### 14.4. Asset, cân bằng và nghiệm thu
@@ -350,7 +350,7 @@ Teammate bổ sung quy trình Android đã chạy thành công, không yêu cầ
 | Phi thuyền | Chưa chọn | Chưa ghi | Chưa ghi |
 | Axit/lava/VFX/audio bổ sung | Chưa chọn | Chưa ghi | Chưa ghi |
 
-- Giá trị cuối và vị trí config chỉnh được (N, spawn cap/interval, enemy speed/budget, camera, boost nếu có): Chưa chốt.
+- Giá trị cuối và vị trí config chỉnh được (N, spawn cap/interval, enemy speed/budget, camera, boost nếu có): Config tại `Assets/Resources/Levels/Level1..4.asset` (ghi bằng Tools > Robo Lac Loi > Write Level Configs / `LevelConfigBuilder.WriteDefaults`): N 6/10/14/18; có sẵn 3/4/5/6; trần energy 5/6/7/8; interval 5–7/5–7/4–6/4–6 giây; enemy cap Easy/Normal/Hard L1 2/3/4, L2 4/5/6, L3 6/7/8, L4 8/9/10; boss cap 1/1/2/2. Giá trị khởi điểm, chưa cân bằng.
 - Diện tích L1–2 trước/sau và ảnh top-down: Trước: L1 1021 m², L2 2237 m²; ảnh top-down tạo bằng `BaselineProbe.Run` (ghi ra `~/Downloads/claude/work/probe/Level{1,2}_topdown_before.png` trên máy build, không commit). Sau: Chưa đo.
 - Report test tự động và ma trận chơi thử mục 12: Chưa chạy.
 - Video Android multitouch, AI vượt vật cản và Ending: Chưa có.
