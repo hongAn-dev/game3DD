@@ -31,6 +31,9 @@ public class OverdriveTests {
 			OverdriveIndicator indicator = Object.FindObjectOfType<OverdriveIndicator>();
 			Assert.IsNotNull(indicator, level.levelId);
 			Assert.IsFalse(indicator.content.activeSelf, level.levelId + ": hidden until boosted");
+			Assert.AreEqual(new Color32(255, 214, 40, 255), (Color32)indicator.seconds.color, level.levelId + ": countdown in Overdrive yellow");
+			// The HUD zone label follows LevelConfig (it kept the pre-T4 names before).
+			Assert.AreEqual(level.displayName.ToUpperInvariant(), GameObject.Find("Zone Text").GetComponent<UnityEngine.UI.Text>().text, level.levelId);
 		}
 	}
 }

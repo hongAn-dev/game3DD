@@ -6,7 +6,7 @@ using UnityEngine.UI;
 /// <summary>
 /// Overdrive (spec §9): builds Assets/Prefabs/Overdrive.prefab (static trigger root, spinning bolt child), adds the
 /// OverdriveDirector to Level2+ (removed from Level1) and an "Overdrive Indicator" (bolt icon + seconds) to every
-/// level's MainCanvas. Re-runnable. Run UiTheme.Apply afterwards.
+/// level's energy panel. Re-runnable. Run UiTheme.Apply first (it creates the panel's "Zone Text").
 /// </summary>
 public static class OverdriveSetup {
 
@@ -63,18 +63,19 @@ public static class OverdriveSetup {
 		}
 	}
 
-	// Top centre of the HUD, under the score bar: bolt icon and the seconds left; hidden until Overdrive runs.
+	// Under the energy panel at the top right (below the zone name): bolt icon and the seconds left; hidden until
+	// Overdrive runs.
 	static void Indicator(Sprite sprite) {
-		GameObject canvas = GameObject.Find("MainCanvas");
-		Transform old = canvas.transform.Find("Overdrive Indicator");
-		if (old != null)
+		Transform panel = GameObject.Find("Zone Text").transform.parent;
+		foreach (OverdriveIndicator old in Object.FindObjectsOfType<OverdriveIndicator>(true))
 			Object.DestroyImmediate(old.gameObject);
 		GameObject go = new GameObject("Overdrive Indicator", typeof(RectTransform));
-		go.transform.SetParent(canvas.transform, false);
+		go.transform.SetParent(panel, false);
 		RectTransform rect = (RectTransform)go.transform;
-		rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0.5f, 1f);
-		rect.anchoredPosition = new Vector2(0f, -150f);
-		rect.sizeDelta = new Vector2(200f, 80f);
+		rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(1f, 0f);
+		rect.pivot = new Vector2(1f, 1f);
+		rect.anchoredPosition = new Vector2(-4f, -34f);
+		rect.sizeDelta = new Vector2(110f, 44f);
 		OverdriveIndicator indicator = go.AddComponent<OverdriveIndicator>();
 
 		GameObject content = new GameObject("Content", typeof(RectTransform));
@@ -88,7 +89,7 @@ public static class OverdriveSetup {
 		iconGo.transform.SetParent(content.transform, false);
 		RectTransform iconRect = (RectTransform)iconGo.transform;
 		iconRect.anchorMin = iconRect.anchorMax = iconRect.pivot = new Vector2(0f, 0.5f);
-		iconRect.sizeDelta = new Vector2(80f, 80f);
+		iconRect.sizeDelta = new Vector2(44f, 44f);
 		Image image = iconGo.GetComponent<Image>();
 		image.sprite = sprite;
 		image.raycastTarget = false;
@@ -98,11 +99,11 @@ public static class OverdriveSetup {
 		RectTransform textRect = (RectTransform)textGo.transform;
 		textRect.anchorMin = new Vector2(0f, 0f);
 		textRect.anchorMax = new Vector2(1f, 1f);
-		textRect.offsetMin = new Vector2(90f, 0f);
+		textRect.offsetMin = new Vector2(50f, 0f);
 		textRect.offsetMax = Vector2.zero;
 		Text text = textGo.GetComponent<Text>();
 		text.font = AssetDatabase.LoadAssetAtPath<Font>("Assets/Fonts/ChakraPetch/ChakraPetch-Bold.ttf");
-		text.fontSize = 56;
+		text.fontSize = 34;
 		text.alignment = TextAnchor.MiddleLeft;
 		text.color = new Color32(255, 214, 40, 255);
 		text.text = "5";

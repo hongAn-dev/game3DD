@@ -16,6 +16,7 @@ public static class UiTheme {
 	static readonly Color Panel = new Color32(14, 19, 26, 230);
 	static readonly Color PanelSelected = new Color32(22, 92, 98, 240);
 	static readonly Color Cyan = new Color32(46, 230, 230, 255);
+	static readonly Color OverdriveYellow = new Color32(255, 214, 40, 255);
 	static readonly Color TextColor = new Color32(240, 246, 250, 255);
 	// Light slate: readable over the bright menu terrain with a drop shadow.
 	static readonly Color Muted = new Color32(203, 213, 225, 255);
@@ -243,6 +244,8 @@ public static class UiTheme {
 			color = DifficultyColors[difficulty];
 		else if (text.name == "Zone Text")
 			color = Cyan;
+		else if (text.transform.parent != null && text.transform.parent.parent != null && text.transform.parent.parent.name == "Overdrive Indicator")
+			color = OverdriveYellow;
 		else if (text.name == "Subtitle")
 			color = Muted;
 		else if (text.name == "Lost Title")
@@ -442,6 +445,9 @@ public static class UiTheme {
 			zoneT = zone.transform;
 		}
 		if (zoneT != null) {
+			// Re-runs keep the label in step with LevelConfig (zone names changed in T4).
+			if (zoneTitle.Length > 0)
+				zoneT.GetComponent<Text>().text = zoneTitle.ToUpperInvariant();
 			RectTransform zoneRect = (RectTransform)zoneT;
 			zoneRect.anchorMin = zoneRect.anchorMax = new Vector2(1f, 0f);
 			zoneRect.pivot = new Vector2(1f, 1f);
