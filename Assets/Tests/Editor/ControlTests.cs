@@ -93,4 +93,17 @@ public class ControlTests {
 		Assert.AreEqual(2300f / 2400f, anchors.width, 0.0001f);
 		Assert.AreEqual(1f, anchors.height, 0.0001f);
 	}
+
+	[Test]
+	public void LookFullWidthTurns180() {
+		Vector2 r = ThirdPersonOrbitCamera.ApplyLook(0f, 40f, new Vector2(1000f, 0f), 1000f, 1f, 15f, 65f);
+		Assert.AreEqual(180f, r.x, 0.001f);
+		Assert.AreEqual(40f, r.y, 0.001f);
+	}
+
+	[Test]
+	public void LookClampsPitch() {
+		Assert.AreEqual(65f, ThirdPersonOrbitCamera.ApplyLook(0f, 40f, new Vector2(0f, -5000f), 1000f, 1f, 15f, 65f).y, 0.001f);
+		Assert.AreEqual(15f, ThirdPersonOrbitCamera.ApplyLook(0f, 40f, new Vector2(0f, 5000f), 1000f, 1f, 15f, 65f).y, 0.001f);
+	}
 }

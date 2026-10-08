@@ -78,4 +78,50 @@ public class ControlPlayTests {
 		}
 		Assert.Less(minVertical, -5f);
 	}
+
+	ThirdPersonOrbitCamera OrbitRig(out Transform target) {
+		offset = new Vector3(2000f + 500f * (testIndex++), 0f, 0f);
+		target = new GameObject("Orbit Target").transform;
+		target.position = offset;
+		GameObject camGo = new GameObject("Orbit Camera");
+		camGo.AddComponent<Camera>();
+		ThirdPersonOrbitCamera orbit = camGo.AddComponent<ThirdPersonOrbitCamera>();
+		orbit.target = target;
+		orbit.yaw = 0f;
+		orbit.pitch = 30f;
+		orbit.distance = 8f;
+		GameFlow.ResetForScene();
+		return orbit;
+	}
+
+	[UnityTest]
+	public IEnumerator OrbitCameraStopsAtObstacle() {
+		Transform target;
+		ThirdPersonOrbitCamera orbit = OrbitRig(out target);
+		yield return null;
+		float free = Vector3.Distance(orbit.transform.position, target.position + Vector3.up * 0.5f);
+		Assert.AreEqual(8f, free, 0.3f);
+
+		// A wall halfway between the pivot and the camera.
+		GameObject wall = GameObject.CreatePrimitive(PrimitiveType.Cube);
+		wall.transform.position = Vector3.Lerp(target.position + Vector3.up * 0.5f, orbit.transform.position, 0.5f);
+		wall.transform.localScale = new Vector3(10f, 10f, 0.5f);
+		yield return new WaitForFixedUpdate();
+		yield return null;
+		float blocked = Vector3.Distance(orbit.transform.position, target.position + Vector3.up * 0.5f);
+		Assert.Less(blocked, free * 0.6f);
+		Assert.IsFalse(wall.GetComponent<Collider>().bounds.Contains(orbit.transform.position));
+	}
+
+	[UnityTest]
+	public IEnumerator OrbitCameraIgnoresInputWhenNotPlaying() {
+		Transform target;
+		ThirdPersonOrbitCamera orbit = OrbitRig(out target);
+		yield return null;
+		GameFlow.Pause();
+		orbit.AddLook(new Vector2(500f, 0f));
+		yield return null;
+		Assert.AreEqual(0f, orbit.yaw, 0.001f);
+		GameFlow.Resume();
+	}
 }

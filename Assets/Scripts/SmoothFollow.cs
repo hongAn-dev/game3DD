@@ -20,7 +20,11 @@ public class SmoothFollow : MonoBehaviour {
 	[SerializeField]
 	private float heightDamping;
 
-	// Mouse camera controls: wheel zooms, right button drag orbits and tilts.
+	// Mouse camera controls (only when allowed; the minimap keeps a fixed view): wheel zooms, right drag orbits.
+	[SerializeField]
+	private bool allowUserInput = false;
+	public bool AllowUserInput { get { return allowUserInput; } set { allowUserInput = value; } }
+
 	[SerializeField]
 	private float zoomSpeed = 0.5f;
 	[SerializeField]
@@ -56,7 +60,7 @@ public class SmoothFollow : MonoBehaviour {
 		currentHeight = Mathf.Lerp(currentHeight, wantedHeight, heightDamping * Time.deltaTime);
 
 		// Zoom with the mouse wheel, keeping the camera angle.
-		float scroll = Input.GetAxis("Mouse ScrollWheel");
+		float scroll = allowUserInput && GameFlow.IsGameplayActive ? Input.GetAxis("Mouse ScrollWheel") : 0f;
 		if (scroll != 0) {
 			float newDistance = Mathf.Clamp(distance * (1 - scroll * zoomSpeed), minDistance, maxDistance);
 			currentHeight = target.position.y + (currentHeight - target.position.y) * newDistance / distance;
@@ -64,7 +68,7 @@ public class SmoothFollow : MonoBehaviour {
 		}
 
 		// Orbit and tilt while the right mouse button is held.
-		if (Input.GetMouseButton(1)) {
+		if (allowUserInput && GameFlow.IsGameplayActive && Input.GetMouseButton(1)) {
 			currentRotationAngle += Input.GetAxis("Mouse X") * orbitSpeed;
 			currentHeight = Mathf.Clamp(currentHeight - Input.GetAxis("Mouse Y") * tiltSpeed,
 				target.position.y + 0.5f, target.position.y + maxDistance);
