@@ -310,15 +310,15 @@ Không để trống các phần liên quan khi đánh dấu bản sửa hoàn t
 - Commit baseline / branch triển khai: ba66683 / robo-escape.
 - Unity đã mở project thành công / tình trạng LFS: Unity 2020.3.19f1 mở project bằng batchmode thành công; git lfs fsck OK, không còn pointer.
 - Owner T0–T7, người tích hợp và lịch dự kiến: Chưa phân công.
-- Thiết bị Android chính/phụ (model, SoC, RAM, OS, độ phân giải): Chưa chọn.
+- Thiết bị Android chính/phụ (model, SoC, RAM, OS, độ phân giải): Chưa chọn — cần chủ dự án cung cấp 2 máy.
 - Sai khác source so với mục 2 và cách xử lý: Khớp mục 2. Thêm: Zones.cs giữ tên khu (thay bằng LevelConfig ở T1); chưa có pause UI (chỉ UIButtonResumeGame).
-- Số đo ban đầu (V của Robo, kích thước boss/creep, diện tích đi được L1–2): Chưa đo.
+- Số đo ban đầu (V của Robo, kích thước boss/creep, diện tích đi được L1–2): Robo không có tốc độ ổn định (Ball dùng AddForce 25 N, khối lượng 1,3, drag 0,1, UseTorque tắt; jumpPower 0 nên nhảy đang tắt) — giữ full input từ đứng yên trên nền phẳng: 1 giây 11,6 m/s, 2 giây 19,6 m/s, 4 giây 33,1 m/s; V chuẩn sẽ đo lại sau khi thêm trần tốc độ (T2). Boss `Enemy - Monster` (root scale 3): bounds 13,9 × 7,6 × 5,0 (cao ≈ 7,6 đường kính Robo). Creep `Enemy - Crater`: 1,47 × 1,53 × 1,47. Diện tích đi được (lưới 1 m, dốc < 45°): L1 = 1021 m², L2 = 2237 m². Audit override (instance / override ngoài transform): L1 Coin 5/1, WaterDeathZone 1/0; L2 Coin 35/0; L3 Coin 119/0, Sil 1, Vin 1, Monster 3/5; L4 Coin 236/0, Sil 1, Vin 1, Monster 8/0; Crater không có instance đặt sẵn (chỉ sinh từ spawner).
 
 ### 14.2. Tiến độ và bằng chứng
 
 | Gói | Trạng thái | Owner | Commit/file chính | Bằng chứng, lỗi còn lại |
 |---|---|---|---|---|
-| T0 Baseline | Chưa làm | — | — | — |
+| T0 Baseline | Đang làm | Claude | BuildScript.cs, BaselineProbe.cs, BaselineProbes.cs | APK dev baseline build OK; số đo ở 14.1. Chưa có: video baseline 4 màn, thiết bị Android (cần chủ dự án). |
 | T1 Flow/config | Chưa làm | — | — | — |
 | T2 Android/control | Chưa làm | — | — | — |
 | T3 Energy | Chưa làm | — | — | — |
@@ -351,7 +351,7 @@ Teammate bổ sung quy trình Android đã chạy thành công, không yêu cầ
 | Axit/lava/VFX/audio bổ sung | Chưa chọn | Chưa ghi | Chưa ghi |
 
 - Giá trị cuối và vị trí config chỉnh được (N, spawn cap/interval, enemy speed/budget, camera, boost nếu có): Chưa chốt.
-- Diện tích L1–2 trước/sau và ảnh top-down: Chưa đo.
+- Diện tích L1–2 trước/sau và ảnh top-down: Trước: L1 1021 m², L2 2237 m²; ảnh top-down tạo bằng `BaselineProbe.Run` (ghi ra `~/Downloads/claude/work/probe/Level{1,2}_topdown_before.png` trên máy build, không commit). Sau: Chưa đo.
 - Report test tự động và ma trận chơi thử mục 12: Chưa chạy.
 - Video Android multitouch, AI vượt vật cản và Ending: Chưa có.
 - Kết quả frame time/memory/10 vòng retry trên thiết bị đã chọn: Chưa đo.
