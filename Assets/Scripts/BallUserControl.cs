@@ -66,18 +66,20 @@ public class BallUserControl : MonoBehaviour {
 			v = (v == 0) ? joystick.Vertical : v;
 		}
 
-		// Calculate move direction.
+		// Calculate move direction, keeping the analog magnitude of the stick.
 		if (cam != null)
-		{
-			// Calculate camera relative direction to move.
-			camForward = Vector3.Scale(cam.forward, new Vector3(1, 0, 1)).normalized;
-			move = (v*camForward + h*cam.right).normalized;
-		}
+			move = CameraRelative(h, v, cam.forward, cam.right);
 		else
-		{
-			// Use world-relative directions in the case of no main camera.
-			move = (v*Vector3.forward + h*Vector3.right).normalized;
-		}
+			move = CameraRelative(h, v, Vector3.forward, Vector3.right);
+	}
+
+	/// <summary>
+	/// Stick (h, v) to a horizontal world direction relative to the camera, magnitude kept and clamped to 1.
+	/// </summary>
+	public static Vector3 CameraRelative(float h, float v, Vector3 camForward, Vector3 camRight) {
+		Vector3 forward = new Vector3(camForward.x, 0f, camForward.z).normalized;
+		Vector3 right = new Vector3(camRight.x, 0f, camRight.z).normalized;
+		return Vector3.ClampMagnitude(forward * v + right * h, 1f);
 	}
 
 	/// <summary>

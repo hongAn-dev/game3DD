@@ -40,9 +40,16 @@ public class GameplayTests {
 		GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Enemy - Monster.prefab");
 		Object.Instantiate(prefab, player.transform.position + new Vector3(3, 1, 0), Quaternion.identity);
 
+		// The robot stops a few metres away to attack; the braking ball no longer drifts into it, so roll into it.
+		Ball ball = player.GetComponent<Ball>();
+		Object.Destroy(player.GetComponent<BallUserControl>());
+		GameObject robot = GameObject.FindWithTag("Player") != null ? Object.FindObjectOfType<MonsterChaser>().gameObject : null;
 		float end = Time.time + 6f;
-		while (Time.time < end && health != null && health.isAlive)
-			yield return null;
+		while (Time.time < end && health != null && health.isAlive) {
+			yield return new WaitForFixedUpdate();
+			if (ball != null && robot != null)
+				ball.Move((robot.transform.position - ball.transform.position).normalized, false);
+		}
 
 		Assert.IsTrue(health == null || !health.isAlive, "Player should die when the patrol robot reaches it");
 #else
