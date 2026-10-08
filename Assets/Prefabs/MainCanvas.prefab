@@ -310,6 +310,7 @@ MonoBehaviour:
   inputVector: {x: 0, y: 0}
   background: {fileID: 224541398504482006}
   handle: {fileID: 224797421307946036}
+  deadZone: 0.1
 --- !u!1 &1172328169131350
 GameObject:
   m_ObjectHideFlags: 0

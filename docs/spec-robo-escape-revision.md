@@ -312,7 +312,7 @@ Không để trống các phần liên quan khi đánh dấu bản sửa hoàn t
 - Owner T0–T7, người tích hợp và lịch dự kiến: Chưa phân công.
 - Thiết bị Android chính/phụ (model, SoC, RAM, OS, độ phân giải): Chưa chọn — cần chủ dự án cung cấp 2 máy.
 - Sai khác source so với mục 2 và cách xử lý: Khớp mục 2. Thêm: Zones.cs giữ tên khu (thay bằng LevelConfig ở T1); chưa có pause UI (chỉ UIButtonResumeGame).
-- Số đo ban đầu (V của Robo, kích thước boss/creep, diện tích đi được L1–2): Robo không có tốc độ ổn định (Ball dùng AddForce 25 N, khối lượng 1,3, drag 0,1, UseTorque tắt; jumpPower 0 nên nhảy đang tắt) — giữ full input từ đứng yên trên nền phẳng: 1 giây 11,6 m/s, 2 giây 19,6 m/s, 4 giây 33,1 m/s; V chuẩn sẽ đo lại sau khi thêm trần tốc độ (T2). Boss `Enemy - Monster` (root scale 3): bounds 13,9 × 7,6 × 5,0 (cao ≈ 7,6 đường kính Robo). Creep `Enemy - Crater`: 1,47 × 1,53 × 1,47. Diện tích đi được (lưới 1 m, dốc < 45°): L1 = 1021 m², L2 = 2237 m². Audit override (instance / override ngoài transform): L1 Coin 5/1, WaterDeathZone 1/0; L2 Coin 35/0; L3 Coin 119/0, Sil 1, Vin 1, Monster 3/5; L4 Coin 236/0, Sil 1, Vin 1, Monster 8/0; Crater không có instance đặt sẵn (chỉ sinh từ spawner).
+- Số đo ban đầu (V của Robo, kích thước boss/creep, diện tích đi được L1–2): Robo không có tốc độ ổn định (Ball dùng AddForce 25 N, khối lượng 1,3, drag 0,1, UseTorque tắt; jumpPower 0 nên nhảy đang tắt) — giữ full input từ đứng yên trên nền phẳng: 1 giây 11,6 m/s, 2 giây 19,6 m/s, 4 giây 33,1 m/s; Sau T2: Ball có trần tốc độ ngang 9 m/s (tăng tốc 25 N, phanh 8 m/s² khi nhả, không chặn vận tốc rơi) → **V = 9,0 m/s** (đạt sau < 1 giây). Boss `Enemy - Monster` (root scale 3): bounds 13,9 × 7,6 × 5,0 (cao ≈ 7,6 đường kính Robo). Creep `Enemy - Crater`: 1,47 × 1,53 × 1,47. Diện tích đi được (lưới 1 m, dốc < 45°): L1 = 1021 m², L2 = 2237 m². Audit override (instance / override ngoài transform): L1 Coin 5/1, WaterDeathZone 1/0; L2 Coin 35/0; L3 Coin 119/0, Sil 1, Vin 1, Monster 3/5; L4 Coin 236/0, Sil 1, Vin 1, Monster 8/0; Crater không có instance đặt sẵn (chỉ sinh từ spawner).
 
 ### 14.2. Tiến độ và bằng chứng
 
@@ -320,7 +320,7 @@ Không để trống các phần liên quan khi đánh dấu bản sửa hoàn t
 |---|---|---|---|---|
 | T0 Baseline | Đang làm | Claude | BuildScript.cs, BaselineProbe.cs, BaselineProbes.cs | APK dev baseline build OK; số đo ở 14.1. Chưa có: video baseline 4 màn, thiết bị Android (cần chủ dự án). |
 | T1 Flow/config | Xong | Claude | Assets/Scripts/Flow/*, GameManager.cs, Treasure.cs, Resources/Levels, Scenes/Ending.unity | EditMode 30/30, PlayMode 17/17 (gồm chết-trước-thắng, nhặt 1 lần, route đủ 4 màn → Ending, Level4 mở trực tiếp → menu). Ending hiện chỉ có màn hoàn thành (cinematic ở T6); pause UI/nút ở T2. |
-| T2 Android/control | Chưa làm | — | — | — |
+| T2 Android/control | Xong (chờ thử máy thật) | Claude | Ball.cs, BallUserControl.cs, FixedJoystick.cs, Scripts/Controls/*, Editor/ControlSetup.cs, 4 level scene | EditMode 41/41, PlayMode 28/28 (trần tốc độ, phanh, rơi không bị chặn, joystick analog + giữ pointer, vùng vuốt bỏ qua pointer khác, reset khi mất focus, camera dừng trước vật cản, tạm dừng/tiếp tục). Chưa có: video Android hai ngón (chưa có thiết bị). Nhảy vẫn tắt như baseline nên không thêm nút nhảy. |
 | T3 Energy | Chưa làm | — | — | — |
 | T4 Map/theme | Chưa làm | — | — | — |
 | T5 Enemy/AI | Chưa làm | — | — | — |
@@ -350,6 +350,7 @@ Teammate bổ sung quy trình Android đã chạy thành công, không yêu cầ
 | Phi thuyền | Chưa chọn | Chưa ghi | Chưa ghi |
 | Axit/lava/VFX/audio bổ sung | Chưa chọn | Chưa ghi | Chưa ghi |
 
+- Điều khiển/camera (T2): Ball m_MaxSpeed 9, m_Acceleration 25, m_Brake 8 (Player.prefab); joystick dead zone 0,1, kích thước 132/600 đơn vị canvas (≈ 22% chiều cao); vùng vuốt nửa phải, hết chiều rộng = 180° × độ nhạy (0,5–2, mặc định 1, lưu PlayerPrefs `camera_sensitivity`, thanh trượt trong menu tạm dừng); camera ThirdPersonOrbitCamera distance 7,8 (3–20), pitch 15–65°, va chạm SphereCast bán kính 0,25. Tạm dừng: ESC, nút “II” trên mobile, mất focus.
 - Giá trị cuối và vị trí config chỉnh được (N, spawn cap/interval, enemy speed/budget, camera, boost nếu có): Config tại `Assets/Resources/Levels/Level1..4.asset` (ghi bằng Tools > Robo Lac Loi > Write Level Configs / `LevelConfigBuilder.WriteDefaults`): N 6/10/14/18; có sẵn 3/4/5/6; trần energy 5/6/7/8; interval 5–7/5–7/4–6/4–6 giây; enemy cap Easy/Normal/Hard L1 2/3/4, L2 4/5/6, L3 6/7/8, L4 8/9/10; boss cap 1/1/2/2. Giá trị khởi điểm, chưa cân bằng.
 - Diện tích L1–2 trước/sau và ảnh top-down: Trước: L1 1021 m², L2 2237 m²; ảnh top-down tạo bằng `BaselineProbe.Run` (ghi ra `~/Downloads/claude/work/probe/Level{1,2}_topdown_before.png` trên máy build, không commit). Sau: Chưa đo.
 - Report test tự động và ma trận chơi thử mục 12: Chưa chạy.

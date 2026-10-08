@@ -1,4 +1,7 @@
+using System.Linq;
 using NUnit.Framework;
+using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine.EventSystems;
 using UnityEngine;
 
@@ -105,5 +108,44 @@ public class ControlTests {
 	public void LookClampsPitch() {
 		Assert.AreEqual(65f, ThirdPersonOrbitCamera.ApplyLook(0f, 40f, new Vector2(0f, -5000f), 1000f, 1f, 15f, 65f).y, 0.001f);
 		Assert.AreEqual(15f, ThirdPersonOrbitCamera.ApplyLook(0f, 40f, new Vector2(0f, 5000f), 1000f, 1f, 15f, 65f).y, 0.001f);
+	}
+
+	static readonly string[] Levels = { "Level1", "Level2", "Level3", "Level4" };
+
+	[Test]
+	public void EveryLevelUsesOrbitCameraAndFixedMinimap() {
+		foreach (string level in Levels) {
+			EditorSceneManager.OpenScene("Assets/Scenes/" + level + ".unity", OpenSceneMode.Single);
+			Camera main = Object.FindObjectsOfType<Camera>(true).First(c => c.CompareTag("MainCamera"));
+			ThirdPersonOrbitCamera orbit = main.GetComponent<ThirdPersonOrbitCamera>();
+			Assert.IsNotNull(orbit, level);
+			Assert.IsNotNull(orbit.target, level);
+			Assert.AreEqual("Player", orbit.target.tag, level);
+			SmoothFollow old = main.GetComponent<SmoothFollow>();
+			Assert.IsTrue(old == null || !old.enabled, level);
+			foreach (SmoothFollow follow in Object.FindObjectsOfType<SmoothFollow>(true))
+				Assert.IsFalse(follow.AllowUserInput, level + "/" + follow.name);
+		}
+	}
+
+	[Test]
+	public void EveryLevelHasLookAreaSafeAreaAndPause() {
+		foreach (string level in Levels) {
+			EditorSceneManager.OpenScene("Assets/Scenes/" + level + ".unity", OpenSceneMode.Single);
+			TouchLookArea look = Object.FindObjectsOfType<TouchLookArea>(true).SingleOrDefault();
+			Assert.IsNotNull(look, level);
+			RectTransform rect = (RectTransform)look.transform;
+			Assert.AreEqual(0.5f, rect.anchorMin.x, 0.001f, level);
+			Assert.AreEqual(1f, rect.anchorMax.x, 0.001f, level);
+			FixedJoystick joystick = Object.FindObjectsOfType<FixedJoystick>(true).Single();
+			Assert.IsNotNull(joystick.GetComponentsInParent<SafeAreaFitter>(true).FirstOrDefault(), level);
+			Assert.IsNotNull(Object.FindObjectsOfType<PauseController>(true).SingleOrDefault(), level);
+		}
+	}
+
+	[Test]
+	public void PlayerUsesInterpolation() {
+		GameObject player = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Player.prefab");
+		Assert.AreEqual(RigidbodyInterpolation.Interpolate, player.GetComponent<Rigidbody>().interpolation);
 	}
 }

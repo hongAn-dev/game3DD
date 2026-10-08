@@ -44,7 +44,7 @@ public class BaselineProbes {
 				next++;
 			}
 		}
-		Debug.Log("PROBE V " + string.Join(" ", marks.ToArray()) + " m/s (full input from rest, robot diameter 1.0, no speed cap)");
+		Debug.Log("PROBE V " + string.Join(" ", marks.ToArray()) + " m/s (full input from rest, robot diameter 1.0)");
 		Assert.Greater(speed, 0.5f);
 #else
 		yield return null;
