@@ -132,4 +132,82 @@ public class BossPlayTests {
 		Vector3 centre = BossAttacks.SlamCentre(boss.transform.position, Flat(player.transform.position - boss.transform.position).normalized, boss.slamReach);
 		Assert.Less(Vector3.Distance(Flat(disc.center), Flat(centre)), 0.3f, "drawn where it lands");
 	}
+
+	IEnumerator WaitForDashWindup(EnemyBrain boss, float timeout) {
+		float end = Time.time + timeout;
+		while (!(boss.State == EnemyState.Windup && boss.CurrentAttack == AttackKind.Dash) && Time.time < end)
+			yield return null;
+		Assert.AreEqual(AttackKind.Dash, boss.CurrentAttack, "no dash windup");
+		Assert.AreEqual(EnemyState.Windup, boss.State);
+	}
+
+	[UnityTest]
+	public IEnumerator L4BossAlternatesSlamAndDash() {
+		yield return Arena();
+		EnemyBrain boss = Boss("Level4", new Vector3(0f, 0f, 4.5f));
+		var attacks = new System.Collections.Generic.List<AttackKind>();
+		EnemyState last = boss.State;
+		float end = Time.time + 12f;
+		while (Time.time < end && attacks.Count < 3) {
+			if (boss.State == EnemyState.Windup && last != EnemyState.Windup)
+				attacks.Add(boss.CurrentAttack);
+			last = boss.State;
+			yield return null;
+		}
+		Assert.GreaterOrEqual(attacks.Count, 2, "attacked at least twice");
+		CollectionAssert.Contains(attacks, AttackKind.Dash);
+		CollectionAssert.Contains(attacks, AttackKind.Slam);
+		Assert.AreNotEqual(attacks[0], attacks[1], "alternates");
+	}
+
+	[UnityTest]
+	public IEnumerator DashKeepsItsLockedLine() {
+		yield return Arena();
+		EnemyBrain boss = Boss("Level4", new Vector3(0f, 0f, 4.5f));
+		yield return WaitForDashWindup(boss, 3f);
+		Vector3 start = boss.transform.position;
+		Vector3 locked = Flat(player.transform.position - start).normalized;
+		Move(new Vector3(3f, 0.5f, 0f));   // sidestep after the direction is locked
+		yield return WaitFor(boss, EnemyState.Recover, 3f);
+		Vector3 travel = Flat(boss.transform.position - start);
+		Assert.Greater(travel.magnitude, 2f, "it dashed");
+		Assert.Less(Vector3.Angle(travel, locked), 5f, "the dash does not bend toward the robot");
+		Assert.AreEqual(0, hits, "dodged");
+	}
+
+	[UnityTest]
+	public IEnumerator DashStopsBeforeObstacle() {
+		yield return Arena(new[] { new Vector3(0f, 1.5f, 0.5f), new Vector3(20f, 3f, 0.2f) });
+		Move(new Vector3(0f, 0.5f, 2f));
+		EnemyBrain boss = Boss("Level4", new Vector3(0f, 0f, 5.5f));
+		yield return WaitForDashWindup(boss, 3f);
+		float startZ = boss.transform.position.z;
+		yield return WaitFor(boss, EnemyState.Recover, 3f);
+		Assert.Greater(boss.transform.position.z, 0.6f + 0.5f, "stopped before the wall, body not inside it");
+		Assert.Less(startZ - boss.transform.position.z, boss.dashLength + 0.01f);
+	}
+
+	[UnityTest]
+	public IEnumerator DashHitsOnce() {
+		yield return Arena();
+		EnemyBrain boss = Boss("Level4", new Vector3(0f, 0f, 4.5f));
+		yield return WaitForDashWindup(boss, 3f);
+		yield return WaitFor(boss, EnemyState.Recover, 3f);
+		yield return null;
+		Assert.AreEqual(1, hits, "one dash, one hit");
+		Assert.AreEqual(30f, lastDamage, 0.01f, "L4 Normal dash damage");
+	}
+
+	[UnityTest]
+	public IEnumerator DashTelegraphShowsWidthAndLength() {
+		yield return Arena();
+		EnemyBrain boss = Boss("Level4", new Vector3(0f, 0f, 4.5f));
+		yield return WaitForDashWindup(boss, 3f);
+		yield return null;
+		Assert.IsTrue(boss.dashTelegraph.activeInHierarchy);
+		Assert.IsFalse(boss.telegraph.activeInHierarchy, "not the slam circle");
+		Bounds strip = boss.dashTelegraph.GetComponentInChildren<Renderer>().bounds;
+		Assert.AreEqual(boss.dashWidth, strip.size.x, 0.15f, "width (dash runs along z)");
+		Assert.That(strip.size.z, Is.InRange(2f, boss.dashLength + 0.05f), "length");
+	}
 }

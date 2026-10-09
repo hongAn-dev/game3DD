@@ -20,6 +20,15 @@ public static class BossAttacks {
 		return d.magnitude <= radius;
 	}
 
+	/// <summary>The dashing boss touches the robot (flat distance within reach, same terrain level).</summary>
+	public static bool TouchesDash(Vector3 boss, Vector3 robot, float reach) {
+		Vector3 d = robot - boss;
+		if (Mathf.Abs(d.y) > 2.5f)
+			return false;
+		d.y = 0f;
+		return d.magnitude <= reach;
+	}
+
 	/// <summary>Line of sight from just above the slam centre to the robot, ignoring moving bodies (robot, enemies).</summary>
 	public static bool Clear(Vector3 from, Vector3 to, RaycastHit[] buffer) {
 		int count = Physics.RaycastNonAlloc(from, to - from, buffer, Vector3.Distance(from, to), ~0, QueryTriggerInteraction.Ignore);

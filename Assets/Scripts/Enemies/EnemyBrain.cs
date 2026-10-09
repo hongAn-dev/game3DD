@@ -40,6 +40,15 @@ public class EnemyBrain : MonoBehaviour {
 	public float slamRadius = 2.4f;
 	public float slamReach = 1.2f;
 
+	[Header("L4 guardian dash (spec §4.3): straight, locked, telegraphed strip; alternates with the slam")]
+	public bool canDash;
+	public float dashLength = 5f;
+	public float dashWidth = 1.5f;
+	public float dashSpeed = 10.5f;
+	public float dashWindup = 1.0f;
+	public float dashRecover = 1.6f;
+	public GameObject dashTelegraph;
+
 	[Header("Legacy animation clips (optional)")]
 	public string idleClip = "";
 	public string runClip = "";
@@ -60,6 +69,8 @@ public class EnemyBrain : MonoBehaviour {
 	float stateTime, repathTimer, stuckCheckTimer, stuckTime;
 	bool hitDone;
 	Vector3 slamCentre;
+	float dashTravel, dashDone;
+	bool nextIsDash;
 	string currentClip = "";
 	static readonly RaycastHit[] SightHits = new RaycastHit[16];
 
@@ -71,6 +82,7 @@ public class EnemyBrain : MonoBehaviour {
 		strike = profile.strike;
 		recover = profile.recover;
 		canSlam = profile.slam;
+		canDash = profile.dash;
 		if (agent != null)
 			agent.speed = speed;
 	}
@@ -122,7 +134,9 @@ public class EnemyBrain : MonoBehaviour {
 			agent.isStopped = attacking || next == EnemyState.Idle || next == EnemyState.Disabled;
 		agent.updateRotation = !attacking;
 		if (telegraph != null)
-			telegraph.SetActive(next == EnemyState.Windup);
+			telegraph.SetActive(next == EnemyState.Windup && CurrentAttack != AttackKind.Dash);
+		if (dashTelegraph != null)
+			dashTelegraph.SetActive(next == EnemyState.Windup && CurrentAttack == AttackKind.Dash);
 		switch (next) {
 		case EnemyState.Windup:
 			lockedForward = FlatTo(target.position);
@@ -133,6 +147,16 @@ public class EnemyBrain : MonoBehaviour {
 				if (telegraph != null) {
 					telegraph.transform.position = slamCentre + Vector3.up * 0.04f;
 					telegraph.transform.localScale = Vector3.one;
+				}
+			}
+			if (CurrentAttack == AttackKind.Dash) {
+				dashTravel = DashTravel(lockedForward);
+				dashDone = 0f;
+				if (dashTelegraph != null) {
+					// The strip shows exactly where the dash will go: its width and its (obstacle-limited) length.
+					dashTelegraph.transform.position = transform.position + lockedForward * dashTravel * 0.5f + Vector3.up * 0.05f;
+					dashTelegraph.transform.rotation = Quaternion.LookRotation(lockedForward);
+					dashTelegraph.transform.localScale = new Vector3(dashWidth, 1f, dashTravel);
 				}
 			}
 			PlayClip(attackClip);
@@ -202,8 +226,20 @@ public class EnemyBrain : MonoBehaviour {
 			}
 			Repath(true);
 			CheckStuck();
+			// Standing within the stopping distance the agent does not turn; face the robot ourselves (yaw only),
+			// or an enemy that ends up beside or past the robot (after a dash) never lines up an attack.
+			if (agent.velocity.sqrMagnitude < 0.25f)
+				transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(FlatTo(target.position)), turnSpeed * Time.deltaTime);
 			if (canSlam) {
-				if (distance <= slamReach + slamRadius * 0.8f && Vector3.Angle(transform.forward, FlatTo(target.position)) <= 60f && Clear()) {
+				float angle = Vector3.Angle(transform.forward, FlatTo(target.position));
+				bool slamReady = distance <= slamReach + slamRadius * 0.8f && angle <= 60f && Clear();
+				bool dashReady = canDash && distance >= 2.5f && distance <= dashLength + 1f && angle <= 30f && Clear()
+					&& DashTravel(FlatTo(target.position)) >= 2f;
+				// L4 alternates: the other attack is preferred, but whichever is possible beats waiting.
+				if (dashReady && (nextIsDash || !slamReady)) {
+					CurrentAttack = AttackKind.Dash;
+					Enter(EnemyState.Windup);
+				} else if (slamReady) {
 					CurrentAttack = AttackKind.Slam;
 					Enter(EnemyState.Windup);
 				}
@@ -218,10 +254,23 @@ public class EnemyBrain : MonoBehaviour {
 				telegraph.transform.localScale = Vector3.one * Mathf.Lerp(0.4f, 1f, stateTime / windup);
 			else if (telegraph != null)
 				telegraph.transform.position = slamCentre + Vector3.up * 0.04f;   // stays on the ground while the boss turns
-			if (stateTime >= windup)
+			if (stateTime >= (CurrentAttack == AttackKind.Dash ? dashWindup : windup))
 				Enter(EnemyState.Strike);
 			break;
 		case EnemyState.Strike:
+			if (CurrentAttack == AttackKind.Dash) {
+				// Straight along the locked line; only the agent moves the root and it cannot leave the NavMesh.
+				float step = Mathf.Min(dashSpeed * Time.deltaTime, dashTravel - dashDone);
+				agent.Move(lockedForward * step);
+				dashDone += step;
+				if (!hitDone && BossAttacks.TouchesDash(transform.position, target.position, agent.radius + 0.7f))
+					Hit();
+				if (dashDone >= dashTravel - 0.001f) {
+					nextIsDash = false;
+					Enter(EnemyState.Recover);
+				}
+				break;
+			}
 			if (CurrentAttack == AttackKind.Slam) {
 				if (!hitDone && BossAttacks.InSlam(slamCentre, slamRadius, target.position)
 					&& BossAttacks.Clear(slamCentre + Vector3.up * 0.5f, target.position, SightHits))
@@ -229,11 +278,14 @@ public class EnemyBrain : MonoBehaviour {
 			} else if (!hitDone && distance <= attackRange && Vector3.Angle(lockedForward, FlatTo(target.position)) <= attackAngle
 				&& Mathf.Abs(target.position.y - transform.position.y) < 2.5f && Clear())
 				Hit();
-			if (stateTime >= strike)
+			if (stateTime >= strike) {
+				if (CurrentAttack == AttackKind.Slam)
+					nextIsDash = canDash;
 				Enter(EnemyState.Recover);
+			}
 			break;
 		case EnemyState.Recover:
-			if (stateTime >= recover)
+			if (stateTime >= (CurrentAttack == AttackKind.Dash ? dashRecover : recover))
 				Enter(distance <= loseRadius ? EnemyState.Chase : EnemyState.Return);
 			break;
 		case EnemyState.Return:
@@ -245,6 +297,15 @@ public class EnemyBrain : MonoBehaviour {
 				Enter(EnemyState.Idle);
 			break;
 		}
+	}
+
+	// How far a dash along dir can go on continuous NavMesh (stops short of obstacles/edges), at most dashLength.
+	float DashTravel(Vector3 dir) {
+		NavMeshHit hit;
+		Vector3 start = transform.position;
+		if (NavMesh.Raycast(start, start + dir * dashLength, out hit, NavMesh.AllAreas))
+			return Mathf.Max(0f, hit.distance - 0.3f);
+		return dashLength;
 	}
 
 	// Nearest NavMesh point under the robot; while it is airborne or off the mesh the last valid point is kept.

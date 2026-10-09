@@ -145,6 +145,17 @@ public class EnemyTests {
 	}
 
 	[Test]
+	public void Level4ProfileDashes() {
+		Assert.IsTrue(EnemyProfile.For(LevelCatalog.Get("Level4"), GameSettings.gameDifficulties.Normal, true).dash);
+		Assert.IsFalse(EnemyProfile.For(LevelCatalog.Get("Level3"), GameSettings.gameDifficulties.Normal, true).dash);
+		Assert.IsTrue(EnemyProfile.For(LevelCatalog.Get("Level3"), GameSettings.gameDifficulties.Normal, true).slam);
+		Assert.IsFalse(EnemyProfile.For(LevelCatalog.Get("Level4"), GameSettings.gameDifficulties.Hard, false).dash, "creeps never dash");
+		EnemyBrain boss = Prefab("Enemy - Monster").GetComponent<EnemyBrain>();
+		Assert.AreEqual(new[] { 5f, 1.5f, 10.5f, 1.0f, 1.6f }, new[] { boss.dashLength, boss.dashWidth, boss.dashSpeed, boss.dashWindup, boss.dashRecover });
+		Assert.IsNotNull(boss.dashTelegraph);
+	}
+
+	[Test]
 	public void EnemyAccelerationAndTurnInRange() {
 		EnemyBrain creep = Prefab("Enemy - Crater").GetComponent<EnemyBrain>();
 		EnemyBrain boss = Prefab("Enemy - Monster").GetComponent<EnemyBrain>();

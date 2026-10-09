@@ -116,6 +116,24 @@ public static class EnemySetup {
 		return pivot;
 	}
 
+	// Flat unit strip (1 x 1 m, pivot at its centre); EnemyBrain sizes it to the dash width x length during the windup.
+	static GameObject DashTelegraph(GameObject root, Material material) {
+		Transform old = root.transform.Find("Dash Telegraph");
+		if (old != null)
+			Object.DestroyImmediate(old.gameObject);
+		GameObject pivot = new GameObject("Dash Telegraph");
+		pivot.transform.SetParent(root.transform, false);
+		GameObject strip = GameObject.CreatePrimitive(PrimitiveType.Cube);
+		strip.name = "Strip";
+		Object.DestroyImmediate(strip.GetComponent<Collider>());
+		strip.transform.SetParent(pivot.transform, false);
+		strip.transform.localScale = new Vector3(1f, 0.01f, 1f);
+		strip.GetComponent<Renderer>().sharedMaterial = material;
+		strip.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+		pivot.SetActive(false);
+		return pivot;
+	}
+
 	/// <summary>World-space size of the active visual from mesh bounds (skinned renderer bounds are stale in prefab contents).</summary>
 	public static Bounds MeshBounds(GameObject root) {
 		bool any = false;
@@ -176,6 +194,12 @@ public static class EnemySetup {
 			brain.slamRadius = 2.4f;
 			brain.slamReach = 1.2f;
 			brain.telegraph = Telegraph(root, brain.slamRadius, telegraph);   // the slam circle at its real size
+			brain.dashLength = 5f;
+			brain.dashWidth = 1.5f;
+			brain.dashSpeed = 10.5f;
+			brain.dashWindup = 1.0f;
+			brain.dashRecover = 1.6f;
+			brain.dashTelegraph = DashTelegraph(root, telegraph);
 			PrefabUtility.SaveAsPrefabAsset(root, BossPath);
 			Debug.Log("EnemySetup: boss " + b.size.ToString("F2") + " radius " + radius.ToString("F2") + " range " + brain.attackRange.ToString("F2"));
 		} finally {

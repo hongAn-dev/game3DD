@@ -18,6 +18,7 @@ public struct EnemyProfile {
 	public int damage;
 	public float windup, strike, recover;
 	public bool slam;   // guardian slam (all bosses)
+	public bool dash;   // Level4 guardian also dashes
 
 	public static EnemyProfile For(LevelConfig config, GameSettings.gameDifficulties difficulty, bool boss) {
 		int d = (int)difficulty;
@@ -29,6 +30,7 @@ public struct EnemyProfile {
 			p.strike = BossStrike;
 			p.recover = BossRecover;
 			p.slam = true;
+			p.dash = config.order >= 4;
 		} else {
 			p.windup = config.creepWindup + (difficulty == GameSettings.gameDifficulties.Easy ? EasyExtraWindup : 0f);
 			p.strike = CreepStrike;
