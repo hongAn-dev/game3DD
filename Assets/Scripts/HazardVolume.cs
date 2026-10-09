@@ -18,6 +18,6 @@ public class HazardVolume : MonoBehaviour {
 				return;
 			GameFlow.ReportDeathCause(cause);
 		}
-		health.ApplyDamage(health.healthPoints);
+		health.TakeDamage(0f, DamageKind.FatalHazard);
 	}
 }

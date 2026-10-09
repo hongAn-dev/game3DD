@@ -18,6 +18,10 @@ public static class ControlSetup {
 		GameObject contents = PrefabUtility.LoadPrefabContents("Assets/Prefabs/Player.prefab");
 		try {
 			contents.GetComponent<Rigidbody>().interpolation = RigidbodyInterpolation.Interpolate;
+			// 100 HP, one life per level (spec §6.1).
+			Health health = contents.GetComponent<Health>();
+			health.maxHealth = health.healthPoints = health.respawnHealthPoints = 100f;
+			health.numberOfLives = 1;
 			var ball = new SerializedObject(contents.GetComponent<Ball>());
 			ball.FindProperty("m_MaxSpeed").floatValue = 11f;
 			ball.FindProperty("m_AccelerationRate").floatValue = 24f;
@@ -69,13 +73,19 @@ public static class ControlSetup {
 	}
 
 	static readonly string[] Tuning = { "m_MaxSpeed", "m_AccelerationRate", "m_Brake", "m_UseTorque" };
+	static readonly string[] HealthFields = { "maxHealth", "healthPoints", "respawnHealthPoints", "numberOfLives" };
 
-	// Scenes must not override the robot tuning, or prefab changes silently do nothing there.
+	// Scenes must not override the robot tuning or HP, or prefab changes silently do nothing there.
 	static void RobotUsesPrefabTuning() {
-		var ball = new SerializedObject(GameObject.FindWithTag("Player").GetComponent<Ball>());
-		foreach (string name in Tuning) {
-			SerializedProperty property = ball.FindProperty(name);
-			if (property.prefabOverride)
+		GameObject player = GameObject.FindWithTag("Player");
+		Revert(new SerializedObject(player.GetComponent<Ball>()), Tuning);
+		Revert(new SerializedObject(player.GetComponent<Health>()), HealthFields);
+	}
+
+	static void Revert(SerializedObject target, string[] names) {
+		foreach (string name in names) {
+			SerializedProperty property = target.FindProperty(name);
+			if (property != null && property.prefabOverride)
 				PrefabUtility.RevertPropertyOverride(property, InteractionMode.AutomatedAction);
 		}
 	}

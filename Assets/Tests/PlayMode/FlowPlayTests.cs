@@ -47,7 +47,7 @@ public class FlowPlayTests {
 	public IEnumerator DeathWinsOverLastCoreInSameFrame() {
 		GameManager gm = GameManager.gm;
 		gm.Collect(gm.BeatLevelScore - 1);
-		GameObject.FindWithTag("Player").GetComponent<Health>().ApplyDamage(10f);
+		GameObject.FindWithTag("Player").GetComponent<Health>().TakeDamage(100f, DamageKind.EnemyAttack);   // lethal strike
 		gm.Collect(1);
 		yield return null;
 		yield return null;

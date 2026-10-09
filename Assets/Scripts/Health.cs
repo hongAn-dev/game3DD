@@ -2,13 +2,21 @@
 using System.Collections;
 using UnityEngine.SceneManagement;
 
+/// <summary>What hurt the robot: enemy strikes respect invulnerability (and the shield); hazards always kill.</summary>
+public enum DamageKind { EnemyAttack, FatalHazard }
+
 /// <summary>
-/// A game object health handler.
+/// A game object health handler. The single owner of HP (spec §6.1): damage goes through TakeDamage with its kind,
+/// heals through Heal (clamped, never revives). After an enemy hit that cost HP the object is invulnerable to enemy
+/// attacks for InvulnerableSeconds of gameplay time. Nothing is taken while gameplay is not Playing.
 /// </summary>
 public class Health : MonoBehaviour {
 	
 	public enum deathAction {loadLevelWhenDead,doNothingWhenDead};
-	
+
+	public const float InvulnerableSeconds = 0.8f;
+
+	public float maxHealth = 100f;
 	public float healthPoints = 1f;
 	// Base health points.
 	public float respawnHealthPoints = 1f;		
@@ -25,6 +33,10 @@ public class Health : MonoBehaviour {
 	
 	private Vector3 respawnPosition;
 	private Quaternion respawnRotation;
+
+	public float InvulnerableLeft { get; private set; }
+	public event System.Action<float> Damaged;
+	public event System.Action<float> Healed;
 	
 
 	/// <summary>
@@ -46,6 +58,8 @@ public class Health : MonoBehaviour {
 	/// Update is called once per frame.
 	/// </summary>
 	void Update () {
+		if (GameFlow.IsGameplayActive && InvulnerableLeft > 0f)
+			InvulnerableLeft = Mathf.Max(0f, InvulnerableLeft - Time.deltaTime);
 		// If the object is 'dead'.
 		if (healthPoints <= 0) {
 			// Decrement # of lives, update lives GUI.
@@ -82,17 +96,43 @@ public class Health : MonoBehaviour {
 	}
 
 	/// <summary>
-	/// Apply damage to the health points.
+	/// Damage of the given kind. Returns true when it cost HP. Enemy attacks are ignored during the invulnerability
+	/// window (and start it); a fatal hazard empties HP regardless. Nothing happens outside Playing or once dead.
 	/// </summary>
+	public bool TakeDamage(float amount, DamageKind kind) {
+		if (!GameFlow.IsGameplayActive || healthPoints <= 0f)
+			return false;
+		if (kind == DamageKind.FatalHazard) {
+			amount = healthPoints;
+		} else {
+			if (InvulnerableLeft > 0f || amount <= 0f)
+				return false;
+			InvulnerableLeft = InvulnerableSeconds;
+		}
+		healthPoints = Mathf.Clamp(healthPoints - amount, 0f, maxHealth);
+		if (Damaged != null)
+			Damaged(amount);
+		return true;
+	}
+
+	/// <summary>Heals up to maxHealth. Returns false (nothing consumed) when full, dead or not Playing.</summary>
+	public bool Heal(float amount) {
+		if (!GameFlow.IsGameplayActive || healthPoints <= 0f || healthPoints >= maxHealth || amount <= 0f)
+			return false;
+		healthPoints = Mathf.Min(maxHealth, healthPoints + amount);
+		if (Healed != null)
+			Healed(amount);
+		return true;
+	}
+
+	/// <summary>Legacy raw damage (old Damage component, non-player objects). The robot uses TakeDamage.</summary>
 	public void ApplyDamage(float amount) {	
 		healthPoints = healthPoints - amount;	
 	}
 
-	/// <summary>
-	/// Apply heal to the health points.
-	/// </summary>
+	/// <summary>Legacy raw heal; the robot uses Heal (clamped).</summary>
 	public void ApplyHeal(float amount) {
-		healthPoints = healthPoints + amount;
+		healthPoints = Mathf.Min(maxHealth, healthPoints + amount);
 	}
 
 	/// <summary>

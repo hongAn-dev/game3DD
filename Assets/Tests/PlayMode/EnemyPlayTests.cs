@@ -20,7 +20,8 @@ public class EnemyPlayTests {
 	Health health;
 	NavMeshDataInstance navMesh;
 
-	int Hits { get { return health == null ? 0 : Lives - health.numberOfLives; } }
+	int hits;
+	int Hits { get { return hits; } }   // strikes that cost HP
 
 	IEnumerator Arena(params Vector3[][] walls) {
 #if UNITY_EDITOR
@@ -46,6 +47,8 @@ public class EnemyPlayTests {
 		player.GetComponent<Rigidbody>().isKinematic = true;   // holds still unless a test moves it
 		health = player.GetComponent<Health>();
 		health.numberOfLives = Lives;
+		hits = 0;
+		health.Damaged += amount => hits++;
 		yield return null;
 	}
 

@@ -272,8 +272,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 72efb9e0cf1734f0988c6069f6220681, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  healthPoints: 1
-  respawnHealthPoints: 1
+  maxHealth: 100
+  healthPoints: 100
+  respawnHealthPoints: 100
   numberOfLives: 1
   isAlive: 1
   explosionPrefab: {fileID: 1556311372243250, guid: a87ca87c0c0e541a4916c09bfb31f3e9,

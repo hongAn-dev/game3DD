@@ -31,6 +31,7 @@ public class EnemyBrain : MonoBehaviour {
 	public float windup = 0.35f;
 	public float strike = 0.1f;
 	public float recover = 0.7f;
+	public int damage = 10;
 	public string hitCause = "Robo bị quái vật đánh trúng";
 	public GameObject telegraph;
 
@@ -247,8 +248,8 @@ public class EnemyBrain : MonoBehaviour {
 		hitDone = true;
 		if (targetHealth == null || targetHealth.healthPoints <= 0f)
 			return;
-		GameFlow.ReportDeathCause(hitCause);
-		targetHealth.ApplyDamage(targetHealth.healthPoints);
+		if (targetHealth.TakeDamage(damage, DamageKind.EnemyAttack) && targetHealth.healthPoints <= 0f)
+			GameFlow.ReportDeathCause(hitCause);   // only the strike that ends the run names the cause
 	}
 
 	Vector3 FlatTo(Vector3 point) {
