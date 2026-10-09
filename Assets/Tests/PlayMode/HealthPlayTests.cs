@@ -82,4 +82,43 @@ public class HealthPlayTests {
 		Assert.IsTrue(health.TakeDamage(10f, DamageKind.EnemyAttack));
 		Assert.AreEqual(80f, health.healthPoints, 0.01f);
 	}
+
+	IEnumerator Level1() {
+		CampaignProgress.BeginRun(GameSettings.gameDifficulties.Normal);
+		GameSettings.showIntroLevelMessage = false;
+		SceneManager.LoadScene("Level1");
+		yield return null;
+		yield return null;
+		player = GameObject.FindWithTag("Player");
+		health = player.GetComponent<Health>();
+		Object.FindObjectOfType<EnemyDirector>().enabled = false;
+		yield return null;
+	}
+
+	[UnityTest]
+	public IEnumerator HealthBarShowsHpAndFollowsTheRobot() {
+		yield return Level1();
+		PlayerHealthBar bar = Object.FindObjectOfType<PlayerHealthBar>();
+		Assert.IsTrue(bar.bar.gameObject.activeSelf);
+		Assert.AreEqual("100/100", bar.label.text);
+		Vector3 robot = Camera.main.WorldToScreenPoint(player.transform.position);
+		Vector3 shown = bar.bar.position;   // overlay canvas: world position = screen pixels
+		Assert.Greater(shown.y, robot.y, "above the robot");
+		Assert.Less(Mathf.Abs(shown.x - robot.x), 30f, "centred over the robot");
+		health.TakeDamage(12f, DamageKind.EnemyAttack);
+		yield return null;
+		Assert.AreEqual("88/100", bar.label.text);
+		Assert.AreEqual(0.88f, bar.fill.fillAmount, 0.001f);
+		Assert.AreEqual(PlayerHealthBar.Green, bar.fill.color);
+	}
+
+	[UnityTest]
+	public IEnumerator HealthBarHiddenWhenDead() {
+		yield return Level1();
+		PlayerHealthBar bar = Object.FindObjectOfType<PlayerHealthBar>();
+		health.TakeDamage(0f, DamageKind.FatalHazard);
+		yield return null;
+		yield return null;
+		Assert.IsFalse(bar.bar.gameObject.activeSelf);
+	}
 }
