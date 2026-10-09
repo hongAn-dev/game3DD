@@ -139,10 +139,13 @@ public class ThemeEditorTests {
 	[Test]
 	public void MainMenuButtonsAreStackedWithoutGap() {
 		EditorSceneManager.OpenScene("Assets/Scenes/MainMenu.unity", OpenSceneMode.Single);
-		RectTransform play = GameObject.Find("Play Button").GetComponent<RectTransform>();
-		RectTransform quit = GameObject.Find("Quit Button").GetComponent<RectTransform>();
-		float gap = (play.anchoredPosition.y - play.sizeDelta.y / 2f) - (quit.anchoredPosition.y + quit.sizeDelta.y / 2f);
-		Assert.That(gap, Is.InRange(16f, 48f));
+		string[] column = { "Play Button", "Guide Button", "Settings Button", "Quit Button" };
+		for (int i = 0; i + 1 < column.Length; i++) {
+			RectTransform upper = GameObject.Find(column[i]).GetComponent<RectTransform>();
+			RectTransform lower = GameObject.Find(column[i + 1]).GetComponent<RectTransform>();
+			float gap = (upper.anchoredPosition.y - upper.sizeDelta.y / 2f) - (lower.anchoredPosition.y + lower.sizeDelta.y / 2f);
+			Assert.That(gap, Is.InRange(16f, 48f), column[i] + " to " + column[i + 1]);
+		}
 	}
 
 	// Each line fits the rect without wrapping and all lines fit its height (at the best-fit size if enabled).

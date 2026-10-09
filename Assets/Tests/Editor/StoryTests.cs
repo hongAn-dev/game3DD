@@ -157,4 +157,27 @@ public class StoryTests {
 			Assert.IsEmpty(pause.overlay.GetComponentsInChildren<Slider>(true), level.levelId + " settings live in the main menu");
 		}
 	}
+
+	// Spec §7.3/§7.6/§8.2: the main menu has Hướng dẫn chơi and Cài đặt (camera sensitivity, music/SFX/ambience).
+	[Test]
+	public void MainMenuHasSettingsAndGuide() {
+		EditorSceneManager.OpenScene("Assets/Scenes/MainMenu.unity", OpenSceneMode.Single);
+		Transform play = Object.FindObjectsOfType<Button>(true).Single(b => b.name == "Play Button").transform;
+		foreach (string label in new[] { "Hướng dẫn chơi", "Cài đặt" })
+			Assert.IsTrue(play.parent.GetComponentsInChildren<Button>(true).Any(b => b.GetComponentInChildren<Text>(true).text == label), label);
+		MainMenuPanels panels = Object.FindObjectOfType<MainMenuPanels>(true);
+		Assert.IsNotNull(panels.dialog);
+		Assert.IsFalse(panels.settings.activeSelf, "closed at start");
+		Assert.AreEqual(0.5f, panels.sensitivity.minValue);
+		Assert.AreEqual(2f, panels.sensitivity.maxValue);
+		foreach (Slider slider in new[] { panels.sensitivity, panels.music, panels.sfx, panels.ambience }) {
+			Assert.GreaterOrEqual(((RectTransform)slider.transform).sizeDelta.y, 70f, slider.name + " touch height");
+			Assert.GreaterOrEqual(slider.handleRect.sizeDelta.x, 60f, slider.name + " handle");
+			Assert.AreNotEqual(Color.white, slider.fillRect.GetComponent<Image>().color, slider.name);
+		}
+		foreach (Slider slider in new[] { panels.music, panels.sfx, panels.ambience })
+			Assert.AreEqual(new Vector2(0f, 1f), new Vector2(slider.minValue, slider.maxValue), slider.name);
+		var labels = panels.settings.GetComponentsInChildren<Text>(true).Select(t => t.text).ToArray();
+		CollectionAssert.IsSubsetOf(new[] { "Cài đặt", "Độ nhạy camera", "Nhạc nền", "Hiệu ứng âm thanh", "Âm thanh môi trường", "Đóng" }, labels);
+	}
 }

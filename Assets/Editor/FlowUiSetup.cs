@@ -34,7 +34,7 @@ public static class FlowUiSetup {
 			EditorSceneManager.SaveScene(scene);
 		}
 		var menu = EditorSceneManager.OpenScene("Assets/Scenes/MainMenu.unity", OpenSceneMode.Single);
-		Dialog();
+		MenuPanels(Dialog());
 		TopBar(null);
 		EditorSceneManager.MarkSceneDirty(menu);
 		EditorSceneManager.SaveScene(menu);
@@ -75,6 +75,68 @@ public static class FlowUiSetup {
 		dialog.startButton = Button("Start Button", dialog.box, 480f, 340f, "Bắt đầu", dialog.Finish);
 		backdrop.gameObject.SetActive(false);
 		return dialog;
+	}
+
+	// Main menu: "Hướng dẫn chơi" and "Cài đặt" under "Chơi mới" (UiTheme lays the column out) and the settings panel.
+	static void MenuPanels(DialogPanel dialog) {
+		GameObject old = GameObject.Find("Settings Canvas");
+		if (old != null)
+			Object.DestroyImmediate(old);
+		GameObject root = Canvas("Settings Canvas", 45);
+		MainMenuPanels panels = root.AddComponent<MainMenuPanels>();
+		panels.dialog = dialog;
+
+		RectTransform backdrop = Rect("Settings", root.transform, Vector2.zero);
+		Stretch(backdrop);
+		backdrop.gameObject.AddComponent<Image>().color = new Color(0f, 0f, 0f, 0.6f);
+		backdrop.gameObject.AddComponent<ModalBackdrop>();
+		panels.settings = backdrop.gameObject;
+		RectTransform box = Rect("Box", backdrop, new Vector2(1240f, 860f));
+		foreach (string name in new[] { "BoxBackground", "BoxBorder" }) {
+			RectTransform part = Rect(name, box, Vector2.zero);
+			Stretch(part);
+			part.gameObject.AddComponent<Image>().raycastTarget = false;
+		}
+		Label("Dialog Title", box, new Vector2(0f, 340f), new Vector2(1100f, 100f), "Bold", 60).text = "Cài đặt";
+		panels.sensitivity = SettingRow(box, "Độ nhạy camera", 190f, 0.5f, 2f, panels.SetSensitivity);
+		panels.music = SettingRow(box, "Nhạc nền", 60f, 0f, 1f, panels.SetMusic);
+		panels.sfx = SettingRow(box, "Hiệu ứng âm thanh", -70f, 0f, 1f, panels.SetSfx);
+		panels.ambience = SettingRow(box, "Âm thanh môi trường", -200f, 0f, 1f, panels.SetAmbience);
+		Button("Close Button", box, 0f, 340f, "Đóng", panels.CloseSettings);
+		backdrop.gameObject.SetActive(false);
+
+		Transform play = Object.FindObjectsOfType<Button>(true).Single(x => x.name == "Play Button").transform;
+		foreach (string name in new[] { "Guide Button", "Settings Button" }) {
+			Transform existing = play.parent.Find(name);
+			if (existing != null)
+				Object.DestroyImmediate(existing.gameObject);
+		}
+		MenuButton("Guide Button", play.parent, "Hướng dẫn chơi", panels.OpenGuide);
+		MenuButton("Settings Button", play.parent, "Cài đặt", panels.OpenSettings);
+	}
+
+	static Slider SettingRow(Transform box, string label, float y, float min, float max, UnityEngine.Events.UnityAction<float> action) {
+		Text text = Label(label + " Label", box, new Vector2(-300f, y), new Vector2(500f, 70f), "SemiBold", 38);
+		text.text = label;
+		text.alignment = TextAnchor.MiddleLeft;
+		GameObject go = DefaultControls.CreateSlider(new DefaultControls.Resources());
+		go.name = label + " Slider";
+		go.transform.SetParent(box, false);
+		((RectTransform)go.transform).anchoredPosition = new Vector2(250f, y);
+		Slider slider = go.GetComponent<Slider>();
+		slider.minValue = min;
+		slider.maxValue = max;
+		slider.value = max;
+		ControlSetup.StyleSlider(slider);
+		UnityEventTools.AddPersistentListener(slider.onValueChanged, action);
+		return slider;
+	}
+
+	static void MenuButton(string name, Transform parent, string label, UnityEngine.Events.UnityAction action) {
+		Button button = Button(name, parent, 0f, 520f, label, action);
+		RectTransform rect = (RectTransform)button.transform;
+		rect.sizeDelta = new Vector2(520f, 110f);
+		rect.SetSiblingIndex(parent.Find("Play Button").GetSiblingIndex() + 1);
 	}
 
 	// Spec §7.6: 110×110 touch areas (≈ 48 dp) with 60-unit icons (≈ 26 dp), pause at the corner, sound 18 to its left,

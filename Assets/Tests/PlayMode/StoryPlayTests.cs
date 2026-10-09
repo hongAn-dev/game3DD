@@ -253,4 +253,50 @@ public class StoryPlayTests {
 		Assert.AreEqual(SceneRouter.MainMenuScene, SceneManager.GetActiveScene().name);
 		Assert.IsFalse(CampaignProgress.IsActiveRun, "leaving ends the run");
 	}
+
+	[UnityTest]
+	public IEnumerator SettingsSlidersSaveVolumesAndSensitivity() {
+		float music = SoundSettings.MusicVolume, sfx = SoundSettings.SfxVolume, ambience = SoundSettings.AmbienceVolume, look = ThirdPersonOrbitCamera.Sensitivity;
+		yield return Open("MainMenu");
+		MainMenuPanels panels = Object.FindObjectOfType<MainMenuPanels>(true);
+		panels.OpenSettings();
+		Assert.IsTrue(panels.settings.activeSelf);
+		Assert.AreEqual(music, panels.music.value, 0.001f, "shows the saved value");
+		panels.music.value = 0.4f;
+		panels.sfx.value = 0.7f;
+		panels.ambience.value = 0.2f;
+		panels.sensitivity.value = 1.5f;
+		Assert.AreEqual(0.4f, PlayerPrefs.GetFloat("volume_music"), 0.001f);
+		Assert.AreEqual(0.7f, SoundSettings.SfxVolume, 0.001f);
+		Assert.AreEqual(0.2f, SoundSettings.AmbienceVolume, 0.001f);
+		Assert.AreEqual(1.5f, ThirdPersonOrbitCamera.Sensitivity, 0.001f);
+		panels.CloseSettings();
+		Assert.IsFalse(panels.settings.activeSelf);
+		SoundSettings.MusicVolume = music;
+		SoundSettings.SfxVolume = sfx;
+		SoundSettings.AmbienceVolume = ambience;
+		ThirdPersonOrbitCamera.Sensitivity = look;
+	}
+
+	[UnityTest]
+	public IEnumerator GuideReturnsToMenuWithoutStartingARun() {
+		CampaignProgress.Reset();
+		yield return Open("MainMenu");
+		MainMenuPanels panels = Object.FindObjectOfType<MainMenuPanels>(true);
+		panels.OpenGuide();
+		Assert.IsTrue(dialog.IsOpen);
+		var titles = new System.Collections.Generic.List<string> { dialog.title.text };
+		while (dialog.nextButton.gameObject.activeSelf) {
+			dialog.Next();
+			titles.Add(dialog.title.text);
+		}
+		CollectionAssert.IsSubsetOf(new[] { "Robo lạc lối", "Vật phẩm hỗ trợ", "Vật phẩm tăng tốc", "Âm thanh và tạm dừng" }, titles);
+		Assert.AreEqual("Đóng", dialog.startButton.GetComponentInChildren<UnityEngine.UI.Text>().text);
+		dialog.Finish();
+		yield return null;
+		Assert.IsFalse(dialog.IsOpen);
+		Assert.AreEqual(SceneRouter.MainMenuScene, SceneManager.GetActiveScene().name);
+		Assert.IsFalse(CampaignProgress.IsActiveRun);
+		Assert.IsFalse(CampaignProgress.TutorialPending);
+	}
 }

@@ -398,8 +398,10 @@ public static class UiTheme {
 			shadow.effectDistance = new Vector2(2f, -2f);
 			changed = true;
 		}
-		changed |= Place(root, "Play Button", 0f, new Vector2(440f, 110f));
-		changed |= Place(root, "Quit Button", -140f, new Vector2(440f, 110f));
+		changed |= Place(root, "Play Button", 0f, new Vector2(520f, 110f));
+		changed |= Place(root, "Guide Button", -130f, new Vector2(520f, 110f));
+		changed |= Place(root, "Settings Button", -260f, new Vector2(520f, 110f));
+		changed |= Place(root, "Quit Button", -390f, new Vector2(520f, 110f));
 		changed |= Place(root, "Easy Button", 140f, new Vector2(440f, 110f), "DifficultCanvas");
 		changed |= Place(root, "Normal Button", 0f, new Vector2(440f, 110f), "DifficultCanvas");
 		changed |= Place(root, "Hard Button", -140f, new Vector2(440f, 110f), "DifficultCanvas");
