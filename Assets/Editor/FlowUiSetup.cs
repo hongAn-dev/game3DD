@@ -25,6 +25,8 @@ public static class FlowUiSetup {
 				&& PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(t.gameObject) == "Assets/Prefabs/IntroBeatLevelCanvas.prefab").ToList())
 				Object.DestroyImmediate(t.gameObject);
 			manager.dialog = Dialog();
+			manager.hideOnResult = new[] { Object.FindObjectsOfType<Camera>(true).Single(c => c.name == "Minimap Camera").gameObject,
+				Object.FindObjectOfType<PlayerHealthBar>(true).gameObject };
 			EditorSceneManager.MarkSceneDirty(scene);
 			EditorSceneManager.SaveScene(scene);
 		}

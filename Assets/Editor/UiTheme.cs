@@ -34,24 +34,25 @@ public static class UiTheme {
 	static readonly KeyValuePair<string, string>[] Strings = {
 		new KeyValuePair<string, string>("LiBot Adventure", "ROBO LẠC LỐI"),
 		new KeyValuePair<string, string>("Robo Lạc Lối", "ROBO LẠC LỐI"),
-		new KeyValuePair<string, string>("Play Again", "THỬ LẠI"),
-		new KeyValuePair<string, string>("Thử lại", "THỬ LẠI"),
-		new KeyValuePair<string, string>("Play", "CHƠI"),
-		new KeyValuePair<string, string>("Chơi", "CHƠI"),
-		new KeyValuePair<string, string>("Quit", "THOÁT"),
-		new KeyValuePair<string, string>("Thoát", "THOÁT"),
-		new KeyValuePair<string, string>("Easy", "DỄ"),
-		new KeyValuePair<string, string>("Dễ", "DỄ"),
-		new KeyValuePair<string, string>("Normal", "THƯỜNG"),
-		new KeyValuePair<string, string>("Thường", "THƯỜNG"),
-		new KeyValuePair<string, string>("Hard", "KHÓ"),
-		new KeyValuePair<string, string>("Khó", "KHÓ"),
+		new KeyValuePair<string, string>("Play Again", "Thử lại"),
+		new KeyValuePair<string, string>("THỬ LẠI", "Thử lại"),
+		// Sentence case, as the spec writes the labels (Chơi mới, Thoát, Dễ...); old uppercase labels are converted.
+		new KeyValuePair<string, string>("Play", "Chơi mới"),
+		new KeyValuePair<string, string>("CHƠI", "Chơi mới"),
+		new KeyValuePair<string, string>("Quit", "Thoát"),
+		new KeyValuePair<string, string>("THOÁT", "Thoát"),
+		new KeyValuePair<string, string>("Easy", "Dễ"),
+		new KeyValuePair<string, string>("DỄ", "Dễ"),
+		new KeyValuePair<string, string>("Normal", "Thường"),
+		new KeyValuePair<string, string>("THƯỜNG", "Thường"),
+		new KeyValuePair<string, string>("Hard", "Khó"),
+		new KeyValuePair<string, string>("KHÓ", "Khó"),
 		new KeyValuePair<string, string>("Level Victory!", "ĐỦ NĂNG LƯỢNG!"),
 		new KeyValuePair<string, string>("Đủ năng lượng!", "ĐỦ NĂNG LƯỢNG!"),
-		new KeyValuePair<string, string>("Main Menu", "MENU CHÍNH"),
-		new KeyValuePair<string, string>("Menu chính", "MENU CHÍNH"),
-		new KeyValuePair<string, string>("Next Level", "KHU TIẾP THEO"),
-		new KeyValuePair<string, string>("Khu tiếp theo", "KHU TIẾP THEO"),
+		new KeyValuePair<string, string>("Main Menu", "Menu chính"),
+		new KeyValuePair<string, string>("MENU CHÍNH", "Menu chính"),
+		new KeyValuePair<string, string>("Next Level", "Sang màn tiếp theo"),
+		new KeyValuePair<string, string>("KHU TIẾP THEO", "Sang màn tiếp theo"),
 		new KeyValuePair<string, string>("CONGRATULATIONS!", "ĐÃ VỀ TỚI CĂN CỨ!"),
 		new KeyValuePair<string, string>("Thanks for playing", "Cảm ơn bạn đã chơi!"),
 	};
@@ -124,8 +125,27 @@ public static class UiTheme {
 	static bool Style(GameObject root, Theme theme, string zoneTitle) {
 		bool changed = false;
 
-		if (root.name == "GameOver Canvas" && root.transform.Find("Lost Title") == null) {
-			NewText("Lost Title", root.transform, theme.fonts.bold, "MẤT KẾT NỐI", 72, LostColor);
+		// Spec §7.1: the lose panel says only "Bạn đã thua" (no cause, no score).
+		if (root.name == "GameOver Canvas") {
+			Transform lost = root.transform.Find("Lost Title");
+			(lost != null ? lost.GetComponent<Text>() : NewText("Lost Title", root.transform, theme.fonts.bold, "", 72, LostColor)).text = StoryText.Lost;
+			Transform score = root.transform.Find("EndGameScore Text");
+			if (score != null)
+				Object.DestroyImmediate(score.gameObject);
+			changed = true;
+		}
+		// Spec §7.5: level complete = story title + paragraph (texts set at runtime; the longest ones size the layout).
+		if (root.name == "BeatLevelUICanvas") {
+			LevelConfig[] levels = LevelCatalog.All.Where(l => !l.IsFinal).ToArray();
+			root.transform.Find("Congratulations Text").GetComponent<Text>().text =
+				levels.Select(l => StoryText.LevelComplete(l).title).OrderByDescending(t => t.Length).First();
+			Transform bodyT = root.transform.Find("Complete Body");
+			Text body = bodyT != null ? bodyT.GetComponent<Text>() : NewText("Complete Body", root.transform, theme.fonts.semiBold, "", 36, TextColor);
+			body.text = levels.Select(l => StoryText.LevelComplete(l).body).OrderByDescending(t => t.Length).First();
+			body.horizontalOverflow = HorizontalWrapMode.Wrap;
+			body.verticalOverflow = VerticalWrapMode.Overflow;
+			body.lineSpacing = 1.1f;
+			body.raycastTarget = false;
 			changed = true;
 		}
 
@@ -202,21 +222,22 @@ public static class UiTheme {
 		Transform border = root.transform.Find("BoxBorder");
 
 		if (root.name == "BeatLevelUICanvas") {
-			SetCenter(box, 0f, new Vector2(820f, 440f));
+			SetCenter(box, 0f, new Vector2(1240f, 620f));
 			Transform title = root.transform.Find("Congratulations Text");
-			SetCenter(title, 80f, new Vector2(740f, 150f));
-			FitFor(title, null, 110);
-			SetCenter(root.transform.Find("Next Level Button"), -120f, new Vector2(460f, 110f));
+			SetCenter(title, 210f, new Vector2(1140f, 90f));
+			FitFor(title, null, 56);
+			Transform body = root.transform.Find("Complete Body");
+			SetCenter(body, 25f, new Vector2(1140f, 240f));
+			body.GetComponent<Text>().fontSize = 36;
+			body.GetComponent<Text>().alignment = TextAnchor.MiddleCenter;
+			SetCenter(root.transform.Find("Next Level Button"), -205f, new Vector2(560f, 110f));
 		} else {
-			SetCenter(box, 0f, new Vector2(820f, 580f));
+			SetCenter(box, 0f, new Vector2(820f, 440f));
 			Transform lost = root.transform.Find("Lost Title");
-			SetCenter(lost, 200f, new Vector2(740f, 90f));
+			SetCenter(lost, 100f, new Vector2(740f, 100f));
 			FitFor(lost, null, 72);
-			Transform score = root.transform.Find("EndGameScore Text");
-			SetCenter(score, 95f, new Vector2(740f, 100f));
-			FitFor(score, "100 / 100", 96);
-			SetCenter(root.transform.Find("Play Again Button"), -45f, new Vector2(460f, 100f));
-			SetCenter(root.transform.Find("Main Menu Button"), -170f, new Vector2(460f, 100f));
+			SetCenter(root.transform.Find("Play Again Button"), -35f, new Vector2(460f, 100f));
+			SetCenter(root.transform.Find("Main Menu Button"), -155f, new Vector2(460f, 100f));
 		}
 		if (border != null)
 			SetCenter(border, 0f, ((RectTransform)box).sizeDelta);
@@ -232,7 +253,7 @@ public static class UiTheme {
 		}
 
 		bool heading = text.name == "Game Title" || text.name == "Congratulations Text" || text.name == "Lost Title"
-			|| text.name == "Score Text" || text.name == "Dialog Title" || text.name == "EndGameScore Text";
+			|| text.name == "Score Text" || text.name == "Dialog Title";
 		text.font = heading ? fonts.bold : text.name == "Subtitle" ? fonts.medium : fonts.semiBold;
 
 		Color color = TextColor;

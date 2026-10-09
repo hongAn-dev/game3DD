@@ -238,7 +238,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "MENU CH\xCDNH"
+  m_Text: "Menu ch\xEDnh"
 --- !u!114 &114060630870740466
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -31,7 +31,8 @@ public class GameManager : MonoBehaviour {
 	public GameObject mainCanvas;
 	public Text mainScoreDisplay;
 	public GameObject gameOverCanvas;
-	public Text gameOverScoreDisplay;
+	[Tooltip("Hidden on the lose/level-complete panels: minimap camera, robot HP bar (the main canvas hides too).")]
+	public GameObject[] hideOnResult = new GameObject[0];
 
 	[Tooltip("Only need to set if canBeatLevel is set to true.")]
 	public GameObject beatLevelCanvas;
@@ -172,11 +173,10 @@ public class GameManager : MonoBehaviour {
 			GameFlow.Die ("MẤT KẾT NỐI");
 			gameState = gameStates.Death;
 			BeginResult (SfxEvent.Lose);
-			gameOverScoreDisplay.text = mainScoreDisplay.text;
-			Transform cause = gameOverCanvas.transform.Find ("Lost Title");
-			if (cause != null)
-				cause.GetComponent<Text> ().text = GameFlow.DeathCause.ToUpperInvariant ();
-			mainCanvas.SetActive (false);
+			// The panel only says "Bạn đã thua" (spec §7.1); the cause goes to the development log.
+			if (Debug.isDebugBuild)
+				Debug.Log ("GameManager: lost, cause: " + GameFlow.DeathCause);
+			HideHud ();
 			gameOverCanvas.SetActive (true);
 			SelectButton ("Play Again Button");
 			return;
@@ -187,14 +187,26 @@ public class GameManager : MonoBehaviour {
 			if (config != null)
 				CampaignProgress.CompleteLevel (config.levelId);
 			player.SetActive (false);
-			mainCanvas.SetActive (false);
+			HideHud ();
 			if (config != null && config.IsFinal) {
 				StartCoroutine (GoToEnding ());
 			} else {
+				if (config != null) {
+					StoryPage done = StoryText.LevelComplete (config);
+					beatLevelCanvas.transform.Find ("Congratulations Text").GetComponent<Text> ().text = done.title;
+					beatLevelCanvas.transform.Find ("Complete Body").GetComponent<Text> ().text = done.body;
+				}
 				beatLevelCanvas.SetActive (true);
 				SelectButton (isFinalLevel ? "Main Menu Button" : "Next Level Button");
 			}
 		}
+	}
+
+	void HideHud () {
+		mainCanvas.SetActive (false);
+		foreach (GameObject hud in hideOnResult)
+			if (hud != null)
+				hud.SetActive (false);
 	}
 
 	void BeginResult (SfxEvent cue) {

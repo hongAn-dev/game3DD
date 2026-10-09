@@ -44,4 +44,25 @@ public class EndingTests {
 		Assert.IsEmpty(Object.FindObjectsOfType<Treasure>(true));
 		Assert.IsEmpty(Object.FindObjectsOfType<Collider>(true).Where(c => c.attachedRigidbody != null));
 	}
+
+	// Spec §7.5: the "ship ready" caption over the fuelled-up moment (enough time to read), the closing texts and
+	// Chơi lại / Menu chính.
+	[Test]
+	public void EndingCaptionAndFinalTexts() {
+		EditorSceneManager.OpenScene("Assets/Scenes/Ending.unity", OpenSceneMode.Single);
+		EndingController controller = Object.FindObjectOfType<EndingController>();
+		var texts = Object.FindObjectsOfType<UnityEngine.UI.Text>(true);
+		UnityEngine.UI.Text ready = texts.Single(t => t.name == "Caption Ready");
+		Assert.AreEqual(StoryText.ShipReady.title + "\n" + StoryText.ShipReady.body, ready.text);
+		TimelineAsset timeline = (TimelineAsset)controller.director.playableAsset;
+		TimelineClip clip = timeline.GetOutputTracks().Single(t => t.name == "Caption ready").GetClips().Single();
+		Assert.That(clip.start, Is.InRange(10.0, 13.0));
+		Assert.GreaterOrEqual(clip.duration, 5.0, "time to read");
+		Assert.IsFalse(texts.Any(t => t.text.Contains("…")), "no cut text");
+		Transform panel = controller.completionPanel.transform;
+		Assert.AreEqual(StoryText.Finale.title, panel.Find("Title").GetComponent<UnityEngine.UI.Text>().text);
+		Assert.AreEqual(StoryText.Finale.body, panel.Find("Subtitle").GetComponent<UnityEngine.UI.Text>().text);
+		CollectionAssert.AreEqual(new[] { "Chơi lại", "Menu chính" },
+			panel.GetComponentsInChildren<UnityEngine.UI.Button>(true).Select(b => b.GetComponentInChildren<UnityEngine.UI.Text>(true).text).ToArray());
+	}
 }

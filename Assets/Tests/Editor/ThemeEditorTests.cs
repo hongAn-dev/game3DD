@@ -154,12 +154,14 @@ public class ThemeEditorTests {
 			settings.fontSize = text.resizeTextMaxSize;
 			settings.resizeTextForBestFit = false;
 		}
-		settings.horizontalOverflow = HorizontalWrapMode.Overflow;
+		// Paragraphs ("... Body") wrap by design; labels and titles must fit on their lines.
+		settings.horizontalOverflow = text.name.EndsWith("Body") ? HorizontalWrapMode.Wrap : HorizontalWrapMode.Overflow;
 		settings.verticalOverflow = VerticalWrapMode.Overflow;
 		TextGenerator generator = new TextGenerator();
 		float width = generator.GetPreferredWidth(text.text, settings) / text.pixelsPerUnit;
 		float height = generator.GetPreferredHeight(text.text, settings) / text.pixelsPerUnit;
-		Assert.LessOrEqual(width, size.x + 1f, text.name + " width: " + text.text);
+		if (settings.horizontalOverflow == HorizontalWrapMode.Overflow)   // wrapped paragraphs: the height is what counts
+			Assert.LessOrEqual(width, size.x + 1f, text.name + " width: " + text.text);
 		Assert.LessOrEqual(height, size.y + 1f, text.name + " height: " + text.text);
 	}
 
@@ -246,9 +248,6 @@ public class ThemeEditorTests {
 					.Where(r => r.parent == root.transform && r.name != "BoxBackground" && r.name != "BoxBorder")
 					.ToList();
 				foreach (Text text in root.GetComponentsInChildren<Text>(true).Where(t => t.transform.parent == root.transform)) {
-					// The score shows "x / y" at runtime; check the widest realistic value.
-					if (text.name == "EndGameScore Text")
-						text.text = "100 / 100";
 					AssertFits(text);
 				}
 				foreach (RectTransform item in items) {

@@ -111,7 +111,7 @@ public class FlowPlayTests {
 		var labels = new System.Collections.Generic.List<string>();
 		foreach (UnityEngine.UI.Button b in Object.FindObjectsOfType<UnityEngine.UI.Button>())
 			labels.Add(b.GetComponentInChildren<UnityEngine.UI.Text>().text);
-		CollectionAssert.AreEquivalent(new[] { "CHƠI LẠI TỪ ĐẦU", "VỀ MENU" }, labels);
+		CollectionAssert.AreEquivalent(new[] { "Chơi lại", "Menu chính" }, labels);
 	}
 
 	static IEnumerator WaitForState(FlowState state, float seconds) {

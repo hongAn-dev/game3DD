@@ -390,7 +390,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 1
     m_VerticalOverflow: 1
     m_LineSpacing: 1
-  m_Text: "KH\xD3"
+  m_Text: "Kh\xF3"
 --- !u!114 &114939063766949748
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -713,7 +713,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 1
     m_VerticalOverflow: 1
     m_LineSpacing: 1
-  m_Text: "TH\u01AF\u1EDCNG"
+  m_Text: "Th\u01B0\u1EDDng"
 --- !u!114 &114647865998184860
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -959,7 +959,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 1
     m_VerticalOverflow: 1
     m_LineSpacing: 1
-  m_Text: "D\u1EC4"
+  m_Text: "D\u1EC5"
 --- !u!114 &114362676676867738
 MonoBehaviour:
   m_ObjectHideFlags: 0

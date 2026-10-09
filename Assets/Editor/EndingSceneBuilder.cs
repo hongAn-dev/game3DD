@@ -167,21 +167,26 @@ public static class EndingSceneBuilder {
 		GameObject fade = Stretch(new GameObject("Fade", typeof(RectTransform), typeof(Image), typeof(CanvasGroup), typeof(Animator)), canvasGo.transform);
 		fade.GetComponent<Image>().color = Color.black;
 		fade.GetComponent<Image>().raycastTarget = false;
-		GameObject charging = Label(canvasGo.transform, "Caption Charging", "ĐANG NẠP NĂNG LƯỢNG…", medium, 52, -380f, new Vector2(1200f, 80f)).gameObject;
-		GameObject fuel = Label(canvasGo.transform, "Caption Fuel", "NHIÊN LIỆU 100%", bold, 64, -380f, new Vector2(1200f, 90f)).gameObject;
-		GameObject escaped = Label(canvasGo.transform, "Caption Escaped", "Robo đã thoát khỏi hành tinh. Hành trình tiếp tục.", medium, 52, -380f, new Vector2(1700f, 80f)).gameObject;
-		foreach (GameObject caption in new[] { charging, fuel, escaped })
+		// Spec §7.5: the "ship ready" caption once the fuel is full, long enough to read; no extra tap in the flow.
+		Text readyText = Label(canvasGo.transform, "Caption Ready", StoryText.ShipReady.title + "\n" + StoryText.ShipReady.body, medium, 44, -360f, new Vector2(1700f, 150f));
+		readyText.horizontalOverflow = HorizontalWrapMode.Wrap;
+		readyText.lineSpacing = 1.15f;
+		GameObject ready = readyText.gameObject;
+		GameObject escaped = Label(canvasGo.transform, "Caption Escaped", "Phi thuyền đã cất cánh, rời khỏi hành tinh xa lạ.", medium, 52, -380f, new Vector2(1700f, 80f)).gameObject;
+		foreach (GameObject caption in new[] { ready, escaped })
 			caption.SetActive(false);
 
 		GameObject panel = Stretch(new GameObject("Completion Panel", typeof(RectTransform)), canvasGo.transform);
 		panel.SetActive(false);
-		Label(panel.transform, "Title", "ROBO ĐÃ THOÁT KHỎI HÀNH TINH", bold, 84, 260f, new Vector2(1700f, 120f));
-		Label(panel.transform, "Subtitle", "Hành trình tiếp tục.", medium, 48, 160f, new Vector2(1200f, 70f));
+		Label(panel.transform, "Title", StoryText.Finale.title, bold, 80, 300f, new Vector2(1700f, 110f));
+		Text finale = Label(panel.transform, "Subtitle", StoryText.Finale.body, medium, 42, 140f, new Vector2(1500f, 180f));
+		finale.horizontalOverflow = HorizontalWrapMode.Wrap;
+		finale.lineSpacing = 1.15f;
 
 		EndingController controller = canvasGo.AddComponent<EndingController>();
 		controller.completionPanel = panel;
-		UnityEventTools.AddPersistentListener(Button(panel.transform, "Play Again Button", "CHƠI LẠI TỪ ĐẦU", bold, -40f).onClick, controller.PlayAgain);
-		UnityEventTools.AddPersistentListener(Button(panel.transform, "Main Menu Button", "VỀ MENU", bold, -180f).onClick, controller.BackToMenu);
+		UnityEventTools.AddPersistentListener(Button(panel.transform, "Play Again Button", "Chơi lại", bold, -60f).onClick, controller.PlayAgain);
+		UnityEventTools.AddPersistentListener(Button(panel.transform, "Main Menu Button", "Menu chính", bold, -200f).onClick, controller.BackToMenu);
 		Button skip = Button(canvasGo.transform, "Skip Button", "BỎ QUA", bold, 0f);
 		RectTransform skipRect = (RectTransform)skip.transform;
 		skipRect.anchorMin = skipRect.anchorMax = skipRect.pivot = new Vector2(1f, 0f);
@@ -276,8 +281,7 @@ public static class EndingSceneBuilder {
 		AssetDatabase.AddObjectToAsset(fadeClip, timeline);
 		Animate(timeline, director, "Fade", fade.GetComponent<Animator>(), fadeClip);
 		Activation(timeline, director, "Fade visible", fade, 0f, 1.6f);   // no full-screen overdraw once it is clear
-		Activation(timeline, director, "Caption charging", charging, 8.5f, 3.5f);
-		Activation(timeline, director, "Caption fuel", fuel, 12f, 2f);
+		Activation(timeline, director, "Caption ready", ready, 11.5f, 5.5f);
 		Activation(timeline, director, "Caption escaped", escaped, 23.5f, Duration - 23.5f);
 		Sound(timeline, director, charge_, 8f, 5f);
 		Sound(timeline, director, full, 12f, 0.8f);

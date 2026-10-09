@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -122,5 +123,71 @@ public class StoryPlayTests {
 		GameSettings.showIntroLevelMessage = true;
 		yield return Open("Level2");
 		Assert.IsFalse(dialog.IsOpen);
+	}
+
+	IEnumerator Playing(string scene) {
+		CampaignProgress.BeginRun(GameSettings.gameDifficulties.Normal);
+		GameSettings.showIntroLevelMessage = false;
+		yield return Open(scene);
+	}
+
+	static string[] ButtonLabels(GameObject root) {
+		return root.GetComponentsInChildren<UnityEngine.UI.Button>().Select(b => b.GetComponentInChildren<UnityEngine.UI.Text>().text).ToArray();
+	}
+
+	// Spec §7.1: exactly "Bạn đã thua", two buttons, no score, gameplay HUD hidden.
+	[UnityTest]
+	public IEnumerator LosePanelSaysBanDaThua() {
+		yield return Playing("Level1");
+		GameFlow.Die("Robo rơi xuống biển axit");
+		yield return null;
+		yield return null;
+		GameObject panel = GameManager.gm.gameOverCanvas;
+		Assert.IsTrue(panel.activeSelf);
+		var texts = panel.GetComponentsInChildren<UnityEngine.UI.Text>().Where(t => t.GetComponentInParent<UnityEngine.UI.Button>() == null).Select(t => t.text).ToArray();
+		CollectionAssert.AreEqual(new[] { "Bạn đã thua" }, texts, "only the message");
+		CollectionAssert.AreEquivalent(new[] { "Thử lại", "Menu chính" }, ButtonLabels(panel));
+		Assert.IsFalse(GameManager.gm.mainCanvas.activeInHierarchy, "score HUD and joystick hidden");
+		foreach (GameObject hidden in GameManager.gm.hideOnResult)
+			Assert.IsFalse(hidden.activeSelf, hidden.name + " hidden");
+		Assert.IsTrue(GameManager.gm.hideOnResult.Any(g => g.GetComponent<Camera>() != null), "the minimap is one of them");
+	}
+
+	[UnityTest]
+	public IEnumerator RetryButtonLoadsOnce() {
+		yield return Playing("Level1");
+		GameFlow.Die("test");
+		yield return null;
+		int loads = 0;
+		UnityEngine.Events.UnityAction<Scene, LoadSceneMode> count = (scene, mode) => loads++;
+		SceneManager.sceneLoaded += count;
+		UnityEngine.UI.Button retry = GameManager.gm.gameOverCanvas.GetComponentsInChildren<UnityEngine.UI.Button>()
+			.First(b => b.GetComponentInChildren<UnityEngine.UI.Text>().text == "Thử lại");
+		retry.onClick.Invoke();
+		retry.onClick.Invoke();
+		yield return null;
+		yield return null;
+		yield return new WaitForSecondsRealtime(0.3f);
+		SceneManager.sceneLoaded -= count;
+		Assert.AreEqual(1, loads);
+		Assert.AreEqual(0, GameManager.gm.score);
+		Assert.IsTrue(CampaignProgress.IsActiveRun, "retry keeps the run");
+	}
+
+	// Spec §7.5: level complete shows its story title, text and "Sang màn tiếp theo".
+	[UnityTest]
+	public IEnumerator LevelCompleteUsesTheStory() {
+		yield return Playing("Level1");
+		GameManager.gm.Collect(GameManager.gm.BeatLevelScore);
+		yield return null;
+		yield return null;
+		GameObject panel = GameManager.gm.beatLevelCanvas;
+		Assert.IsTrue(panel.activeSelf);
+		StoryPage done = StoryText.LevelComplete(LevelCatalog.Get("Level1"));
+		var texts = panel.GetComponentsInChildren<UnityEngine.UI.Text>().Where(t => t.GetComponentInParent<UnityEngine.UI.Button>() == null).Select(t => t.text).ToArray();
+		CollectionAssert.AreEquivalent(new[] { "Đã vượt qua Đảo hoang", done.body }, texts);
+		CollectionAssert.AreEqual(new[] { "Sang màn tiếp theo" }, ButtonLabels(panel));
+		foreach (GameObject hidden in GameManager.gm.hideOnResult)
+			Assert.IsFalse(hidden.activeSelf, hidden.name + " hidden");
 	}
 }

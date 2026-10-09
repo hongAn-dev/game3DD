@@ -79,7 +79,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "CH\u01A0I"
+  m_Text: "Ch\u01A1i m\u1EDBi"
 --- !u!114 &114040806683379784
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -382,7 +382,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "THO\xC1T"
+  m_Text: "Tho\xE1t"
 --- !u!114 &114317808646162522
 MonoBehaviour:
   m_ObjectHideFlags: 0
