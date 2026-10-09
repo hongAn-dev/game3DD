@@ -241,10 +241,67 @@ public class EnergySpawnDirector : MonoBehaviour {
 		return Pick(Candidates(), band, near, out point);
 	}
 
-	/// <summary>A safe point for a support item, from the same candidates (≥ 2 m from cores and items): near the robot
-	/// (6–18 m by path) or spread out.</summary>
-	public bool PickSupportPoint(bool near, out Vector3 point) {
-		return Pick(nearPath, near, out point);
+	/// <summary>
+	/// A safe point for a support item, from the same candidates (≥ 2 m from cores and items): near the robot (6–18 m
+	/// by path) or spread out. visible = prefer points on screen with a clear line from the camera (first shield).
+	/// </summary>
+	public bool PickSupportPoint(bool near, bool visible, out Vector3 point) {
+		List<Candidate> all = Candidates();
+		Camera cam = Camera.main;
+		if (visible && cam != null) {
+			List<Candidate> seen = all.FindAll(c => InView(cam, c.point));
+			if (seen.Count > 0)
+				return Pick(seen, nearPath, near, out point);
+			if (PointAhead(cam, out point))
+				return true;
+		}
+		return Pick(all, nearPath, near, out point);
+	}
+
+	// On screen (with a margin) and a clear line from the camera to the item's middle.
+	static bool InView(Camera cam, Vector3 ground) {
+		Vector3 to = ground + Vector3.up * 0.5f;
+		Vector3 v = cam.WorldToViewportPoint(to);
+		if (v.z <= 0f || v.x < 0.08f || v.x > 0.92f || v.y < 0.08f || v.y > 0.92f)
+			return false;
+		RaycastHit hit;
+		Vector3 from = cam.transform.position;
+		return !Physics.Raycast(from, to - from, out hit, Vector3.Distance(from, to) - 0.3f, ~0, QueryTriggerInteraction.Ignore)
+			|| hit.collider.attachedRigidbody != null;
+	}
+
+	// No landing point in view: a NavMesh point straight ahead of the camera (hazards are not walkable), ≥ 1 m from
+	// a NavMesh edge, free of cores/items/enemies and reachable from the robot.
+	bool PointAhead(Camera cam, out Vector3 point) {
+		point = Vector3.zero;
+		Vector3 ahead = Vector3.ProjectOnPlane(cam.transform.forward, Vector3.up).normalized;
+		List<Vector3> taken = Occupied();
+		if (EnemyDirector.Current != null)
+			taken.AddRange(EnemyDirector.Current.PendingSpawns);
+		foreach (EnemyBrain e in FindObjectsOfType<EnemyBrain>())
+			taken.Add(e.transform.position);
+		foreach (float d in new[] { 6f, 5f, 7f, 4f, 8f }) {
+			NavMeshHit nav, edge;
+			if (!NavMesh.SamplePosition(player.position + ahead * d, out nav, 2f, NavMesh.AllAreas)
+				|| !NavMesh.FindClosestEdge(nav.position, out edge, NavMesh.AllAreas) || edge.distance < 1f
+				|| Vector3.Distance(nav.position, player.position) < minPlayerDistance || !InView(cam, nav.position)
+				|| PathFromRobot(nav.position) == float.MaxValue || taken.Exists(o => Vector3.Distance(o, nav.position) < minSpacing))
+				continue;
+			point = nav.position;
+			return true;
+		}
+		return false;
+	}
+
+	/// <summary>NavMesh path length from the robot to a point, or float.MaxValue when there is no complete path.</summary>
+	public float PathFromRobot(Vector3 point) {
+		UpdateRobotPoint();
+		NavMeshHit nav;
+		var path = new NavMeshPath();
+		if (!robotPointValid || !NavMesh.SamplePosition(point, out nav, 1.5f, NavMesh.AllAreas)
+			|| !NavMesh.CalculatePath(robotPoint, nav.position, NavMesh.AllAreas, path) || path.status != NavMeshPathStatus.PathComplete)
+			return float.MaxValue;
+		return PathLength(path);
 	}
 
 	// Removes candidates the new core makes too close, and lowers the isolation of the rest (one candidate scan per

@@ -4,7 +4,7 @@ public enum SupportKind { Shield, Heal10, Heal20, Overdrive }
 
 /// <summary>
 /// A support item (spec §6.3): the robot touching it while Playing gets the effect. It is consumed only when the
-/// effect applied (a heal at full HP stays for later). It lasts lifetime seconds of gameplay time, blinks gently in
+/// effect applied (a heal at full HP stays for later). It lasts lifetime seconds of gameplay time, pulses gently in
 /// the last blinkTime seconds, and reports Gone exactly once (pickup or expiry). Never energy.
 /// </summary>
 public class SupportPickup : MonoBehaviour {
@@ -17,10 +17,13 @@ public class SupportPickup : MonoBehaviour {
 
 	float age;
 	bool gone;
-	Renderer[] renderers;
+	Transform model;
+	Vector3 modelScale;
 
 	void Awake() {
-		renderers = GetComponentsInChildren<Renderer>();
+		model = transform.Find("Model");
+		if (model != null)
+			modelScale = model.localScale;
 	}
 
 	void OnTriggerEnter(Collider other) {
@@ -42,9 +45,9 @@ public class SupportPickup : MonoBehaviour {
 	public static bool Apply(SupportKind kind, GameObject robot) {
 		switch (kind) {
 		case SupportKind.Shield: {
-			ShieldEffect shield = robot.GetComponent<ShieldEffect>();
+			ShieldEffect shield = robot.GetComponent<ShieldEffect>();   // on the Player prefab, with its bubble material
 			if (shield == null)
-				shield = robot.AddComponent<ShieldEffect>();
+				return false;
 			shield.Activate();
 			return true;
 		}
@@ -75,10 +78,10 @@ public class SupportPickup : MonoBehaviour {
 			Finish();
 			return;
 		}
-		bool visible = lifetime - age > blinkTime || Mathf.Repeat(age, 0.4f) < 0.28f;
-		foreach (Renderer r in renderers)
-			if (r != null && r.enabled != visible)
-				r.enabled = visible;
+		// Last blinkTime seconds: a gentle shrink-and-grow pulse (never disappears).
+		if (model != null)
+			model.localScale = lifetime - age > blinkTime ? modelScale
+				: modelScale * (0.85f + 0.15f * (0.5f + 0.5f * Mathf.Cos(age * Mathf.PI * 4f)));
 	}
 
 	/// <summary>Removes the item and frees its slot; safe to call more than once.</summary>

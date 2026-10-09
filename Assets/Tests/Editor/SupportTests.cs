@@ -102,8 +102,8 @@ public class SupportTests {
 			Assert.IsNotNull(d.heal10Prefab);
 			Assert.IsNotNull(d.heal20Prefab);
 			Assert.IsNotNull(d.overdrivePrefab);
-			foreach (MonoBehaviour m in Object.FindObjectsOfType<MonoBehaviour>(true))
-				Assert.IsNotNull(m, level.levelId + " has a missing script");
+			foreach (GameObject go in Object.FindObjectsOfType<GameObject>(true))
+				Assert.AreEqual(0, GameObjectUtility.GetMonoBehavioursWithMissingScriptCount(go), level.levelId + ": missing script on " + go.name);
 		}
 	}
 }

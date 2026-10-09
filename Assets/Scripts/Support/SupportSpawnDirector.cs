@@ -22,6 +22,8 @@ public class SupportSpawnDirector : MonoBehaviour {
 	public float intervalOverride = -1f;
 	[Tooltip("Item lifetime; < 0 keeps the prefab's 25 s (tests set it).")]
 	public float lifetimeOverride = -1f;
+	[Tooltip("Tests: replaces LevelConfig.supportWeights when set.")]
+	public float[] weightsOverride;
 	public float lowHealth = 40f;
 	public float healNear = 18f;
 	public float markerDuration = 0.35f;
@@ -108,10 +110,14 @@ public class SupportSpawnDirector : MonoBehaviour {
 		return robot != null && robot.healthPoints > 0f && robot.healthPoints <= lowHealth;
 	}
 
+	static bool IsHeal(SupportKind kind) {
+		return kind == SupportKind.Heal10 || kind == SupportKind.Heal20;
+	}
+
+	// A heal the robot can actually reach soon (by NavMesh path, not straight line).
 	bool HealNearRobot() {
 		foreach (SupportPickup item in Items)
-			if ((item.kind == SupportKind.Heal10 || item.kind == SupportKind.Heal20)
-				&& Vector3.Distance(item.transform.position, robot.transform.position) <= healNear)
+			if (IsHeal(item.kind) && energy.PathFromRobot(item.transform.position) <= healNear)
 				return true;
 		return false;
 	}
@@ -120,29 +126,31 @@ public class SupportSpawnDirector : MonoBehaviour {
 		if (!GameFlow.IsGameplayActive)
 			return;
 		elapsed += Time.deltaTime;
-		if (!firstShieldDone && config.firstShieldAfter > 0f && elapsed >= config.firstShieldAfter) {
-			firstShieldDone = true;
-			if (AliveCount < config.supportCap)
-				TrySpawn(SupportKind.Shield, true);   // a visible point near the robot
-		}
+		// First shield (Level1): retried until it actually drops, at a point the camera can see.
+		if (!firstShieldDone && config.firstShieldAfter > 0f && elapsed >= config.firstShieldAfter && AliveCount < config.supportCap)
+			firstShieldDone = TrySpawn(SupportKind.Shield, true, true);
 		timer += Time.deltaTime;
 		if (timer < (intervalOverride > 0f ? intervalOverride : next))
 			return;
 		ScheduleNext();
 		bool needHeal = LowHealth() && !HealNearRobot();
 		if (AliveCount < config.supportCap) {
-			TrySpawn(needHeal ? SupportKind.Heal20 : Choose(config.supportWeights, Random.value), needHeal);
+			TrySpawn(needHeal ? SupportKind.Heal20 : Choose(weightsOverride != null && weightsOverride.Length == 4 ? weightsOverride : config.supportWeights, Random.value), needHeal, false);
 		} else if (needHeal && pending.Count == 0) {
-			// Budget full of non-heal items: swap the farthest one (never right next to the robot) for a +20.
+			// Budget full of non-heal items: swap the farthest one (never right next to the robot) for a +20 — only
+			// once a point for the +20 is found, and never a heal.
 			SupportPickup far = null;
 			foreach (SupportPickup item in Items) {
+				if (IsHeal(item.kind))
+					continue;
 				float d = Vector3.Distance(item.transform.position, robot.transform.position);
 				if (d >= 3f && (far == null || d > Vector3.Distance(far.transform.position, robot.transform.position)))
 					far = item;
 			}
-			if (far != null) {
+			Vector3 point;
+			if (far != null && energy.PickSupportPoint(true, false, out point)) {
 				far.Finish();
-				TrySpawn(SupportKind.Heal20, true);
+				StartDrop(SupportKind.Heal20, point);
 			}
 		}
 	}
@@ -156,13 +164,17 @@ public class SupportSpawnDirector : MonoBehaviour {
 		}
 	}
 
-	void TrySpawn(SupportKind kind, bool near) {
-		GameObject prefab = PrefabFor(kind);
+	bool TrySpawn(SupportKind kind, bool near, bool visible) {
 		Vector3 point;
-		if (prefab == null || !energy.PickSupportPoint(near, out point))
-			return;
+		if (PrefabFor(kind) == null || !energy.PickSupportPoint(near, visible, out point))
+			return false;
+		StartDrop(kind, point);
+		return true;
+	}
+
+	void StartDrop(SupportKind kind, Vector3 point) {
 		pending.Add(point);
-		StartCoroutine(Drop(prefab, point));
+		StartCoroutine(Drop(PrefabFor(kind), point));
 	}
 
 	IEnumerator Drop(GameObject prefab, Vector3 point) {

@@ -180,6 +180,11 @@ public class SupportPlayTests {
 		Assert.IsNotNull(first);
 		Assert.AreEqual(SupportKind.Shield, first.kind);
 		Assert.That(Time.time - start, Is.InRange(5f, 5f + 0.85f + 0.6f), "5 s after the intro, after its marker and fall");
+		while (support.Items.Count == 0 && Time.time - start < 9f)
+			yield return null;   // landed
+		Assert.AreEqual(1, support.Items.Count);
+		Vector3 view = Camera.main.WorldToViewportPoint(support.Items[0].transform.position);
+		Assert.IsTrue(view.z > 0f && view.x > 0f && view.x < 1f && view.y > 0f && view.y < 1f, "on screen for the robot's camera");
 	}
 
 	[UnityTest]
@@ -212,9 +217,15 @@ public class SupportPlayTests {
 		Assert.AreEqual(SupportKind.Heal20, first.kind, "HP <= 40 and no heal nearby");
 	}
 
+	void PinRobot() {
+		Rigidbody body = player.GetComponent<Rigidbody>();
+		body.isKinematic = true;
+	}
+
 	[UnityTest]
 	public IEnumerator ItemsExpireAfterTheirLifetime() {
 		yield return Load("Level2");
+		PinRobot();   // items land >= 3 m away, so only expiry can remove them
 		support.lifetimeOverride = 1f;
 		support.intervalOverride = 0.2f;
 		SupportPickup item = null;
@@ -234,11 +245,10 @@ public class SupportPlayTests {
 	public IEnumerator ExpiryFreesTheSlotOnce() {
 		yield return Load("Level2");
 		support.intervalOverride = 0.2f;
-		SupportPickup item = null;
-		while (item == null) {
-			item = Object.FindObjectOfType<SupportPickup>();
+		PinRobot();
+		while (support.Items.Count == 0)
 			yield return null;
-		}
+		SupportPickup item = support.Items[0];   // a landed item, not a falling one
 		support.intervalOverride = 100f;
 		yield return null;
 		int before = support.AliveCount, gone = 0;
@@ -269,10 +279,33 @@ public class SupportPlayTests {
 		yield return Load("Level1");
 		support.intervalOverride = 0.1f;
 		support.lifetimeOverride = 0.15f;   // keep slots free so many items roll
+		int seen = 0;
+		var counted = new System.Collections.Generic.HashSet<SupportPickup>();
 		float end = Time.time + 4f;
 		while (Time.time < end) {
+			foreach (SupportPickup p in Object.FindObjectsOfType<SupportPickup>())
+				if (counted.Add(p))
+					seen++;
 			Assert.IsFalse(Object.FindObjectsOfType<SupportPickup>().Any(p => p.kind == SupportKind.Overdrive), "no Overdrive in Level1");
 			yield return null;
 		}
+		Assert.Greater(seen, 3, "items did spawn");
+	}
+
+	// HP <= 40 with the budget full of non-heal items: one far item is swapped for a +20.
+	[UnityTest]
+	public IEnumerator LowHpSwapsAFarItemForAHeal20() {
+		yield return Load("Level2");
+		PinRobot();
+		support.weightsOverride = new[] { 1f, 0f, 0f, 0f };   // shields only
+		support.intervalOverride = 0.2f;
+		while (support.Items.Count < 2)
+			yield return null;
+		health.TakeDamage(70f, DamageKind.EnemyAttack);
+		float end = Time.time + 3f;
+		while (Time.time < end && !support.Items.Any(i => i.kind == SupportKind.Heal20))
+			yield return null;
+		Assert.AreEqual(1, support.Items.Count(i => i.kind == SupportKind.Heal20), "one far shield became a +20");
+		Assert.LessOrEqual(support.AliveCount, 2, "within the budget");
 	}
 }
