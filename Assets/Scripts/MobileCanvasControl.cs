@@ -2,18 +2,9 @@
 using System.Collections;
 
 /// <summary>
-/// Setup the mobile canvas behavior based on device the game is running.
+/// The mobile canvas (joystick, look area, pause button) stays visible on every platform: Android plays with it, and
+/// in the Editor/PC it works with the mouse while WASD/arrow keys also drive the robot (spec §3.1). It used to hide
+/// itself off handheld devices, which made the joystick look missing in the Editor.
 /// </summary>
 public class MobileCanvasControl : MonoBehaviour {
-
-	/// <summary>
-	/// Use this for initialization.
-	/// </summary>
-	void Start () {
-		// Check if the device running this is not a handheld and hide jostick control. 
-		// Note: AppleTV is listed as Handheld so need to check it separately. 
-		if ( (SystemInfo.deviceType != DeviceType.Handheld) || (Application.platform == RuntimePlatform.tvOS)) {
-			this.gameObject.SetActive (false);
-		}
-	}
 }

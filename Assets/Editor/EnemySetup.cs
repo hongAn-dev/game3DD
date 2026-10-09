@@ -41,9 +41,9 @@ public static class EnemySetup {
 			director.bossPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(BossPath);
 			director.creepPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(CreepPath);
 			director.telegraphMaterial = telegraph;
-			// Level1 teaches the controls first: its boss waits for two cores or 30 s (spec §5/§6.2).
-			director.bossAfterScore = level.levelId == "Level1" ? 2 : 0;
-			director.bossAfterTime = level.levelId == "Level1" ? 30f : 8f;
+			director.intervalMin = 2f;
+			director.intervalMax = 3f;
+			director.minPlayerDistance = 8f;
 			director.spawnPoints = SpawnPoints(data).ToArray();
 			EditorSceneManager.MarkSceneDirty(scene);
 			EditorSceneManager.SaveScene(scene);
@@ -116,6 +116,24 @@ public static class EnemySetup {
 		return pivot;
 	}
 
+	// Flat unit strip (1 x 1 m, pivot at its centre); EnemyBrain sizes it to the dash width x length during the windup.
+	static GameObject DashTelegraph(GameObject root, Material material) {
+		Transform old = root.transform.Find("Dash Telegraph");
+		if (old != null)
+			Object.DestroyImmediate(old.gameObject);
+		GameObject pivot = new GameObject("Dash Telegraph");
+		pivot.transform.SetParent(root.transform, false);
+		GameObject strip = GameObject.CreatePrimitive(PrimitiveType.Cube);
+		strip.name = "Strip";
+		Object.DestroyImmediate(strip.GetComponent<Collider>());
+		strip.transform.SetParent(pivot.transform, false);
+		strip.transform.localScale = new Vector3(1f, 0.01f, 1f);
+		strip.GetComponent<Renderer>().sharedMaterial = material;
+		strip.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+		pivot.SetActive(false);
+		return pivot;
+	}
+
 	/// <summary>World-space size of the active visual from mesh bounds (skinned renderer bounds are stale in prefab contents).</summary>
 	public static Bounds MeshBounds(GameObject root) {
 		bool any = false;
@@ -159,17 +177,29 @@ public static class EnemySetup {
 			float radius = Mathf.Clamp(Mathf.Min(b.size.x, b.size.z) * 0.5f, 0.5f, 0.9f);
 			Body(root, BossHeight, radius, BossHeight / 2f);
 			EnemyBrain brain = Brain(root);
-			brain.speedFactor = new[] { 0.70f, 0.85f, 1.00f };
-			brain.windup = 0.55f;
-			brain.strike = 0.15f;
-			brain.recover = 0.8f;
+			// Defaults = L3 Normal; EnemyDirector applies the level profile when it spawns the boss.
+			brain.speed = 6.5f;
+			brain.damage = 25;
+			brain.windup = EnemyProfile.BossWindup;
+			brain.strike = EnemyProfile.BossStrike;
+			brain.recover = EnemyProfile.BossRecover;
+			brain.turnSpeed = 270f;
 			brain.attackRange = radius + RobotRadius + 0.9f;
 			brain.attackAngle = 50f;
-			brain.acceleration = 16f;
+			brain.acceleration = 12f;
 			brain.idleClip = "Idle";
 			brain.runClip = "Run";
 			brain.attackClip = "Attack";
-			brain.telegraph = Telegraph(root, brain.attackRange, telegraph);
+			brain.canSlam = true;
+			brain.slamRadius = 2.4f;
+			brain.slamReach = 1.2f;
+			brain.telegraph = Telegraph(root, brain.slamRadius, telegraph);   // the slam circle at its real size
+			brain.dashLength = 5f;
+			brain.dashWidth = 1.5f;
+			brain.dashSpeed = 10.5f;
+			brain.dashWindup = 1.0f;
+			brain.dashRecover = 1.6f;
+			brain.dashTelegraph = DashTelegraph(root, telegraph);
 			PrefabUtility.SaveAsPrefabAsset(root, BossPath);
 			Debug.Log("EnemySetup: boss " + b.size.ToString("F2") + " radius " + radius.ToString("F2") + " range " + brain.attackRange.ToString("F2"));
 		} finally {
@@ -204,13 +234,16 @@ public static class EnemySetup {
 
 			Body(root, Mathf.Max(b.size.y, 0.5f), 0.4f, Mathf.Max(b.size.y, 0.5f) / 2f);
 			EnemyBrain brain = Brain(root);
-			brain.speedFactor = new[] { 0.80f, 0.95f, 1.05f };
-			brain.windup = 0.35f;
-			brain.strike = 0.10f;
-			brain.recover = 0.7f;
+			// Defaults = L2 Normal; EnemyDirector applies the level profile when it spawns the creep.
+			brain.speed = 6f;
+			brain.damage = 12;
+			brain.windup = 0.60f;
+			brain.strike = EnemyProfile.CreepStrike;
+			brain.recover = 0.95f;
+			brain.turnSpeed = 300f;
 			brain.attackRange = 0.4f + RobotRadius + 0.5f;
 			brain.attackAngle = 45f;
-			brain.acceleration = 20f;
+			brain.acceleration = 14f;
 			brain.idleClip = brain.runClip = brain.attackClip = "";
 			brain.telegraph = Telegraph(root, brain.attackRange, telegraph);
 			PrefabUtility.SaveAsPrefabAsset(root, CreepPath);

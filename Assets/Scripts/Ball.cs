@@ -39,14 +39,19 @@ public class Ball : MonoBehaviour {
 	// The length of the ray to check if the ball is grounded.
 	private const float k_GroundRayLength = 1f;
 	private Rigidbody m_Rigidbody;
+	private float m_Radius = 0.5f;
 
 	/// <summary>
 	/// Use this for initialization.
 	/// </summary>
 	private void Start() {
 		m_Rigidbody = GetComponent<Rigidbody>();
-		// Set the maximum angular velocity.
-		GetComponent<Rigidbody>().maxAngularVelocity = m_MaxAngularVelocity;
+		SphereCollider sphere = GetComponent<SphereCollider>();
+		if (sphere != null)
+			m_Radius = Mathf.Max(0.05f, sphere.radius * Mathf.Max(transform.lossyScale.x, transform.lossyScale.y, transform.lossyScale.z));
+		// Set the maximum angular velocity, high enough for the rolling spin at Overdrive speed (otherwise the spin is
+		// capped and the ball skids).
+		GetComponent<Rigidbody>().maxAngularVelocity = Mathf.Max(m_MaxAngularVelocity, m_MaxSpeed * Overdrive.SpeedBoost / m_Radius * 1.1f);
 	}
 
 	/// <summary>
@@ -67,14 +72,21 @@ public class Ball : MonoBehaviour {
 			// In the air with the stick released the arc is left alone.
 			Vector3 desired = input >= 0.1f ? Vector3.ClampMagnitude(new Vector3(moveDirection.x, 0f, moveDirection.z), 1f) * maxSpeed : Vector3.zero;
 			float rate = (input >= 0.1f ? m_AccelerationRate * AccelMultiplier : m_Brake) * Time.fixedDeltaTime;
-			m_Rigidbody.AddForce(Vector3.MoveTowards(horizontal, desired, rate) - horizontal, ForceMode.VelocityChange);
+			horizontal = Vector3.MoveTowards(horizontal, desired, rate);
 		}
 
-		// Clamp only the horizontal part of the velocity.
-		velocity = m_Rigidbody.velocity;
-		horizontal = new Vector3(velocity.x, 0f, velocity.z);
-		if (horizontal.magnitude > maxSpeed) {
+		// Clamp only the horizontal part of the velocity (an easing Overdrive lowers maxSpeed gradually).
+		if (horizontal.magnitude > maxSpeed)
 			horizontal = horizontal.normalized * maxSpeed;
+		bool torqueDriving = m_UseTorque && input >= 0.1f;
+		if (!torqueDriving) {
+			// Set the new velocity directly (an AddForce would only show up next step, so the clamp and the spin below
+			// would act on the old speed) and, on the ground, spin exactly as fast as the ball rolls: otherwise contact
+			// friction turns part of every push and brake into spin and the real rates drop to ~5/7.
+			m_Rigidbody.velocity = new Vector3(horizontal.x, velocity.y, horizontal.z);
+			if (grounded && !m_UseTorque)
+				m_Rigidbody.angularVelocity = Vector3.Cross(Vector3.up, horizontal) / m_Radius;
+		} else if (new Vector3(velocity.x, 0f, velocity.z).magnitude > maxSpeed) {
 			m_Rigidbody.velocity = new Vector3(horizontal.x, velocity.y, horizontal.z);
 		}
 

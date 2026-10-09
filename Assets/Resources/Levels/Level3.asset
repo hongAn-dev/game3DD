@@ -14,13 +14,31 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   levelId: Level3
   order: 3
-  displayName: "V\xF9ng \u0111\u1ECBa nhi\u1EC7t"
+  displayName: "Thung l\u0169ng dung nham"
   nextScene: Level4
   energyTarget: 14
-  energyAtStart: 5
-  energyCap: 7
-  energyIntervalMin: 4
-  energyIntervalMax: 6
-  enemyCap: 060000000700000008000000
-  bossCap: 020000000200000002000000
+  energyAtStart: 7
+  energyCap: 8
+  energyIntervalMin: 1.5
+  energyIntervalMax: 2.5
+  energyBatchMin: 2
+  energyBatchMax: 3
+  enemyCap: 040000000500000006000000
+  bossCap: 010000000100000001000000
+  creepSpeed: 6.8
+  bossSpeed: 6.5
+  creepDamage: 15
+  bossDamage: 25
+  creepWindup: 0.55
+  creepRecover: 0.9
+  quietTime: 5
+  supportCap: 3
+  supportIntervalMin: 7
+  supportIntervalMax: 10
+  supportWeights:
+  - 30
+  - 35
+  - 20
+  - 15
+  firstShieldAfter: -1
   hazardDeathMessage: "Robo ch\u1EA1m dung nham"

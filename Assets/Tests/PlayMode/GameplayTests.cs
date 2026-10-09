@@ -40,7 +40,7 @@ public class GameplayTests {
 		yield return null;
 
 		Assert.AreEqual(0, GameManager.gm.score);
-		StringAssert.StartsWith("0", GameManager.gm.mainScoreDisplay.text);
+		StringAssert.StartsWith("Năng lượng: 0/", GameManager.gm.mainScoreDisplay.text);
 	}
 
 	[UnityTest]
@@ -90,15 +90,15 @@ public class GameplayTests {
 		yield return null;
 		GameManager gm = GameManager.gm;
 		Assert.AreEqual(6, gm.BeatLevelScore);
-		Assert.AreEqual("0 / 6", gm.mainScoreDisplay.text);
+		Assert.AreEqual("Năng lượng: 0/6", gm.mainScoreDisplay.text);
 	}
 
 	[Test]
 	public void ZoneTitlesAreVietnamese() {
-		Assert.AreEqual("Bãi đáp hỏng", LevelCatalog.Get("Level1").displayName);
+		Assert.AreEqual("Đảo hoang", LevelCatalog.Get("Level1").displayName);
 		Assert.AreEqual("Trạm khai thác bỏ hoang", LevelCatalog.Get("Level2").displayName);
-		Assert.AreEqual("Vùng địa nhiệt", LevelCatalog.Get("Level3").displayName);
-		Assert.AreEqual("Bãi phóng cũ", LevelCatalog.Get("Level4").displayName);
+		Assert.AreEqual("Thung lũng dung nham", LevelCatalog.Get("Level3").displayName);
+		Assert.AreEqual("Bãi phóng bỏ hoang", LevelCatalog.Get("Level4").displayName);
 		Assert.IsNull(LevelCatalog.Get("MainMenu"));
 	}
 }

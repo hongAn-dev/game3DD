@@ -30,12 +30,16 @@ public class Overdrive : MonoBehaviour {
 		Remaining = Duration;
 		blend = 1f;
 		Apply();
+		Sfx.Play(SfxEvent.OverdriveOn);
 	}
 
 	void Update() {
 		if (!GameFlow.IsGameplayActive)
 			return;
+		bool was = Active;
 		Remaining = Mathf.Max(0f, Remaining - Time.deltaTime);
+		if (was && !Active)
+			Sfx.Play(SfxEvent.OverdriveOff);
 		if (!Active)
 			blend = Mathf.MoveTowards(blend, 0f, Time.deltaTime / EaseOut);
 		Apply();

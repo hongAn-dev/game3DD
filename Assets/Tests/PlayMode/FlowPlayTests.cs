@@ -47,7 +47,7 @@ public class FlowPlayTests {
 	public IEnumerator DeathWinsOverLastCoreInSameFrame() {
 		GameManager gm = GameManager.gm;
 		gm.Collect(gm.BeatLevelScore - 1);
-		GameObject.FindWithTag("Player").GetComponent<Health>().ApplyDamage(10f);
+		GameObject.FindWithTag("Player").GetComponent<Health>().TakeDamage(100f, DamageKind.EnemyAttack);   // lethal strike
 		gm.Collect(1);
 		yield return null;
 		yield return null;
@@ -60,10 +60,11 @@ public class FlowPlayTests {
 	public IEnumerator CampaignRouteReachesEndingOnce() {
 		foreach (string level in new[] { "Level1", "Level2", "Level3", "Level4" }) {
 			Assert.AreEqual(level, SceneManager.GetActiveScene().name);
-			// Next() shows the intro card (FlowState.Intro, time frozen); pickups count only once it is over.
-			float playing = Time.realtimeSinceStartup + 4f;
-			while (GameFlow.State != FlowState.Playing && Time.realtimeSinceStartup < playing)
-				yield return null;
+			// Next() shows the intro card (FlowState.Intro, time frozen) until "Bắt đầu"; pickups count only after it.
+			DialogPanel dialog = Object.FindObjectOfType<DialogPanel>(true);
+			Assert.AreEqual(level != "Level1", dialog.IsOpen, level + " intro card");
+			dialog.Finish();
+			Assert.AreEqual(FlowState.Playing, GameFlow.State);
 			GameManager.gm.Collect(GameManager.gm.BeatLevelScore);
 			yield return null;
 			yield return null;
@@ -108,32 +109,15 @@ public class FlowPlayTests {
 		ending.Complete();
 		Assert.IsTrue(ending.completionPanel.activeSelf);
 		var labels = new System.Collections.Generic.List<string>();
-		foreach (UnityEngine.UI.Button b in Object.FindObjectsOfType<UnityEngine.UI.Button>())
+		foreach (UnityEngine.UI.Button b in ending.completionPanel.GetComponentsInChildren<UnityEngine.UI.Button>())
 			labels.Add(b.GetComponentInChildren<UnityEngine.UI.Text>().text);
-		CollectionAssert.AreEquivalent(new[] { "CHƠI LẠI TỪ ĐẦU", "VỀ MENU" }, labels);
+		CollectionAssert.AreEquivalent(new[] { "Chơi lại", "Menu chính" }, labels);
 	}
 
 	static IEnumerator WaitForState(FlowState state, float seconds) {
 		float end = Time.realtimeSinceStartup + seconds;
 		while (GameFlow.State != state && Time.realtimeSinceStartup < end)
 			yield return null;
-	}
-
-	[UnityTest]
-	public IEnumerator TappingIntroCardStartsPlayThroughGameFlow() {
-		GameSettings.showIntroLevelMessage = true;
-		SceneManager.LoadScene("Level1");
-		yield return null;
-		yield return WaitForState(FlowState.Intro, 2f);
-		Assert.AreEqual(FlowState.Intro, GameFlow.State);
-
-		Object.FindObjectOfType<UIButtonResumeGame>(true).resumeGame();
-		yield return null;
-		yield return null;
-
-		Assert.AreEqual(FlowState.Playing, GameFlow.State);
-		Assert.AreEqual(1f, Time.timeScale);
-		Assert.IsFalse(GameManager.gm.introBeatLevelCanvas.activeSelf, "card hides as soon as it is tapped");
 	}
 
 	[UnityTest]

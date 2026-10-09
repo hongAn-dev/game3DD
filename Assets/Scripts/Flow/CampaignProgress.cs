@@ -6,12 +6,18 @@ using System.Collections.Generic;
 public static class CampaignProgress {
 
 	static readonly HashSet<string> completed = new HashSet<string>();
+	static readonly HashSet<string> introsSeen = new HashSet<string>();
+
+	/// <summary>Set by New Game: the first level opens with the tutorial (consumed by GameManager).</summary>
+	public static bool TutorialPending { get; set; }
 
 	public static GameSettings.gameDifficulties Difficulty { get; private set; }
 	public static bool IsActiveRun { get; private set; }
 
 	public static void BeginRun(GameSettings.gameDifficulties difficulty) {
 		completed.Clear();
+		introsSeen.Clear();
+		TutorialPending = false;
 		Difficulty = difficulty;
 		GameSettings.difficulty = difficulty;
 		IsActiveRun = true;
@@ -24,6 +30,15 @@ public static class CampaignProgress {
 
 	public static bool IsCompleted(string levelId) {
 		return completed.Contains(levelId);
+	}
+
+	/// <summary>Intro cards already read in this run (Retry does not show them again).</summary>
+	public static bool IntroSeen(string levelId) {
+		return introsSeen.Contains(levelId);
+	}
+
+	public static void MarkIntroSeen(string levelId) {
+		introsSeen.Add(levelId);
 	}
 
 	public static int CompletedCount { get { return completed.Count; } }
@@ -43,6 +58,8 @@ public static class CampaignProgress {
 
 	public static void Reset() {
 		completed.Clear();
+		introsSeen.Clear();
+		TutorialPending = false;
 		IsActiveRun = false;
 		Difficulty = GameSettings.gameDifficulties.Easy;
 	}

@@ -20,7 +20,8 @@ public class EnemyPlayTests {
 	Health health;
 	NavMeshDataInstance navMesh;
 
-	int Hits { get { return health == null ? 0 : Lives - health.numberOfLives; } }
+	int hits;
+	int Hits { get { return hits; } }   // strikes that cost HP
 
 	IEnumerator Arena(params Vector3[][] walls) {
 #if UNITY_EDITOR
@@ -46,6 +47,8 @@ public class EnemyPlayTests {
 		player.GetComponent<Rigidbody>().isKinematic = true;   // holds still unless a test moves it
 		health = player.GetComponent<Health>();
 		health.numberOfLives = Lives;
+		hits = 0;
+		health.Damaged += amount => hits++;
 		yield return null;
 	}
 
@@ -85,9 +88,38 @@ public class EnemyPlayTests {
 		EnemyBrain boss = Spawn("Enemy - Monster", new Vector3(0f, 0f, 1.6f));
 		yield return WaitFor(boss, EnemyState.Windup, 2f);
 		Assert.AreEqual(0, Hits, "no damage before the strike");
-		yield return WaitFor(boss, EnemyState.Recover, 1f);
+		yield return WaitFor(boss, EnemyState.Recover, 2f);
 		yield return null;   // Health counts the life on its next Update
 		Assert.AreEqual(1, Hits, "one strike = one hit");
+	}
+
+	// One chase token: the second creep waits until the chaser is gone, then takes over.
+	[UnityTest]
+	public IEnumerator ChaseTokenReleasedWhenChaserDies() {
+		yield return Arena();
+		EnemyDirector director = new GameObject("Director").AddComponent<EnemyDirector>();
+		director.maxChasers = 1;
+		EnemyBrain a = Spawn("Enemy - Crater", new Vector3(6f, 0f, 0f)), b = Spawn("Enemy - Crater", new Vector3(-6f, 0f, 0f));
+		yield return new WaitForSeconds(0.5f);
+		EnemyBrain chaser = a.State == EnemyState.Chase ? a : b, waiting = chaser == a ? b : a;
+		Assert.AreEqual(EnemyState.Chase, chaser.State);
+		Assert.AreNotEqual(EnemyState.Chase, waiting.State, "only one token");
+		Object.Destroy(chaser.gameObject);
+		yield return new WaitForSeconds(1f);
+		Assert.AreNotEqual(EnemyState.Idle, waiting.State, "token freed when the chaser died");
+		Assert.AreNotEqual(EnemyState.Patrol, waiting.State, "token freed when the chaser died");
+		Assert.AreEqual(1, director.Chasing);
+	}
+
+	[UnityTest]
+	public IEnumerator EnemySpeedIgnoresRobotSpeed() {
+		yield return Arena();
+		player.GetComponent<Ball>().SpeedMultiplier = Overdrive.SpeedBoost;
+		EnemyBrain creep = Spawn("Enemy - Crater", new Vector3(0f, 0f, 10f));
+		creep.Configure(new EnemyProfile { speed = 6f, damage = 12, windup = 0.6f, strike = 0.1f, recover = 0.95f });
+		yield return null;
+		Assert.AreEqual(6f, creep.GetComponent<NavMeshAgent>().speed, 0.001f);
+		Assert.AreEqual(12, creep.damage);
 	}
 
 	[UnityTest]
@@ -96,7 +128,7 @@ public class EnemyPlayTests {
 		EnemyBrain creep = Spawn("Enemy - Crater", new Vector3(0f, 0f, 1.1f));
 		yield return WaitFor(creep, EnemyState.Windup, 2f);
 		player.transform.position = new Vector3(0f, 0.5f, -5f);   // out of range before the strike
-		yield return WaitFor(creep, EnemyState.Recover, 1f);
+		yield return WaitFor(creep, EnemyState.Recover, 2f);
 		yield return null;
 		Assert.AreEqual(0, Hits);
 	}

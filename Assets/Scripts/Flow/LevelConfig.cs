@@ -17,10 +17,31 @@ public class LevelConfig : ScriptableObject {
 	public int energyCap;
 	public float energyIntervalMin;
 	public float energyIntervalMax;
+	[Tooltip("Cores per drop batch, both bounds included.")]
+	public int energyBatchMin = 1;
+	public int energyBatchMax = 1;
 
-	[Header("Enemies per difficulty: Easy, Normal, Hard")]
+	[Header("Enemies per difficulty: Easy, Normal, Hard (enemyCap = creeps + bosses, alive + telegraphed)")]
 	public int[] enemyCap = new int[3];
 	public int[] bossCap = new int[3];
+
+	[Header("Enemy Normal values (EnemyProfile scales them per difficulty)")]
+	public float creepSpeed;
+	public float bossSpeed;
+	public int creepDamage;
+	public int bossDamage;
+	public float creepWindup;
+	public float creepRecover;
+	[Tooltip("Gameplay seconds after the intro before the first enemy.")]
+	public float quietTime = 5f;
+
+	[Header("Support items (spec §6.3): budget alive + falling, interval, weights shield/heal10/heal20/overdrive")]
+	public int supportCap;
+	public float supportIntervalMin;
+	public float supportIntervalMax;
+	public float[] supportWeights = new float[4];
+	[Tooltip("Seconds into play for a first shield (Level1); < 0 = none.")]
+	public float firstShieldAfter = -1f;
 
 	[Header("Hazard")]
 	public string hazardDeathMessage;

@@ -111,19 +111,6 @@ public class ThemeEditorTests {
 		}
 	}
 
-	[Test]
-	public void ExplosionPrefabsUseThemeSounds() {
-		var expected = new System.Collections.Generic.Dictionary<string, string> {
-			{ "ExplodeCoin Particle", "forceField_000" },
-			{ "ExplodeEnemy Particle", "explosionCrunch_000" },
-			{ "ExplodePlayer Particle", "lowFrequency_explosion_000" },
-		};
-		foreach (var pair in expected) {
-			GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/" + pair.Key + ".prefab");
-			Assert.AreEqual(pair.Value, prefab.GetComponentInChildren<AudioSource>().clip.name, pair.Key);
-		}
-	}
-
 	static IEnumerable<GameObject> UiRoots() {
 		foreach (string guid in AssetDatabase.FindAssets("t:Prefab", new[] { "Assets/Prefabs" }))
 			yield return AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(guid));
@@ -152,10 +139,13 @@ public class ThemeEditorTests {
 	[Test]
 	public void MainMenuButtonsAreStackedWithoutGap() {
 		EditorSceneManager.OpenScene("Assets/Scenes/MainMenu.unity", OpenSceneMode.Single);
-		RectTransform play = GameObject.Find("Play Button").GetComponent<RectTransform>();
-		RectTransform quit = GameObject.Find("Quit Button").GetComponent<RectTransform>();
-		float gap = (play.anchoredPosition.y - play.sizeDelta.y / 2f) - (quit.anchoredPosition.y + quit.sizeDelta.y / 2f);
-		Assert.That(gap, Is.InRange(16f, 48f));
+		string[] column = { "Play Button", "Guide Button", "Settings Button", "Quit Button" };
+		for (int i = 0; i + 1 < column.Length; i++) {
+			RectTransform upper = GameObject.Find(column[i]).GetComponent<RectTransform>();
+			RectTransform lower = GameObject.Find(column[i + 1]).GetComponent<RectTransform>();
+			float gap = (upper.anchoredPosition.y - upper.sizeDelta.y / 2f) - (lower.anchoredPosition.y + lower.sizeDelta.y / 2f);
+			Assert.That(gap, Is.InRange(16f, 48f), column[i] + " to " + column[i + 1]);
+		}
 	}
 
 	// Each line fits the rect without wrapping and all lines fit its height (at the best-fit size if enabled).
@@ -167,25 +157,15 @@ public class ThemeEditorTests {
 			settings.fontSize = text.resizeTextMaxSize;
 			settings.resizeTextForBestFit = false;
 		}
-		settings.horizontalOverflow = HorizontalWrapMode.Overflow;
+		// Paragraphs ("... Body") wrap by design; labels and titles must fit on their lines.
+		settings.horizontalOverflow = text.name.EndsWith("Body") ? HorizontalWrapMode.Wrap : HorizontalWrapMode.Overflow;
 		settings.verticalOverflow = VerticalWrapMode.Overflow;
 		TextGenerator generator = new TextGenerator();
 		float width = generator.GetPreferredWidth(text.text, settings) / text.pixelsPerUnit;
 		float height = generator.GetPreferredHeight(text.text, settings) / text.pixelsPerUnit;
-		Assert.LessOrEqual(width, size.x + 1f, text.name + " width: " + text.text);
+		if (settings.horizontalOverflow == HorizontalWrapMode.Overflow)   // wrapped paragraphs: the height is what counts
+			Assert.LessOrEqual(width, size.x + 1f, text.name + " width: " + text.text);
 		Assert.LessOrEqual(height, size.y + 1f, text.name + " height: " + text.text);
-	}
-
-	[Test]
-	public void IntroCardFitsLongestZoneAndGoal() {
-		GameObject prefab = PrefabUtility.LoadPrefabContents("Assets/Prefabs/IntroBeatLevelCanvas.prefab");
-		try {
-			Text intro = prefab.GetComponentsInChildren<Text>(true).First(t => t.name == "Intro Level Text");
-			intro.text = LevelCatalog.All.OrderByDescending(l => l.displayName.Length).First().displayName.ToUpperInvariant() + "\nTHU 100 LÕI NĂNG LƯỢNG";
-			AssertFits(intro);
-		} finally {
-			PrefabUtility.UnloadPrefabContents(prefab);
-		}
 	}
 
 	[Test]
@@ -236,7 +216,7 @@ public class ThemeEditorTests {
 
 	[Test]
 	public void PanelTextIsReadableOnItsBox() {
-		foreach (string name in new[] { "IntroBeatLevelCanvas", "BeatLevelUICanvas", "GameOver Canvas" }) {
+		foreach (string name in new[] { "BeatLevelUICanvas", "GameOver Canvas" }) {
 			GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/" + name + ".prefab");
 			Image box = prefab.GetComponentsInChildren<Image>(true).First(i => i.name == "BoxBackground");
 			foreach (Text text in prefab.GetComponentsInChildren<Text>(true).Where(t => t.GetComponentInParent<Button>() == null))
@@ -271,9 +251,6 @@ public class ThemeEditorTests {
 					.Where(r => r.parent == root.transform && r.name != "BoxBackground" && r.name != "BoxBorder")
 					.ToList();
 				foreach (Text text in root.GetComponentsInChildren<Text>(true).Where(t => t.transform.parent == root.transform)) {
-					// The score shows "x / y" at runtime; check the widest realistic value.
-					if (text.name == "EndGameScore Text")
-						text.text = "100 / 100";
 					AssertFits(text);
 				}
 				foreach (RectTransform item in items) {

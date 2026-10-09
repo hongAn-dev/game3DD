@@ -21,6 +21,7 @@ public class OverdrivePlayTests {
 		player.GetComponent<Health>().numberOfLives = 999;
 		ball = player.GetComponent<Ball>();
 		Object.FindObjectOfType<EnemyDirector>().enabled = false;   // no interference
+		Object.FindObjectOfType<SupportSpawnDirector>().enabled = false;
 	}
 
 	Overdrive Boost() {
@@ -94,63 +95,6 @@ public class OverdrivePlayTests {
 		Assert.IsTrue(overdrive.Active);
 		Assert.AreEqual(score, GameManager.gm.score, "not energy");
 		Assert.IsTrue(Object.FindObjectOfType<OverdriveIndicator>().content.activeSelf, "countdown shown");
-	}
-
-	[UnityTest]
-	public IEnumerator DirectorKeepsAtMostOneBoostAndReplacesItAfterPickup() {
-		yield return Load();
-		OverdriveDirector director = Object.FindObjectOfType<OverdriveDirector>();
-		EnergySpawnDirector energy = Object.FindObjectOfType<EnergySpawnDirector>();
-		director.intervalOverride = 0.1f;
-		ball.GetComponent<Rigidbody>().isKinematic = true;   // stays away from the pickups
-		yield return new WaitForSeconds(0.5f);
-		GameObject first = director.Current;
-		Assert.IsNotNull(first);
-		Object.Destroy(first);   // as if the robot took it
-		int max = 0;
-		float end = Time.time + 1.5f;
-		while (Time.time < end) {
-			max = Mathf.Max(max, Object.FindObjectsOfType<OverdrivePickup>().Length);
-			yield return null;
-		}
-		Assert.AreEqual(1, max, "one at a time");
-		Assert.IsNotNull(director.Current, "a new one after the pickup");
-		Assert.AreNotSame(first, director.Current);
-		Assert.GreaterOrEqual(Vector3.Distance(director.Current.transform.position, ball.transform.position), director.minPlayerDistance);
-		foreach (Vector3 core in energy.Occupied())
-			if (core != director.Current.transform.position)
-				Assert.GreaterOrEqual(Vector3.Distance(core, director.Current.transform.position), director.minCoreDistance);
-	}
-
-	// Energy drops must not land on the boost (and the boost not on a core that is still falling).
-	[UnityTest]
-	public IEnumerator CoresAndBoostNeverShareAPoint() {
-		yield return Load();
-		OverdriveDirector director = Object.FindObjectOfType<OverdriveDirector>();
-		EnergySpawnDirector energy = Object.FindObjectOfType<EnergySpawnDirector>();
-		ball.GetComponent<Rigidbody>().isKinematic = true;
-		director.intervalOverride = 0.1f;
-		energy.intervalOverride = 0.1f;
-		float end = Time.time + 6f;
-		while (Time.time < end) {
-			if (director.Current != null)
-				foreach (Treasure core in Object.FindObjectsOfType<Treasure>())
-					Assert.Greater(Vector3.Distance(Flat(core.transform.position), Flat(director.Current.transform.position)), 1f, "core on the boost");
-			if (director.Current != null && Time.frameCount % 20 == 0)
-				Object.Destroy(director.Current);   // keep boosts coming back while cores drop
-			yield return null;
-		}
-	}
-
-	static Vector3 Flat(Vector3 v) {
-		v.y = 0f;
-		return v;
-	}
-
-	[UnityTest]
-	public IEnumerator Level1HasNoBoost() {
-		yield return Load("Level1");
-		Assert.IsNull(Object.FindObjectOfType<OverdriveDirector>());
 	}
 
 	[UnityTest]

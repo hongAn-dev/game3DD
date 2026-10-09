@@ -33,7 +33,7 @@ public class Damage : MonoBehaviour {
 		
 			// If the hit object has the Health script on it, deal damage.
 			if (collision.gameObject.GetComponent<Health> () != null) {	
-				collision.gameObject.GetComponent<Health> ().ApplyDamage (damageAmount);
+				Hurt (collision.gameObject.GetComponent<Health> ());
 
 				// Destroy the object whenever it hits something.
 				if (destroySelfOnImpact) {
@@ -61,7 +61,7 @@ public class Damage : MonoBehaviour {
 		
 			// If the hit object has the Health script on it, deal damage.
 			if (collision.gameObject.GetComponent<Health> () != null) {
-				collision.gameObject.GetComponent<Health> ().ApplyDamage (damageAmount);
+				Hurt (collision.gameObject.GetComponent<Health> ());
 			
 				// Destroy the object whenever it hits something.
 				if (destroySelfOnImpact) {
@@ -86,9 +86,17 @@ public class Damage : MonoBehaviour {
 			if (collision.gameObject.tag == "Player" && collision.gameObject.GetComponent<Health> () != null) {
 				if (Time.time - savedTime >= continuousTimeBetweenHits) {
 					savedTime = Time.time;
-					collision.gameObject.GetComponent<Health> ().ApplyDamage (damageAmount);
+					Hurt (collision.gameObject.GetComponent<Health> ());
 				}
 			}
 		}
+	}
+
+	// The robot only takes damage through Health.TakeDamage (spec §6.1); other objects keep the raw legacy damage.
+	void Hurt (Health health) {
+		if (health.CompareTag ("Player"))
+			health.TakeDamage (damageAmount, DamageKind.EnemyAttack);
+		else
+			health.ApplyDamage (damageAmount);
 	}
 }

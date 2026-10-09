@@ -3,12 +3,14 @@ using System.Linq;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.AI;
 
 /// <summary>
 /// Adds the EnergySpawnDirector to each level (on the GameManager object) and authors its landing points under
-/// "Energy Landing Points": points on a 3 m grid over ground reachable from the robot start (WalkableGrid) that are
-/// flat, away from drops and hazards and free of obstacles, spread out and seeded near the start (spec §4.2). Authored cores are then removed: the
-/// director creates every core. Re-running rebuilds the points. Run per map change.
+/// "Energy Landing Points" (spec §5.2): points on a 3 m grid over ground the robot can roll to from the start
+/// (WalkableGrid) that are flat, away from drops and hazards, free of obstacles and have a complete path on the
+/// level's baked NavMesh (run EnemySetup first), at least 12/20/28/36 per level, spread out and seeded about 7 m (by
+/// path) from the start. Authored cores are removed: the director creates every core. Re-run after map changes.
 /// </summary>
 public static class EnergySetup {
 
@@ -26,13 +28,55 @@ public static class EnergySetup {
 				director = manager.gameObject.AddComponent<EnergySpawnDirector>();
 			director.corePrefab = core;
 			director.markerMaterial = marker;
-			director.landingPoints = LandingPoints(level.energyCap * 2 + 4).ToArray();
+			// Scenes keep serialized values, so every timing/distance is written here (spec §5.2), not left to defaults.
+			director.markerDuration = 0.35f;
+			director.dropDuration = 0.5f;
+			director.dropHeight = 4f;
+			director.staleDelay = 12f;
+			director.minPlayerDistance = 3f;
+			director.minSpacing = 2f;
+			director.firstCorePath = new Vector2(4f, 10f);
+			director.nearPath = new Vector2(6f, 18f);
+			director.intervalOverride = -1f;
+			NavMeshLoader loader = manager.GetComponent<NavMeshLoader>();
+			if (loader == null || loader.data == null)
+				throw new System.Exception("EnergySetup: " + level.levelId + " has no baked NavMesh; run Apply Enemy Setup first");
+			NavMeshDataInstance nav = NavMesh.AddNavMeshData(loader.data);
+			try {
+				director.landingPoints = LandingPoints(PointTarget(level.order)).ToArray();
+			} finally {
+				nav.Remove();
+			}
+			if (director.landingPoints.Length < PointTarget(level.order))
+				Debug.LogWarning("EnergySetup: " + level.levelId + " has only " + director.landingPoints.Length + " safe landing points (target " + PointTarget(level.order) + ")");
 			RemoveAuthoredCores();
 			EditorSceneManager.MarkSceneDirty(scene);
 			EditorSceneManager.SaveScene(scene);
 			Debug.Log("EnergySetup: " + level.levelId + " landing points " + director.landingPoints.Length);
 		}
 		Debug.Log("EnergySetup: done");
+	}
+
+	/// <summary>Spec §5.2 landing point targets: L1 12, L2 20, L3 28, L4 36.</summary>
+	public static int PointTarget(int order) {
+		return new[] { 12, 20, 28, 36 }[Mathf.Clamp(order, 1, 4) - 1];
+	}
+
+	// NavMesh path length from the start to point, or -1 when there is no complete path.
+	static float PathFromStart(Vector3 start, Vector3 point) {
+		NavMeshHit from, to;
+		if (!NavMesh.SamplePosition(start, out from, 3f, NavMesh.AllAreas) || !NavMesh.SamplePosition(point, out to, 1.5f, NavMesh.AllAreas))
+			return -1f;
+		var path = new NavMeshPath();
+		if (!NavMesh.CalculatePath(from.position, to.position, NavMesh.AllAreas, path) || path.status != NavMeshPathStatus.PathComplete)
+			return -1f;
+		return EnergySpawnDirector.PathLength(path);
+	}
+
+	static Vector3 StartGround() {
+		Vector3 start = WalkableGrid.PlayerStart();
+		RaycastHit hit;
+		return WalkableGrid.Ground(start.x, start.z, out hit) ? hit.point : start;
 	}
 
 	static bool Ground(Vector3 from, out RaycastHit hit) {
@@ -58,25 +102,31 @@ public static class EnergySetup {
 			Object.DestroyImmediate(old);
 		Transform root = new GameObject("Energy Landing Points").transform;
 
-		// Only ground the robot can roll to from the start, sampled every 3 m.
+		// Only ground the robot can roll to from the start and enemies/paths can reach, sampled every 3 m.
+		Vector3 start = StartGround();
 		var candidates = new List<Vector3>();
+		var pathFromStart = new Dictionary<Vector3, float>();
 		foreach (Vector2Int cell in WalkableGrid.Reachable(WalkableGrid.PlayerStart()).Keys) {
 			if (cell.x % 3 != 0 || cell.y % 3 != 0)
 				continue;
 			RaycastHit hit;
 			Vector3 top = new Vector3(cell.x, 0f, cell.y);
-			if (Ground(top, out hit) && Valid(top, hit))
-				candidates.Add(hit.point + Vector3.up * CoreLift);
+			if (!Ground(top, out hit) || !Valid(top, hit))
+				continue;
+			Vector3 point = hit.point + Vector3.up * CoreLift;
+			float length = PathFromStart(start, hit.point);
+			if (length < 0f || pathFromStart.ContainsKey(point))
+				continue;
+			candidates.Add(point);
+			pathFromStart[point] = length;
 		}
 
-		// Seed with the candidate closest to 12 m from the robot start (so the first core is near), then add the
+		// Seed with the candidate about 7 m by path from the start (the first core goes 4-10 m away), then add the
 		// candidates farthest from everything chosen so far.
 		var chosen = new List<Vector3>();
-		var rest = candidates.Distinct().ToList();
-		GameObject player = GameObject.FindWithTag("Player");
-		if (player != null && rest.Count > 0) {
-			Vector3 start = player.transform.position;
-			Vector3 seed = rest.OrderBy(c => Mathf.Abs(Vector3.Distance(c, start) - 12f)).First();
+		var rest = candidates.ToList();
+		if (rest.Count > 0) {
+			Vector3 seed = rest.OrderBy(c => Mathf.Abs(pathFromStart[c] - 7f)).First();
 			chosen.Add(seed);
 			rest.Remove(seed);
 		}

@@ -17,10 +17,28 @@ MonoBehaviour:
   displayName: "Tr\u1EA1m khai th\xE1c b\u1ECF hoang"
   nextScene: Level3
   energyTarget: 10
-  energyAtStart: 4
+  energyAtStart: 5
   energyCap: 6
-  energyIntervalMin: 5
-  energyIntervalMax: 7
-  enemyCap: 040000000500000006000000
-  bossCap: 010000000100000001000000
+  energyIntervalMin: 2
+  energyIntervalMax: 3
+  energyBatchMin: 1
+  energyBatchMax: 2
+  enemyCap: 020000000300000004000000
+  bossCap: 000000000000000000000000
+  creepSpeed: 6
+  bossSpeed: 0
+  creepDamage: 12
+  bossDamage: 0
+  creepWindup: 0.6
+  creepRecover: 0.95
+  quietTime: 6
+  supportCap: 2
+  supportIntervalMin: 8
+  supportIntervalMax: 12
+  supportWeights:
+  - 30
+  - 35
+  - 20
+  - 15
+  firstShieldAfter: -1
   hazardDeathMessage: "Robo r\u01A1i xu\u1ED1ng bi\u1EC3n axit"

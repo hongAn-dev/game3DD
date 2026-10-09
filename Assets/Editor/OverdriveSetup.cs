@@ -4,16 +4,16 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// Overdrive (spec §9): builds Assets/Prefabs/Overdrive.prefab (static trigger root, spinning bolt child), adds the
-/// OverdriveDirector to Level2+ (removed from Level1) and an "Overdrive Indicator" (bolt icon + seconds) to every
-/// level's energy panel. Re-runnable. Run UiTheme.Apply first (it creates the panel's "Zone Text").
+/// Overdrive (spec §9, §6.3): builds Assets/Prefabs/Overdrive.prefab (SupportPickup kind Overdrive, 0.6 m bolt) and
+/// an "Overdrive Indicator" (bolt icon + seconds) in every level's energy panel. The SupportSpawnDirector drops it from
+/// Level2 on. Re-runnable. Run UiTheme.Apply first (it creates the panel's "Zone Text") and again after.
 /// </summary>
 public static class OverdriveSetup {
 
 	const string PrefabPath = "Assets/Prefabs/Overdrive.prefab";
 	const string ModelPath = "Assets/ThirdParty/RoboLacLoi/Models/Overdrive.fbx";
 	const string IconPath = "Assets/ThirdParty/RoboLacLoi/Sprites/overdrive_icon.png";
-	public const float BoltHeight = 0.7f;
+	public const float BoltHeight = 0.6f;   // same size as the other pickups (spec §6.4)
 
 	[MenuItem("Tools/Robo Lac Loi/Apply Overdrive Setup")]
 	public static void Apply() {
@@ -23,20 +23,11 @@ public static class OverdriveSetup {
 			icon.alphaIsTransparency = true;
 			icon.SaveAndReimport();
 		}
-		GameObject prefab = BuildPrefab();
+		BuildPrefab();
 		Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(IconPath);
 		foreach (LevelConfig level in LevelCatalog.All) {
 			var scene = EditorSceneManager.OpenScene("Assets/Scenes/" + level.levelId + ".unity", OpenSceneMode.Single);
-			GameManager manager = Object.FindObjectOfType<GameManager>();
-			OverdriveDirector director = manager.GetComponent<OverdriveDirector>();
-			if (level.order >= 2) {
-				if (director == null)
-					director = manager.gameObject.AddComponent<OverdriveDirector>();
-				director.pickupPrefab = prefab;
-			} else if (director != null) {
-				Object.DestroyImmediate(director);
-			}
-			Indicator(sprite);
+			Indicator(sprite);   // Overdrive itself now comes from SupportSpawnDirector (SupportSetup)
 			EditorSceneManager.MarkSceneDirty(scene);
 			EditorSceneManager.SaveScene(scene);
 		}
@@ -44,23 +35,7 @@ public static class OverdriveSetup {
 	}
 
 	static GameObject BuildPrefab() {
-		GameObject root = new GameObject("Overdrive");
-		try {
-			SphereCollider trigger = root.AddComponent<SphereCollider>();
-			trigger.isTrigger = true;
-			trigger.radius = 0.6f;
-			root.AddComponent<OverdrivePickup>();
-			GameObject model = (GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(ModelPath), root.transform);
-			model.name = "Model";
-			Bounds b = model.GetComponentInChildren<Renderer>().bounds;
-			model.transform.localScale *= BoltHeight / b.size.y;
-			b = model.GetComponentInChildren<Renderer>().bounds;
-			model.transform.localPosition -= b.center;
-			model.AddComponent<EnergyBob>();
-			return PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
-		} finally {
-			Object.DestroyImmediate(root);
-		}
+		return SupportSetup.BuildPickup(PrefabPath, ModelPath, SupportKind.Overdrive, BoltHeight);
 	}
 
 	// Under the energy panel at the top right (below the zone name): bolt icon and the seconds left; hidden until

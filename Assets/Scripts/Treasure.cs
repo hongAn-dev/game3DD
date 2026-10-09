@@ -22,6 +22,7 @@ public class Treasure : MonoBehaviour {
 
 		if (GameManager.gm != null)
 			GameManager.gm.Collect (value);
+		Sfx.Play (SfxEvent.EnergyPickup);   // the explosion effect is silent: one sound per pickup
 
 		if (explosionPrefab != null)
 			Instantiate (explosionPrefab, transform.position, Quaternion.identity);

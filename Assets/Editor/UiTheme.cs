@@ -34,24 +34,25 @@ public static class UiTheme {
 	static readonly KeyValuePair<string, string>[] Strings = {
 		new KeyValuePair<string, string>("LiBot Adventure", "ROBO LẠC LỐI"),
 		new KeyValuePair<string, string>("Robo Lạc Lối", "ROBO LẠC LỐI"),
-		new KeyValuePair<string, string>("Play Again", "THỬ LẠI"),
-		new KeyValuePair<string, string>("Thử lại", "THỬ LẠI"),
-		new KeyValuePair<string, string>("Play", "CHƠI"),
-		new KeyValuePair<string, string>("Chơi", "CHƠI"),
-		new KeyValuePair<string, string>("Quit", "THOÁT"),
-		new KeyValuePair<string, string>("Thoát", "THOÁT"),
-		new KeyValuePair<string, string>("Easy", "DỄ"),
-		new KeyValuePair<string, string>("Dễ", "DỄ"),
-		new KeyValuePair<string, string>("Normal", "THƯỜNG"),
-		new KeyValuePair<string, string>("Thường", "THƯỜNG"),
-		new KeyValuePair<string, string>("Hard", "KHÓ"),
-		new KeyValuePair<string, string>("Khó", "KHÓ"),
+		new KeyValuePair<string, string>("Play Again", "Thử lại"),
+		new KeyValuePair<string, string>("THỬ LẠI", "Thử lại"),
+		// Sentence case, as the spec writes the labels (Chơi mới, Thoát, Dễ...); old uppercase labels are converted.
+		new KeyValuePair<string, string>("Play", "Chơi mới"),
+		new KeyValuePair<string, string>("CHƠI", "Chơi mới"),
+		new KeyValuePair<string, string>("Quit", "Thoát"),
+		new KeyValuePair<string, string>("THOÁT", "Thoát"),
+		new KeyValuePair<string, string>("Easy", "Dễ"),
+		new KeyValuePair<string, string>("DỄ", "Dễ"),
+		new KeyValuePair<string, string>("Normal", "Thường"),
+		new KeyValuePair<string, string>("THƯỜNG", "Thường"),
+		new KeyValuePair<string, string>("Hard", "Khó"),
+		new KeyValuePair<string, string>("KHÓ", "Khó"),
 		new KeyValuePair<string, string>("Level Victory!", "ĐỦ NĂNG LƯỢNG!"),
 		new KeyValuePair<string, string>("Đủ năng lượng!", "ĐỦ NĂNG LƯỢNG!"),
-		new KeyValuePair<string, string>("Main Menu", "MENU CHÍNH"),
-		new KeyValuePair<string, string>("Menu chính", "MENU CHÍNH"),
-		new KeyValuePair<string, string>("Next Level", "KHU TIẾP THEO"),
-		new KeyValuePair<string, string>("Khu tiếp theo", "KHU TIẾP THEO"),
+		new KeyValuePair<string, string>("Main Menu", "Menu chính"),
+		new KeyValuePair<string, string>("MENU CHÍNH", "Menu chính"),
+		new KeyValuePair<string, string>("Next Level", "Sang màn tiếp theo"),
+		new KeyValuePair<string, string>("KHU TIẾP THEO", "Sang màn tiếp theo"),
 		new KeyValuePair<string, string>("CONGRATULATIONS!", "ĐÃ VỀ TỚI CĂN CỨ!"),
 		new KeyValuePair<string, string>("Thanks for playing", "Cảm ơn bạn đã chơi!"),
 	};
@@ -73,8 +74,7 @@ public static class UiTheme {
 		Sprite icon = ImportSprite(SpriteFolder + "core_icon.png", Vector4.zero);
 		Sprite fill = ImportSprite(SpriteFolder + "hud_fill.png", new Vector4(24, 24, 24, 24));
 		Sprite brackets = ImportSprite(SpriteFolder + "hud_brackets.png", new Vector4(24, 24, 24, 24));
-		AudioClip click = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/ThirdParty/KenneyAudio/click_002.ogg");
-		var theme = new Theme { fonts = fonts, icon = icon, fill = fill, brackets = brackets, click = click };
+		var theme = new Theme { fonts = fonts, icon = icon, fill = fill, brackets = brackets };
 
 		foreach (string guid in AssetDatabase.FindAssets("t:Prefab", new[] { "Assets/Prefabs" })) {
 			string path = AssetDatabase.GUIDToAssetPath(guid);
@@ -107,7 +107,6 @@ public static class UiTheme {
 	class Theme {
 		public Fonts fonts;
 		public Sprite icon, fill, brackets;
-		public AudioClip click;
 	}
 
 	static Sprite ImportSprite(string path, Vector4 border) {
@@ -126,8 +125,27 @@ public static class UiTheme {
 	static bool Style(GameObject root, Theme theme, string zoneTitle) {
 		bool changed = false;
 
-		if (root.name == "GameOver Canvas" && root.transform.Find("Lost Title") == null) {
-			NewText("Lost Title", root.transform, theme.fonts.bold, "MẤT KẾT NỐI", 72, LostColor);
+		// Spec §7.1: the lose panel says only "Bạn đã thua" (no cause, no score).
+		if (root.name == "GameOver Canvas") {
+			Transform lost = root.transform.Find("Lost Title");
+			(lost != null ? lost.GetComponent<Text>() : NewText("Lost Title", root.transform, theme.fonts.bold, "", 72, LostColor)).text = StoryText.Lost;
+			Transform score = root.transform.Find("EndGameScore Text");
+			if (score != null)
+				Object.DestroyImmediate(score.gameObject);
+			changed = true;
+		}
+		// Spec §7.5: level complete = story title + paragraph (texts set at runtime; the longest ones size the layout).
+		if (root.name == "BeatLevelUICanvas") {
+			LevelConfig[] levels = LevelCatalog.All.Where(l => !l.IsFinal).ToArray();
+			root.transform.Find("Congratulations Text").GetComponent<Text>().text =
+				levels.Select(l => StoryText.LevelComplete(l).title).OrderByDescending(t => t.Length).First();
+			Transform bodyT = root.transform.Find("Complete Body");
+			Text body = bodyT != null ? bodyT.GetComponent<Text>() : NewText("Complete Body", root.transform, theme.fonts.semiBold, "", 36, TextColor);
+			body.text = levels.Select(l => StoryText.LevelComplete(l).body).OrderByDescending(t => t.Length).First();
+			body.horizontalOverflow = HorizontalWrapMode.Wrap;
+			body.verticalOverflow = VerticalWrapMode.Overflow;
+			body.lineSpacing = 1.1f;
+			body.raycastTarget = false;
 			changed = true;
 		}
 
@@ -171,7 +189,6 @@ public static class UiTheme {
 			}
 		}
 
-		changed |= FitIntroCard(root);
 		changed |= FitFinalScreen(root);
 		return changed;
 	}
@@ -205,21 +222,22 @@ public static class UiTheme {
 		Transform border = root.transform.Find("BoxBorder");
 
 		if (root.name == "BeatLevelUICanvas") {
-			SetCenter(box, 0f, new Vector2(820f, 440f));
+			SetCenter(box, 0f, new Vector2(1240f, 620f));
 			Transform title = root.transform.Find("Congratulations Text");
-			SetCenter(title, 80f, new Vector2(740f, 150f));
-			FitFor(title, null, 110);
-			SetCenter(root.transform.Find("Next Level Button"), -120f, new Vector2(460f, 110f));
+			SetCenter(title, 210f, new Vector2(1140f, 90f));
+			FitFor(title, null, 56);
+			Transform body = root.transform.Find("Complete Body");
+			SetCenter(body, 25f, new Vector2(1140f, 240f));
+			body.GetComponent<Text>().fontSize = 36;
+			body.GetComponent<Text>().alignment = TextAnchor.MiddleCenter;
+			SetCenter(root.transform.Find("Next Level Button"), -205f, new Vector2(560f, 110f));
 		} else {
-			SetCenter(box, 0f, new Vector2(820f, 580f));
+			SetCenter(box, 0f, new Vector2(820f, 440f));
 			Transform lost = root.transform.Find("Lost Title");
-			SetCenter(lost, 200f, new Vector2(740f, 90f));
+			SetCenter(lost, 100f, new Vector2(740f, 100f));
 			FitFor(lost, null, 72);
-			Transform score = root.transform.Find("EndGameScore Text");
-			SetCenter(score, 95f, new Vector2(740f, 100f));
-			FitFor(score, "100 / 100", 96);
-			SetCenter(root.transform.Find("Play Again Button"), -45f, new Vector2(460f, 100f));
-			SetCenter(root.transform.Find("Main Menu Button"), -170f, new Vector2(460f, 100f));
+			SetCenter(root.transform.Find("Play Again Button"), -35f, new Vector2(460f, 100f));
+			SetCenter(root.transform.Find("Main Menu Button"), -155f, new Vector2(460f, 100f));
 		}
 		if (border != null)
 			SetCenter(border, 0f, ((RectTransform)box).sizeDelta);
@@ -235,14 +253,14 @@ public static class UiTheme {
 		}
 
 		bool heading = text.name == "Game Title" || text.name == "Congratulations Text" || text.name == "Lost Title"
-			|| text.name == "Score Text" || text.name == "Intro Level Text" || text.name == "EndGameScore Text";
+			|| text.name == "Score Text" || text.name == "Dialog Title";
 		text.font = heading ? fonts.bold : text.name == "Subtitle" ? fonts.medium : fonts.semiBold;
 
 		Color color = TextColor;
 		string difficulty = DifficultyOf(text.transform);
 		if (difficulty != null)
 			color = DifficultyColors[difficulty];
-		else if (text.name == "Zone Text")
+		else if (text.name == "Zone Text" || text.name == "Dialog Title")
 			color = Cyan;
 		else if (text.transform.parent != null && text.transform.parent.parent != null && text.transform.parent.parent.name == "Overdrive Indicator")
 			color = OverdriveYellow;
@@ -341,17 +359,20 @@ public static class UiTheme {
 		colors.fadeDuration = 0.12f;
 		button.colors = colors;
 
-		if (theme.click == null)
-			return;
-		AudioSource source = button.GetComponent<AudioSource>();
-		if (source == null) {
-			source = button.gameObject.AddComponent<AudioSource>();
-			source.playOnAwake = false;
-		}
+		// One soft tick from the SFX catalog (muted with SFX); the old per-button AudioSource and its listener go.
+		for (int i = button.onClick.GetPersistentEventCount() - 1; i >= 0; i--)
+			if (button.onClick.GetPersistentTarget(i) is AudioSource)
+				UnityEventTools.RemovePersistentListener(button.onClick, i);
+		AudioSource old = button.GetComponent<AudioSource>();
+		if (old != null)
+			Object.DestroyImmediate(old, true);
+		ClickSound click = button.GetComponent<ClickSound>();
+		if (click == null)
+			click = button.gameObject.AddComponent<ClickSound>();
 		for (int i = 0; i < button.onClick.GetPersistentEventCount(); i++)
-			if (button.onClick.GetPersistentTarget(i) == source)
+			if (button.onClick.GetPersistentTarget(i) == click)
 				return;
-		UnityEventTools.AddObjectPersistentListener<AudioClip>(button.onClick, source.PlayOneShot, theme.click);
+		UnityEventTools.AddVoidPersistentListener(button.onClick, click.Play);
 	}
 
 	// Main menu (1920x1080 reference): title, subtitle, and stacked buttons without the old GitHub gap.
@@ -377,8 +398,10 @@ public static class UiTheme {
 			shadow.effectDistance = new Vector2(2f, -2f);
 			changed = true;
 		}
-		changed |= Place(root, "Play Button", 0f, new Vector2(440f, 110f));
-		changed |= Place(root, "Quit Button", -140f, new Vector2(440f, 110f));
+		changed |= Place(root, "Play Button", 0f, new Vector2(520f, 110f));
+		changed |= Place(root, "Guide Button", -130f, new Vector2(520f, 110f));
+		changed |= Place(root, "Settings Button", -260f, new Vector2(520f, 110f));
+		changed |= Place(root, "Quit Button", -390f, new Vector2(520f, 110f));
 		changed |= Place(root, "Easy Button", 140f, new Vector2(440f, 110f), "DifficultCanvas");
 		changed |= Place(root, "Normal Button", 0f, new Vector2(440f, 110f), "DifficultCanvas");
 		changed |= Place(root, "Hard Button", -140f, new Vector2(440f, 110f), "DifficultCanvas");
@@ -448,30 +471,17 @@ public static class UiTheme {
 			// Re-runs keep the label in step with LevelConfig (zone names changed in T4).
 			if (zoneTitle.Length > 0)
 				zoneT.GetComponent<Text>().text = zoneTitle.ToUpperInvariant();
+			// Centred under the top-centre panel (the top-right corner belongs to the sound and pause buttons).
 			RectTransform zoneRect = (RectTransform)zoneT;
-			zoneRect.anchorMin = zoneRect.anchorMax = new Vector2(1f, 0f);
-			zoneRect.pivot = new Vector2(1f, 1f);
-			zoneRect.anchoredPosition = new Vector2(-4f, -6f);
+			zoneRect.anchorMin = zoneRect.anchorMax = new Vector2(0.5f, 0f);
+			zoneRect.pivot = new Vector2(0.5f, 1f);
+			zoneRect.anchoredPosition = new Vector2(0f, -6f);
 			zoneRect.sizeDelta = new Vector2(320f, 24f);
-			zoneT.GetComponent<Text>().alignment = TextAnchor.UpperRight;
+			zoneT.GetComponent<Text>().alignment = TextAnchor.UpperCenter;
 		}
-		return true;
-	}
-
-	// The intro card shows the zone name and goal on two lines inside a 460x210 box on an 800-wide canvas.
-	static bool FitIntroCard(GameObject root) {
-		Text intro = root.GetComponentsInChildren<Text>(true).FirstOrDefault(t => t.name == "Intro Level Text");
-		if (intro == null)
-			return false;
-		intro.rectTransform.sizeDelta = new Vector2(420f, 180f);
-		intro.lineSpacing = 1.1f;
-		intro.supportRichText = true;
-		// The text is set at runtime; size the font for the longest zone name and goal.
-		string runtime = intro.text;
-		intro.text = LevelCatalog.All.OrderByDescending(l => l.displayName.Length).First().displayName.ToUpperInvariant() + "\nTHU 100 LÕI NĂNG LƯỢNG";
-		intro.fontSize = 40;
-		ShrinkToFit(intro);
-		intro.text = runtime;
+		// "Năng lượng: 18/18" fits the 250-wide panel right of the core icon.
+		score.fontSize = 22;
+		((RectTransform)score.transform.parent).anchoredPosition = new Vector2(18f, 0f);
 		return true;
 	}
 

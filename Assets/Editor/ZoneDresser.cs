@@ -6,7 +6,7 @@ using UnityEngine;
 
 /// <summary>
 /// Applies the Robo Lac Loi zone look to each level: terrain colors, sky, fog, sun, decorations,
-/// ambient loop and win/lose sounds. Run with -executeMethod ZoneDresser.DressAll
+/// soft ambience bed (none in Level3). Run with -executeMethod ZoneDresser.DressAll
 /// </summary>
 public static class ZoneDresser {
 
@@ -33,7 +33,7 @@ public static class ZoneDresser {
 			ground = C(150, 124, 138), accent = C(118, 72, 56), rock = C(96, 90, 104),
 			skyTint = C(196, 196, 140), ground_sky = C(96, 86, 92), fog = C(186, 190, 140), sun = C(255, 236, 196),
 			fogDensity = 0.012f, sunIntensity = 0.9f,
-			ambient = "Assets/ThirdParty/KenneyAudio/computerNoise_000.ogg",
+			ambient = AudioSetup.Folder + "ambience_acid.wav",
 			props = new Dictionary<string, string> {
 				{ "Tree_1", "KenneyCityKitIndustrial/shipping-container-a" },
 				{ "Tree_2", "KenneyCityKitIndustrial/detail-tank" },
@@ -50,7 +50,7 @@ public static class ZoneDresser {
 			ground = C(112, 116, 120), accent = C(112, 66, 52), rock = C(84, 88, 94),
 			skyTint = C(160, 170, 150), ground_sky = C(70, 74, 80), fog = C(156, 164, 138), sun = C(226, 232, 230),
 			fogDensity = 0.014f, sunIntensity = 0.95f,
-			ambient = "Assets/ThirdParty/KenneyAudio/spaceEngineLow_000.ogg",
+			ambient = AudioSetup.Folder + "ambience_station.wav",
 			props = new Dictionary<string, string> {
 				{ "Rock_1", "KenneyCityKitIndustrial/detail-tank-large" },
 				{ "Rock_2", "KenneyCityKitIndustrial/shipping-container-b" },
@@ -81,7 +81,7 @@ public static class ZoneDresser {
 			ground = C(78, 94, 106), accent = C(60, 70, 82), rock = C(108, 118, 126),
 			skyTint = C(110, 140, 170), ground_sky = C(50, 60, 72), fog = C(120, 140, 160), sun = C(200, 220, 255),
 			fogDensity = 0.012f, sunIntensity = 0.9f,
-			ambient = "Assets/ThirdParty/KenneyAudio/spaceEngineLow_000.ogg",
+			ambient = AudioSetup.Folder + "ambience_station.wav",
 			beacons = true,
 			props = new Dictionary<string, string> {
 				{ "Tree_1", "KenneySpaceStationKit/structure" },
@@ -114,11 +114,6 @@ public static class ZoneDresser {
 		SetSkyFogSun(zone);
 		List<GameObject> swapped = SwapDecorations(zone, scene);
 		AddAmbient(zone);
-		GameManager manager = Object.FindObjectOfType<GameManager>();
-		if (manager != null) {
-			manager.gameOverSFX = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/ThirdParty/KenneyAudio/glitch_004.ogg");
-			manager.beatLevelSFX = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/ThirdParty/KenneyAudio/confirmation_004.ogg");
-		}
 		if (zone.beacons)
 			AddBeacons(swapped);
 		EditorSceneManager.MarkSceneDirty(scene);
@@ -264,12 +259,18 @@ public static class ZoneDresser {
 		return swapped;
 	}
 
-	static void AddAmbient(Zone zone) {
+	// A soft looping bed in the Ambience group (≈ −16.5 dB), or none: the null branch removes an old source.
+	public static void AddAmbient(Zone zone) {
 		GameManager manager = Object.FindObjectOfType<GameManager>();
-		if (manager == null || zone.ambient == null)
+		if (manager == null)
 			return;
-		AudioClip clip = AssetDatabase.LoadAssetAtPath<AudioClip>(zone.ambient);
 		Transform existing = manager.transform.Find("Ambient");
+		if (zone.ambient == null) {
+			if (existing != null)
+				Object.DestroyImmediate(existing.gameObject);
+			return;
+		}
+		AudioClip clip = AssetDatabase.LoadAssetAtPath<AudioClip>(zone.ambient);
 		GameObject ambient = existing != null ? existing.gameObject : new GameObject("Ambient");
 		ambient.transform.SetParent(manager.transform, false);
 		// Unity's fake null breaks '??' on components, so check explicitly.
@@ -281,6 +282,11 @@ public static class ZoneDresser {
 		source.playOnAwake = true;
 		source.volume = 0.15f;
 		source.spatialBlend = 0f;
+		SoundGroup group = ambient.GetComponent<SoundGroup>();
+		if (group == null)
+			group = ambient.AddComponent<SoundGroup>();
+		group.group = SoundGroup.Group.Ambience;
+		group.baseVolume = 0.15f;
 	}
 
 	static void AddBeacons(List<GameObject> decorations) {

@@ -65,6 +65,48 @@ public class ControlPlayTests {
 		Assert.Less(Horizontal(), cap * 0.25f);
 	}
 
+	// Spec §3.2: 90% of top speed within 0.5 s on flat ground.
+	[UnityTest]
+	public IEnumerator ReachesNinetyPercentInHalfASecond() {
+		yield return FlatGround();
+		yield return Push(Vector3.zero, 0.3f);   // settle on the ground
+		float start = Time.time;
+		while (Horizontal() < ball.MaxSpeed * 0.9f && Time.time - start < 2f) {
+			yield return new WaitForFixedUpdate();
+			ball.Move(Vector3.forward, false);
+		}
+		Assert.AreEqual(11f, ball.MaxSpeed, 0.01f);
+		Assert.LessOrEqual(Time.time - start, 0.52f);
+	}
+
+	// Spec §3.2: from 11 m/s, releasing the stick stops the robot in about 0.4 s and no more than 2.3 m.
+	[UnityTest]
+	public IEnumerator StopsWithin2_3Metres() {
+		yield return FlatGround();
+		yield return Push(Vector3.forward, 2f);
+		Assert.Greater(Horizontal(), 10.8f);
+		Vector3 from = body.position;
+		float start = Time.time;
+		while (Horizontal() > 0.05f && Time.time - start < 2f) {
+			yield return new WaitForFixedUpdate();
+			ball.Move(Vector3.zero, false);
+		}
+		Vector3 travel = body.position - from;
+		travel.y = 0f;
+		Assert.LessOrEqual(Time.time - start, 0.45f, "stop time");
+		Assert.LessOrEqual(travel.magnitude, 2.3f, "stop distance");
+	}
+
+	// Overdrive top speed (11 × 1.3) is reached and the ball rolls without skidding (spin not capped below v/r).
+	[UnityTest]
+	public IEnumerator OverdriveSpeedRollsWithoutSkidding() {
+		yield return FlatGround();
+		ball.SpeedMultiplier = Overdrive.SpeedBoost;
+		yield return Push(Vector3.forward, 2.5f);
+		Assert.Greater(Horizontal(), ball.MaxSpeed * Overdrive.SpeedBoost - 0.1f);
+		Assert.AreEqual(Horizontal() / 0.5f, body.angularVelocity.magnitude, 0.5f, "spin keeps up with the roll");
+	}
+
 	[UnityTest]
 	public IEnumerator SpeedCapDoesNotClampFalling() {
 		yield return FlatGround();
@@ -147,5 +189,42 @@ public class ControlPlayTests {
 		yield return new WaitForFixedUpdate();
 		yield return null;
 		Assert.AreEqual(free, Vector3.Distance(orbit.transform.position, target.position + Vector3.up * 0.5f), 0.3f);
+	}
+
+	IEnumerator LoadLevel1() {
+		CampaignProgress.BeginRun(GameSettings.gameDifficulties.Normal);
+		GameSettings.showIntroLevelMessage = false;
+		SceneManager.LoadScene("Level1");
+		yield return null;
+		yield return null;
+	}
+
+	[UnityTest]
+	public IEnumerator MobileControlsStayVisibleOffDevice() {
+		yield return LoadLevel1();
+		FixedJoystick joystick = Object.FindObjectOfType<FixedJoystick>();
+		Assert.IsNotNull(joystick, "joystick active in the Editor/PC run");
+		Assert.IsTrue(joystick.isActiveAndEnabled);
+		Assert.IsNotNull(Object.FindObjectOfType<TouchLookArea>(), "look area active too");
+	}
+
+	[UnityTest]
+	public IEnumerator JoystickResetsWhenNotPlaying() {
+		yield return LoadLevel1();
+		FixedJoystick joystick = Object.FindObjectOfType<FixedJoystick>();
+		Canvas canvas = joystick.GetComponentInParent<Canvas>().rootCanvas;
+		Camera cam = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+		Vector2 centre = RectTransformUtility.WorldToScreenPoint(cam, joystick.background.position);
+		var press = new UnityEngine.EventSystems.PointerEventData(UnityEngine.EventSystems.EventSystem.current) {
+			pointerId = 0, position = centre + new Vector2(joystick.background.rect.width * 0.4f * canvas.scaleFactor, 0f) };
+		joystick.OnPointerDown(press);
+		Assert.Greater(joystick.inputVector.magnitude, 0.3f, "test steers the stick");
+		GameFlow.Pause();
+		yield return null;
+		Assert.AreEqual(Vector2.zero, joystick.inputVector, "pause drops the held vector");
+		Assert.IsFalse(joystick.Owned);
+		GameFlow.Resume();
+		yield return null;
+		Assert.AreEqual(Vector2.zero, joystick.inputVector, "nothing stale after resume");
 	}
 }

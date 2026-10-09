@@ -89,6 +89,115 @@ public class ControlTests {
 	}
 
 	[Test]
+	public void PickInputUsesOneSource() {
+		Assert.AreEqual(new Vector2(1f, 0f), BallUserControl.PickInput(new Vector2(1f, 0f), new Vector2(0f, 1f)), "keys win whole, no X from keys + Y from stick");
+		Assert.AreEqual(new Vector2(0f, 0.6f), BallUserControl.PickInput(Vector2.zero, new Vector2(0f, 0.6f)));
+		Assert.AreEqual(Vector2.zero, BallUserControl.PickInput(Vector2.zero, Vector2.zero));
+		Assert.AreEqual(new Vector2(0f, 1f), BallUserControl.PickInput(new Vector2(0.005f, 0f), new Vector2(0f, 1f)), "a decaying key axis does not hide the stick");
+	}
+
+	// uGUI gives the left mouse button pointer id -1: it must own the stick like any finger.
+	[Test]
+	public void JoystickOwnsTheMousePointer() {
+		FixedJoystick joystick = MakeJoystick();
+		joystick.OnPointerDown(Pointer(-1, new Vector2(80f, 0f), Vector2.zero));
+		Assert.IsTrue(joystick.Owned);
+		Vector2 held = joystick.inputVector;
+		Assert.Greater(held.magnitude, 0.5f);
+		joystick.OnPointerDown(Pointer(3, new Vector2(-80f, 0f), Vector2.zero));
+		joystick.OnDrag(Pointer(3, new Vector2(-80f, 0f), Vector2.zero));
+		Assert.AreEqual(held, joystick.inputVector, "a second pointer cannot steal the stick");
+		joystick.OnPointerUp(Pointer(3, Vector2.zero, Vector2.zero));
+		Assert.IsTrue(joystick.Owned);
+		joystick.OnDrag(Pointer(-1, new Vector2(0f, 90f), Vector2.zero));
+		Assert.Greater(joystick.inputVector.y, 0.5f);
+		joystick.OnPointerUp(Pointer(-1, Vector2.zero, Vector2.zero));
+		Assert.IsFalse(joystick.Owned);
+		Assert.AreEqual(Vector2.zero, joystick.inputVector);
+		Object.DestroyImmediate(joystick.gameObject);
+	}
+
+	// Right/middle mouse drags are camera orbit/pan for the PC; they must not grab the stick or the look area.
+	[Test]
+	public void OnlyLeftButtonOrTouchTakesControl() {
+		FixedJoystick joystick = MakeJoystick();
+		var right = Pointer(-2, new Vector2(80f, 0f), Vector2.zero);
+		right.button = PointerEventData.InputButton.Right;
+		joystick.OnPointerDown(right);
+		Assert.IsFalse(joystick.Owned);
+		Assert.AreEqual(Vector2.zero, joystick.inputVector);
+		TouchLookArea look = new GameObject("Look", typeof(RectTransform)).AddComponent<TouchLookArea>();
+		var middle = Pointer(-3, Vector2.zero, Vector2.zero);
+		middle.button = PointerEventData.InputButton.Middle;
+		look.OnPointerDown(middle);
+		Assert.IsFalse(look.Owned);
+		Object.DestroyImmediate(joystick.gameObject);
+		Object.DestroyImmediate(look.gameObject);
+	}
+
+	[Test]
+	public void PauseBackdropBlocksTouches() {
+		foreach (LevelConfig level in LevelCatalog.All) {
+			EditorSceneManager.OpenScene("Assets/Scenes/" + level.levelId + ".unity", OpenSceneMode.Single);
+			PauseController pause = Object.FindObjectOfType<PauseController>(true);
+			Assert.IsTrue(pause.overlay.GetComponent<UnityEngine.UI.Image>().raycastTarget, level.levelId + ": taps behind the pause menu must not reach the HUD");
+		}
+	}
+
+	[Test]
+	public void LookAreaOwnsTheMousePointer() {
+		TouchLookArea look = new GameObject("Look", typeof(RectTransform)).AddComponent<TouchLookArea>();
+		look.OnPointerDown(Pointer(-1, Vector2.zero, Vector2.zero));
+		Assert.IsTrue(look.Owned);
+		look.OnPointerDown(Pointer(5, Vector2.zero, Vector2.zero));
+		look.OnDrag(Pointer(5, Vector2.zero, new Vector2(40f, 0f)));
+		Assert.AreEqual(Vector2.zero, look.ConsumeDelta(), "the other finger does not turn the camera");
+		look.OnDrag(Pointer(-1, Vector2.zero, new Vector2(12f, 3f)));
+		Assert.AreEqual(new Vector2(12f, 3f), look.ConsumeDelta());
+		look.OnPointerUp(Pointer(5, Vector2.zero, Vector2.zero));
+		Assert.IsTrue(look.Owned);
+		look.OnPointerUp(Pointer(-1, Vector2.zero, Vector2.zero));
+		Assert.IsFalse(look.Owned);
+		Object.DestroyImmediate(look.gameObject);
+	}
+
+	static readonly string[] Tuning = { "m_MaxSpeed", "m_AccelerationRate", "m_Brake", "m_UseTorque" };
+
+	[Test]
+	public void RobotTuningIs11_24_30() {
+		var ball = new SerializedObject(AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Player.prefab").GetComponent<Ball>());
+		Assert.AreEqual(11f, ball.FindProperty("m_MaxSpeed").floatValue);
+		Assert.AreEqual(24f, ball.FindProperty("m_AccelerationRate").floatValue);
+		Assert.AreEqual(30f, ball.FindProperty("m_Brake").floatValue);
+		Assert.IsFalse(ball.FindProperty("m_UseTorque").boolValue);
+		foreach (LevelConfig level in LevelCatalog.All) {
+			EditorSceneManager.OpenScene("Assets/Scenes/" + level.levelId + ".unity", OpenSceneMode.Single);
+			GameObject player = GameObject.FindWithTag("Player");
+			foreach (PropertyModification m in PrefabUtility.GetPropertyModifications(player) ?? new PropertyModification[0])
+				Assert.IsFalse(m.target is Ball && System.Array.IndexOf(Tuning, m.propertyPath) >= 0,
+					level.levelId + " overrides " + m.propertyPath + " on the robot");
+		}
+	}
+
+	static bool Interactive(Transform t) {
+		for (; t != null; t = t.parent)
+			foreach (MonoBehaviour b in t.GetComponents<MonoBehaviour>())
+				if (b is UnityEngine.UI.Selectable || b is IEventSystemHandler)
+					return true;
+		return false;
+	}
+
+	// Decorative images/texts and the minimap must not catch touches meant for the camera swipe.
+	[Test]
+	public void OnlyInteractiveGraphicsCatchRays() {
+		foreach (LevelConfig level in LevelCatalog.All) {
+			EditorSceneManager.OpenScene("Assets/Scenes/" + level.levelId + ".unity", OpenSceneMode.Single);
+			foreach (UnityEngine.UI.Graphic g in Object.FindObjectsOfType<UnityEngine.UI.Graphic>(true))
+				Assert.IsFalse(g.raycastTarget && !Interactive(g.transform), level.levelId + ": " + g.name + " (" + g.GetType().Name + ") blocks touches");
+		}
+	}
+
+	[Test]
 	public void SafeAreaAnchorsForNotch() {
 		Rect anchors = SafeAreaFitter.Anchors(new Rect(100f, 0f, 2200f, 1080f), new Vector2(2400f, 1080f));
 		Assert.AreEqual(100f / 2400f, anchors.x, 0.0001f);
@@ -159,17 +268,6 @@ public class ControlTests {
 			ScreenShareSizer sizer = joystick.GetComponent<ScreenShareSizer>();
 			Assert.IsNotNull(sizer, level);
 			Assert.That(sizer.heightShare, Is.InRange(0.20f, 0.25f), level);
-		}
-	}
-
-	[Test]
-	public void SensitivitySliderIsTouchSized() {
-		foreach (string level in Levels) {
-			EditorSceneManager.OpenScene("Assets/Scenes/" + level + ".unity", OpenSceneMode.Single);
-			UnityEngine.UI.Slider slider = Object.FindObjectsOfType<PauseController>(true).Single().sensitivitySlider;
-			Assert.GreaterOrEqual(((RectTransform)slider.transform).sizeDelta.y, 70f, level);
-			Assert.GreaterOrEqual(slider.handleRect.sizeDelta.x, 60f, level);
-			Assert.AreNotEqual(Color.white, slider.fillRect.GetComponent<UnityEngine.UI.Image>().color, level);
 		}
 	}
 }

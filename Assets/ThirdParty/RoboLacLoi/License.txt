@@ -1,2 +1,3 @@
-Robo Lac Loi models (RoboBall, EnergyCore, core_icon) were made for this project with Tools/blender/*.py.
+Robo Lac Loi models (RoboBall, EnergyCore, core_icon, support crystals, shield_icon) were made for this project with Tools/blender/*.py.
+Robo Lac Loi sounds (Audio/*.wav: SFX, ambience beds, Ending charge/ignition/engine) were synthesized for this project with Tools/audio/make_sfx.py (no samples from other sources).
 License: same as the project (MIT).

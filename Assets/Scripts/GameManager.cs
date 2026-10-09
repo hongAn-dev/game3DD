@@ -31,25 +31,22 @@ public class GameManager : MonoBehaviour {
 	public GameObject mainCanvas;
 	public Text mainScoreDisplay;
 	public GameObject gameOverCanvas;
-	public Text gameOverScoreDisplay;
+	[Tooltip("Hidden on the lose/level-complete panels: minimap camera, robot HP bar (the main canvas hides too).")]
+	public GameObject[] hideOnResult = new GameObject[0];
 
 	[Tooltip("Only need to set if canBeatLevel is set to true.")]
 	public GameObject beatLevelCanvas;
 
 	public AudioSource backgroundMusic;
-	public AudioClip gameOverSFX;
 
-	[Tooltip("Only need to set if canBeatLevel is set to true.")]
-	public AudioClip beatLevelSFX;
+	/// <summary>Seconds (real time) the music takes to fade out after a death or a win.</summary>
+	public const float MusicFade = 1f;
+	float fadeFrom;
+	float fadeStart;
+	SoundGroup musicGroup;
 
-	[Tooltip("Only need to set if canBeatLevel is set to true.")]
-	public GameObject introBeatLevelCanvas;
-
-	[Tooltip("Only need to set if canBeatLevel is set to true.")]
-	public Text introBeatLevelText;
-
-	private float introBeatLevelTextDuration = 2.0f;
-	private float introSavedTime;
+	[Tooltip("Story dialog: New Game tutorial and the level's intro card.")]
+	public DialogPanel dialog;
 
 	private Health playerHealth;
 
@@ -103,12 +100,7 @@ public class GameManager : MonoBehaviour {
 				beatLevelScore = config.energyTarget;
 
 			beatLevelCanvas.SetActive (false);
-			// Show intro level goal message (Only at first level load, doesnt show after a gameover)
-			if (GameSettings.showIntroLevelMessage) {
-				introBeatLevelText.text = "<color=#2EE6E6>" + (config != null ? config.displayName : "").ToUpperInvariant () + "</color>\nTHU " + beatLevelScore.ToString () + " LÕI NĂNG LƯỢNG";
-				GameSettings.showIntroLevelMessage = false;
-				StartCoroutine (ShowIntroBeatLevelCanvas ());
-			}
+			StartStory ();
 		}
 
 		// Setup score display.
@@ -117,20 +109,25 @@ public class GameManager : MonoBehaviour {
 	}
 
 	/// <summary>
-	/// Show intro level message with information about the coins that needs to be collected by the user to beat the level.
+	/// Spec §7.3/§7.4: after New Game the tutorial (its last page is the first level's card), otherwise the level's card
+	/// on its first entry in this run; nothing on Retry. Gameplay stays frozen (Intro) until "Bắt đầu".
 	/// </summary>
-	public IEnumerator ShowIntroBeatLevelCanvas() {
-		introBeatLevelCanvas.SetActive (true);
-		mainCanvas.SetActive (false);
+	void StartStory () {
+		bool tutorial = config != null && config == LevelCatalog.First && CampaignProgress.TutorialPending;
+		bool card = config != null && GameSettings.showIntroLevelMessage && !CampaignProgress.IntroSeen (config.levelId);
+		CampaignProgress.TutorialPending = false;
+		GameSettings.showIntroLevelMessage = false;
+		if (dialog == null || (!tutorial && !card))
+			return;
 		GameFlow.Enter (FlowState.Intro);
-		// Ends early when the card is tapped (UIButtonResumeGame moves GameFlow to Playing).
-		float end = Time.realtimeSinceStartup + introBeatLevelTextDuration;
-		while (GameFlow.State == FlowState.Intro && Time.realtimeSinceStartup < end)
-			yield return null;
-		if (GameFlow.State == FlowState.Intro)
-			GameFlow.Enter (FlowState.Playing);
-		introBeatLevelCanvas.SetActive (false);
-		mainCanvas.SetActive (true);
+		mainCanvas.SetActive (false);
+		StoryPage[] pages = tutorial ? StoryText.Tutorial (config) : new[] { StoryText.LevelCard (config) };
+		dialog.Show (pages, tutorial ? pages.Length - 1 : -1, "Bắt đầu", () => {
+			CampaignProgress.MarkIntroSeen (config.levelId);
+			mainCanvas.SetActive (true);
+			if (GameFlow.State == FlowState.Intro)
+				GameFlow.Enter (FlowState.Playing);
+		});
 	}
 
 	/// <summary>
@@ -143,18 +140,18 @@ public class GameManager : MonoBehaviour {
 				ResolvePlaying ();
 				break;
 			case gameStates.Death:
-				backgroundMusic.volume -= 0.01f;
-				if (backgroundMusic.volume<=0.0f) {
-					AudioSource.PlayClipAtPoint (gameOverSFX,gameObject.transform.position);
-					gameState = gameStates.GameOver;
-				}
-				break;
 			case gameStates.BeatLevel:
-				backgroundMusic.volume -= 0.01f;
-				if (backgroundMusic.volume<=0.0f) {
-					AudioSource.PlayClipAtPoint (beatLevelSFX,gameObject.transform.position);
+				// Fade by time, not per frame; the result cue already played once when the state began.
+				float left = 1f - (Time.unscaledTime - fadeStart) / MusicFade;
+				// Through the music's SoundGroup so a sound-settings change on the result screen keeps it faded.
+				if (musicGroup != null)
+					musicGroup.Fade = left;
+				else if (backgroundMusic != null)
+					backgroundMusic.volume = fadeFrom * Mathf.Max (0f, left);
+				if (left <= 0f) {
 					// If pass on current level should show set to true to show the intro message on the next level.
-					GameSettings.showIntroLevelMessage = true;
+					if (gameState == gameStates.BeatLevel)
+						GameSettings.showIntroLevelMessage = true;
 					gameState = gameStates.GameOver;
 				}
 				break;
@@ -175,28 +172,48 @@ public class GameManager : MonoBehaviour {
 		if (dead) {
 			GameFlow.Die ("MẤT KẾT NỐI");
 			gameState = gameStates.Death;
-			gameOverScoreDisplay.text = mainScoreDisplay.text;
-			Transform cause = gameOverCanvas.transform.Find ("Lost Title");
-			if (cause != null)
-				cause.GetComponent<Text> ().text = GameFlow.DeathCause.ToUpperInvariant ();
-			mainCanvas.SetActive (false);
+			BeginResult (SfxEvent.Lose);
+			// The panel only says "Bạn đã thua" (spec §7.1); the cause goes to the development log.
+			if (Debug.isDebugBuild)
+				Debug.Log ("GameManager: lost, cause: " + GameFlow.DeathCause);
+			HideHud ();
 			gameOverCanvas.SetActive (true);
 			SelectButton ("Play Again Button");
 			return;
 		}
 		if (canBeatLevel && score >= beatLevelScore && GameFlow.CompleteLevel ()) {
 			gameState = gameStates.BeatLevel;
+			BeginResult (config != null && config.IsFinal ? SfxEvent.CampaignWin : SfxEvent.LevelWin);
 			if (config != null)
 				CampaignProgress.CompleteLevel (config.levelId);
 			player.SetActive (false);
-			mainCanvas.SetActive (false);
+			HideHud ();
 			if (config != null && config.IsFinal) {
 				StartCoroutine (GoToEnding ());
 			} else {
+				if (config != null) {
+					StoryPage done = StoryText.LevelComplete (config);
+					beatLevelCanvas.transform.Find ("Congratulations Text").GetComponent<Text> ().text = done.title;
+					beatLevelCanvas.transform.Find ("Complete Body").GetComponent<Text> ().text = done.body;
+				}
 				beatLevelCanvas.SetActive (true);
 				SelectButton (isFinalLevel ? "Main Menu Button" : "Next Level Button");
 			}
 		}
+	}
+
+	void HideHud () {
+		mainCanvas.SetActive (false);
+		foreach (GameObject hud in hideOnResult)
+			if (hud != null)
+				hud.SetActive (false);
+	}
+
+	void BeginResult (SfxEvent cue) {
+		Sfx.Play (cue);
+		fadeFrom = backgroundMusic != null ? backgroundMusic.volume : 0f;
+		musicGroup = backgroundMusic != null ? backgroundMusic.GetComponent<SoundGroup> () : null;
+		fadeStart = Time.unscaledTime;
 	}
 
 	// Fades Level4 to black before the Ending (which fades in from black), spec §8 "Fade từ L4".
@@ -207,8 +224,9 @@ public class GameManager : MonoBehaviour {
 		canvas.sortingOrder = 1000;
 		UnityEngine.UI.Image black = overlay.GetComponent<UnityEngine.UI.Image> ();
 		black.raycastTarget = false;
-		for (float t = 0f; t < 0.75f; t += Time.unscaledDeltaTime) {
-			black.color = new Color (0f, 0f, 0f, t / 0.75f);
+		// As long as the music fade; the campaign win cue plays on into the Ending.
+		for (float t = 0f; t < MusicFade; t += Time.unscaledDeltaTime) {
+			black.color = new Color (0f, 0f, 0f, t / MusicFade);
 			yield return null;
 		}
 		black.color = Color.black;
@@ -230,7 +248,7 @@ public class GameManager : MonoBehaviour {
 			return;
 		score += amount;
 		if (canBeatLevel) {
-			mainScoreDisplay.text = score.ToString () + " / " + beatLevelScore.ToString ();
+			mainScoreDisplay.text = StoryText.EnergyLabel (score, beatLevelScore);
 		} else {
 			mainScoreDisplay.text = score.ToString ();
 		}

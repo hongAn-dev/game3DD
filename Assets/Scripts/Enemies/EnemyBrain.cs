@@ -13,10 +13,10 @@ public enum EnemyState { Idle, Patrol, Chase, Windup, Strike, Recover, Return, D
 [RequireComponent(typeof(NavMeshAgent))]
 public class EnemyBrain : MonoBehaviour {
 
-	[Header("Speed = factor × robot top speed (Easy, Normal, Hard)")]
-	public float[] speedFactor = { 0.8f, 0.95f, 1.05f };
+	[Header("Movement (absolute; EnemyDirector applies the level profile)")]
+	public float speed = 6f;
 	public float acceleration = 14f;
-	public float turnSpeed = 360f;
+	public float turnSpeed = 300f;
 
 	[Header("Senses")]
 	public float detectRadius = 26f;
@@ -31,8 +31,23 @@ public class EnemyBrain : MonoBehaviour {
 	public float windup = 0.35f;
 	public float strike = 0.1f;
 	public float recover = 0.7f;
+	public int damage = 10;
 	public string hitCause = "Robo bị quái vật đánh trúng";
 	public GameObject telegraph;
+
+	[Header("Guardian slam (spec §4.3): a drawn circle in front of the boss")]
+	public bool canSlam;
+	public float slamRadius = 2.4f;
+	public float slamReach = 1.2f;
+
+	[Header("L4 guardian dash (spec §4.3): straight, locked, telegraphed strip; alternates with the slam")]
+	public bool canDash;
+	public float dashLength = 5f;
+	public float dashWidth = 1.5f;
+	public float dashSpeed = 10.5f;
+	public float dashWindup = 1.0f;
+	public float dashRecover = 1.6f;
+	public GameObject dashTelegraph;
 
 	[Header("Legacy animation clips (optional)")]
 	public string idleClip = "";
@@ -40,8 +55,13 @@ public class EnemyBrain : MonoBehaviour {
 	public string attackClip = "";
 
 	public Transform target;
+	[Tooltip("Patrol stops (energy landing points near home), set by EnemyDirector; empty = wander near home.")]
+	public Vector3[] patrolPoints = new Vector3[0];
 
 	public EnemyState State { get; private set; }
+	public float DistanceToTarget { get; private set; }
+	public int HitAttempts { get; private set; }   // strikes that reached Hit (one per attack at most)
+	public AttackKind CurrentAttack { get; private set; }
 
 	NavMeshAgent agent;
 	Animation anim;
@@ -50,11 +70,24 @@ public class EnemyBrain : MonoBehaviour {
 	Vector3 home, goal, lockedForward, lastCheckPosition, patrolPoint;
 	float stateTime, repathTimer, stuckCheckTimer, stuckTime;
 	bool hitDone;
+	Vector3 slamCentre;
+	float dashTravel, dashDone;
+	bool nextIsDash;
+	Vector3 dashStart;
 	string currentClip = "";
 	static readonly RaycastHit[] SightHits = new RaycastHit[16];
 
-	public static float Speed(float[] factor, GameSettings.gameDifficulties difficulty, float robotTopSpeed) {
-		return factor[(int)difficulty] * robotTopSpeed;
+	/// <summary>Level/difficulty numbers (EnemyProfile). Call right after spawning; also works after Start.</summary>
+	public void Configure(EnemyProfile profile) {
+		speed = profile.speed;
+		damage = profile.damage;
+		windup = profile.windup;
+		strike = profile.strike;
+		recover = profile.recover;
+		canSlam = profile.slam;
+		canDash = profile.dash;
+		if (agent != null)
+			agent.speed = speed;
 	}
 
 	void Start() {
@@ -69,8 +102,7 @@ public class EnemyBrain : MonoBehaviour {
 			targetHealth = target.GetComponent<Health>();
 			targetBody = target.GetComponent<Rigidbody>();
 		}
-		Ball ball = target != null ? target.GetComponent<Ball>() : null;
-		agent.speed = Speed(speedFactor, GameSettings.difficulty, ball != null ? ball.MaxSpeed : 9f);
+		agent.speed = speed;
 		agent.acceleration = acceleration;
 		agent.angularSpeed = turnSpeed;
 		agent.stoppingDistance = attackRange * 0.5f;
@@ -81,20 +113,59 @@ public class EnemyBrain : MonoBehaviour {
 		Enter(EnemyState.Idle);
 	}
 
+	// Chase token from the director (spec §4.2: at most 2 or 3 enemies chase at once); no director = no limit.
+	bool MayChase() {
+		return EnemyDirector.Current == null || EnemyDirector.Current.RequestChase(this);
+	}
+
+	void ReleaseToken() {
+		if (EnemyDirector.Current != null)
+			EnemyDirector.Current.ReleaseChase(this);
+	}
+
+	void OnDestroy() {
+		ReleaseToken();
+	}
+
+	bool IsBoss { get { return canSlam || canDash; } }
+
 	void Enter(EnemyState next) {
 		State = next;
+		if (next == EnemyState.Idle || next == EnemyState.Patrol || next == EnemyState.Return || next == EnemyState.Disabled)
+			ReleaseToken();
 		stateTime = 0f;
 		bool attacking = next == EnemyState.Windup || next == EnemyState.Strike || next == EnemyState.Recover;
 		if (agent.isOnNavMesh)
 			agent.isStopped = attacking || next == EnemyState.Idle || next == EnemyState.Disabled;
 		agent.updateRotation = !attacking;
 		if (telegraph != null)
-			telegraph.SetActive(next == EnemyState.Windup);
+			telegraph.SetActive(next == EnemyState.Windup && CurrentAttack != AttackKind.Dash);
+		if (dashTelegraph != null)
+			dashTelegraph.SetActive(next == EnemyState.Windup && CurrentAttack == AttackKind.Dash);
 		switch (next) {
 		case EnemyState.Windup:
 			lockedForward = FlatTo(target.position);
 			hitDone = false;
+			if (CurrentAttack == AttackKind.Slam) {
+				// The circle is drawn at its real size where it will land, from the start of the windup.
+				slamCentre = BossAttacks.SlamCentre(transform.position, lockedForward, slamReach);
+				if (telegraph != null) {
+					telegraph.transform.position = slamCentre + Vector3.up * 0.04f;
+					telegraph.transform.localScale = Vector3.one;
+				}
+			}
+			if (CurrentAttack == AttackKind.Dash) {
+				dashTravel = DashTravel(lockedForward);
+				dashDone = 0f;
+				dashStart = transform.position;
+				PinDashStrip();
+			}
 			PlayClip(attackClip);
+			if (IsBoss)
+				Sfx.Play(SfxEvent.BossWarn);
+			break;
+		case EnemyState.Strike:
+			Sfx.Play(IsBoss ? SfxEvent.BossStrike : SfxEvent.CreepAttack);
 			break;
 		case EnemyState.Chase:
 		case EnemyState.Patrol:
@@ -104,8 +175,7 @@ public class EnemyBrain : MonoBehaviour {
 			PlayClip(runClip);
 			break;
 		default:
-			if (next != EnemyState.Strike)
-				PlayClip(idleClip);
+			PlayClip(idleClip);
 			break;
 		}
 	}
@@ -134,20 +204,22 @@ public class EnemyBrain : MonoBehaviour {
 		stateTime += Time.deltaTime;
 		UpdateRunSpeed();
 		float distance = FlatDistance(target.position);
+		DistanceToTarget = distance;
 
 		switch (State) {
 		case EnemyState.Idle:
-			if (distance <= detectRadius)
+			if (distance <= detectRadius && MayChase())
 				Enter(EnemyState.Chase);
 			else if (stateTime > 2f)
 				Enter(EnemyState.Patrol);
 			break;
 		case EnemyState.Patrol:
-			if (distance <= detectRadius) {
+			if (distance <= detectRadius && MayChase()) {
 				Enter(EnemyState.Chase);
 			} else if (stateTime > 6f || (!agent.pathPending && agent.remainingDistance < 1f)) {
 				NavMeshHit hit;
-				Vector3 random = home + Quaternion.Euler(0f, Random.Range(0f, 360f), 0f) * Vector3.forward * Random.Range(2f, 8f);
+				Vector3 random = patrolPoints.Length > 0 ? patrolPoints[Random.Range(0, patrolPoints.Length)]
+					: home + Quaternion.Euler(0f, Random.Range(0f, 360f), 0f) * Vector3.forward * Random.Range(2f, 8f);
 				if (NavMesh.SamplePosition(random, out hit, 2f, NavMesh.AllAreas))
 					agent.SetDestination(hit.position);
 				stateTime = 0f;
@@ -158,38 +230,117 @@ public class EnemyBrain : MonoBehaviour {
 				Enter(EnemyState.Return);
 				break;
 			}
+			if (EnemyDirector.Current != null && !EnemyDirector.Current.HoldsChase(this)) {
+				Enter(EnemyState.Patrol);   // a closer enemy took this token
+				break;
+			}
 			Repath(true);
 			CheckStuck();
-			if (distance <= attackRange * 0.85f && Vector3.Angle(transform.forward, FlatTo(target.position)) <= attackAngle && Clear())
+			// Standing within the stopping distance the agent does not turn; face the robot ourselves (yaw only),
+			// or an enemy that ends up beside or past the robot (after a dash) never lines up an attack.
+			if (agent.velocity.sqrMagnitude < 0.25f)
+				transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(FlatTo(target.position)), turnSpeed * Time.deltaTime);
+			if (canSlam) {
+				float angle = Vector3.Angle(transform.forward, FlatTo(target.position));
+				bool slamReady = distance <= slamReach + slamRadius * 0.8f && angle <= 60f && Clear();
+				bool dashReady = canDash && distance >= 2.5f && distance <= dashLength + 1f && angle <= 30f && Clear()
+					&& DashTravel(FlatTo(target.position)) >= 2f;
+				// L4 alternates: the other attack is preferred, but whichever is possible beats waiting.
+				if (dashReady && (nextIsDash || !slamReady)) {
+					CurrentAttack = AttackKind.Dash;
+					Enter(EnemyState.Windup);
+				} else if (slamReady) {
+					CurrentAttack = AttackKind.Slam;
+					Enter(EnemyState.Windup);
+				}
+			} else if (distance <= attackRange * 0.85f && Vector3.Angle(transform.forward, FlatTo(target.position)) <= attackAngle && Clear()) {
+				CurrentAttack = AttackKind.Strike;
 				Enter(EnemyState.Windup);
+			}
 			break;
 		case EnemyState.Windup:
 			transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(lockedForward), turnSpeed * Time.deltaTime);
-			if (telegraph != null)
+			if (telegraph != null && CurrentAttack == AttackKind.Strike)
 				telegraph.transform.localScale = Vector3.one * Mathf.Lerp(0.4f, 1f, stateTime / windup);
-			if (stateTime >= windup)
+			else if (telegraph != null && CurrentAttack == AttackKind.Slam)
+				telegraph.transform.position = slamCentre + Vector3.up * 0.04f;   // stays on the ground while the boss turns
+			if (CurrentAttack == AttackKind.Dash)
+				PinDashStrip();   // the strip is a child of the turning boss: keep it on the locked line
+			if (stateTime >= (CurrentAttack == AttackKind.Dash ? dashWindup : windup))
 				Enter(EnemyState.Strike);
 			break;
 		case EnemyState.Strike:
-			if (!hitDone && distance <= attackRange && Vector3.Angle(lockedForward, FlatTo(target.position)) <= attackAngle
+			if (CurrentAttack == AttackKind.Dash) {
+				// Straight along the locked line; only the agent moves the root and it cannot leave the NavMesh.
+				float step = Mathf.Min(dashSpeed * Time.deltaTime, dashTravel - dashDone);
+				Vector3 before = transform.position;
+				agent.Move(lockedForward * step);
+				dashDone += step;
+				// Swept test over this frame's segment (a long frame cannot skip the robot), as wide as the drawn strip.
+				if (!hitDone && BossAttacks.TouchesDash(before, transform.position, target.position, dashWidth * 0.5f + 0.5f))
+					Hit();
+				if (dashDone >= dashTravel - 0.001f) {
+					nextIsDash = false;
+					Enter(EnemyState.Recover);
+				}
+				break;
+			}
+			if (CurrentAttack == AttackKind.Slam) {
+				if (!hitDone && SameLevel() && BossAttacks.InSlam(slamCentre, slamRadius, target.position)
+					&& BossAttacks.Clear(slamCentre + Vector3.up * 0.5f, target.position, SightHits))
+					Hit();
+			} else if (!hitDone && distance <= attackRange && Vector3.Angle(lockedForward, FlatTo(target.position)) <= attackAngle
 				&& Mathf.Abs(target.position.y - transform.position.y) < 2.5f && Clear())
 				Hit();
-			if (stateTime >= strike)
+			if (stateTime >= strike) {
+				if (CurrentAttack == AttackKind.Slam)
+					nextIsDash = canDash;
 				Enter(EnemyState.Recover);
+			}
 			break;
 		case EnemyState.Recover:
-			if (stateTime >= recover)
+			if (stateTime >= (CurrentAttack == AttackKind.Dash ? dashRecover : recover))
 				Enter(distance <= loseRadius ? EnemyState.Chase : EnemyState.Return);
 			break;
 		case EnemyState.Return:
 			Repath(false);
 			// Back home, or at least 3 s of retreat, before chasing again (no chase/retreat flapping when stuck).
-			if (distance <= detectRadius && stateTime > 3f)
+			if (distance <= detectRadius && stateTime > 3f && MayChase())
 				Enter(EnemyState.Chase);
 			else if (!agent.pathPending && agent.remainingDistance < 1f)
 				Enter(EnemyState.Idle);
 			break;
 		}
+	}
+
+	void PinDashStrip() {
+		if (dashTelegraph == null)
+			return;
+		// Exactly where the dash will go: its width and its (obstacle-limited) length, from where it started.
+		dashTelegraph.transform.position = dashStart + lockedForward * dashTravel * 0.5f + Vector3.up * 0.05f;
+		dashTelegraph.transform.rotation = Quaternion.LookRotation(lockedForward);
+		Vector3 parent = dashTelegraph.transform.parent != null ? dashTelegraph.transform.parent.lossyScale : Vector3.one;
+		dashTelegraph.transform.localScale = new Vector3(dashWidth / parent.x, 1f, dashTravel / parent.z);
+	}
+
+	// The robot stands on the boss's terrain level: its ground (under it, ignoring moving bodies) is within 0.6 m of the
+	// boss's ground. A ledge or a lower floor is another level (the NavMesh climb limit is 0.4 m).
+	bool SameLevel() {
+		float ground = float.MinValue;
+		int count = Physics.RaycastNonAlloc(target.position + Vector3.up * 0.1f, Vector3.down, SightHits, 30f, ~0, QueryTriggerInteraction.Ignore);
+		for (int i = 0; i < count; i++)
+			if (SightHits[i].collider.attachedRigidbody == null)
+				ground = Mathf.Max(ground, SightHits[i].point.y);
+		return ground > float.MinValue && Mathf.Abs(ground - transform.position.y) <= 0.6f;
+	}
+
+	// How far a dash along dir can go on continuous NavMesh (stops short of obstacles/edges), at most dashLength.
+	float DashTravel(Vector3 dir) {
+		NavMeshHit hit;
+		Vector3 start = transform.position;
+		if (NavMesh.Raycast(start, start + dir * dashLength, out hit, NavMesh.AllAreas))
+			return Mathf.Max(0f, hit.distance - 0.3f);
+		return dashLength;
 	}
 
 	// Nearest NavMesh point under the robot; while it is airborne or off the mesh the last valid point is kept.
@@ -245,10 +396,11 @@ public class EnemyBrain : MonoBehaviour {
 
 	void Hit() {
 		hitDone = true;
+		HitAttempts++;
 		if (targetHealth == null || targetHealth.healthPoints <= 0f)
 			return;
-		GameFlow.ReportDeathCause(hitCause);
-		targetHealth.ApplyDamage(targetHealth.healthPoints);
+		if (targetHealth.TakeDamage(damage, DamageKind.EnemyAttack) && targetHealth.healthPoints <= 0f)
+			GameFlow.ReportDeathCause(hitCause);   // only the strike that ends the run names the cause
 	}
 
 	Vector3 FlatTo(Vector3 point) {

@@ -149,9 +149,9 @@ public static class EndingSceneBuilder {
 			Object.Instantiate(glows[i - 1], spaceShip.transform, false).SetActive(true);
 
 		// ---------- audio ----------
-		AudioSource wind = Audio("Audio Weak Power", "computerNoise_000"), charge_ = Audio("Audio Charge", "forceField_000"),
-			full = Audio("Audio Fuel Full", "confirmation_004"), ignition = Audio("Audio Ignition", "lowFrequency_explosion_000"),
-			engine = Audio("Audio Engine", "spaceEngineLow_000");
+		// Soft charge, the level-win chime when full, short ignition, smooth engine (spec §8.2); the weak-power part is quiet.
+		AudioSource charge_ = Audio("Audio Charge", "ending_charge"), full = Audio("Audio Fuel Full", "level_win"),
+			ignition = Audio("Audio Ignition", "ending_ignition"), engine = Audio("Audio Engine", "ending_engine");
 
 		// ---------- UI ----------
 		Font bold = AssetDatabase.LoadAssetAtPath<Font>("Assets/Fonts/ChakraPetch/ChakraPetch-Bold.ttf");
@@ -167,21 +167,26 @@ public static class EndingSceneBuilder {
 		GameObject fade = Stretch(new GameObject("Fade", typeof(RectTransform), typeof(Image), typeof(CanvasGroup), typeof(Animator)), canvasGo.transform);
 		fade.GetComponent<Image>().color = Color.black;
 		fade.GetComponent<Image>().raycastTarget = false;
-		GameObject charging = Label(canvasGo.transform, "Caption Charging", "ĐANG NẠP NĂNG LƯỢNG…", medium, 52, -380f, new Vector2(1200f, 80f)).gameObject;
-		GameObject fuel = Label(canvasGo.transform, "Caption Fuel", "NHIÊN LIỆU 100%", bold, 64, -380f, new Vector2(1200f, 90f)).gameObject;
-		GameObject escaped = Label(canvasGo.transform, "Caption Escaped", "Robo đã thoát khỏi hành tinh. Hành trình tiếp tục.", medium, 52, -380f, new Vector2(1700f, 80f)).gameObject;
-		foreach (GameObject caption in new[] { charging, fuel, escaped })
+		// Spec §7.5: the "ship ready" caption once the fuel is full, long enough to read; no extra tap in the flow.
+		Text readyText = Label(canvasGo.transform, "Caption Ready", StoryText.ShipReady.title + "\n" + StoryText.ShipReady.body, medium, 44, -360f, new Vector2(1700f, 150f));
+		readyText.horizontalOverflow = HorizontalWrapMode.Wrap;
+		readyText.lineSpacing = 1.15f;
+		GameObject ready = readyText.gameObject;
+		GameObject escaped = Label(canvasGo.transform, "Caption Escaped", "Phi thuyền đã cất cánh, rời khỏi hành tinh xa lạ.", medium, 52, -380f, new Vector2(1700f, 80f)).gameObject;
+		foreach (GameObject caption in new[] { ready, escaped })
 			caption.SetActive(false);
 
 		GameObject panel = Stretch(new GameObject("Completion Panel", typeof(RectTransform)), canvasGo.transform);
 		panel.SetActive(false);
-		Label(panel.transform, "Title", "ROBO ĐÃ THOÁT KHỎI HÀNH TINH", bold, 84, 260f, new Vector2(1700f, 120f));
-		Label(panel.transform, "Subtitle", "Hành trình tiếp tục.", medium, 48, 160f, new Vector2(1200f, 70f));
+		Label(panel.transform, "Title", StoryText.Finale.title, bold, 80, 300f, new Vector2(1700f, 110f));
+		Text finale = Label(panel.transform, "Subtitle", StoryText.Finale.body, medium, 42, 140f, new Vector2(1500f, 180f));
+		finale.horizontalOverflow = HorizontalWrapMode.Wrap;
+		finale.lineSpacing = 1.15f;
 
 		EndingController controller = canvasGo.AddComponent<EndingController>();
 		controller.completionPanel = panel;
-		UnityEventTools.AddPersistentListener(Button(panel.transform, "Play Again Button", "CHƠI LẠI TỪ ĐẦU", bold, -40f).onClick, controller.PlayAgain);
-		UnityEventTools.AddPersistentListener(Button(panel.transform, "Main Menu Button", "VỀ MENU", bold, -180f).onClick, controller.BackToMenu);
+		UnityEventTools.AddPersistentListener(Button(panel.transform, "Play Again Button", "Chơi lại", bold, -60f).onClick, controller.PlayAgain);
+		UnityEventTools.AddPersistentListener(Button(panel.transform, "Main Menu Button", "Menu chính", bold, -200f).onClick, controller.BackToMenu);
 		Button skip = Button(canvasGo.transform, "Skip Button", "BỎ QUA", bold, 0f);
 		RectTransform skipRect = (RectTransform)skip.transform;
 		skipRect.anchorMin = skipRect.anchorMax = skipRect.pivot = new Vector2(1f, 0f);
@@ -276,17 +281,16 @@ public static class EndingSceneBuilder {
 		AssetDatabase.AddObjectToAsset(fadeClip, timeline);
 		Animate(timeline, director, "Fade", fade.GetComponent<Animator>(), fadeClip);
 		Activation(timeline, director, "Fade visible", fade, 0f, 1.6f);   // no full-screen overdraw once it is clear
-		Activation(timeline, director, "Caption charging", charging, 8.5f, 3.5f);
-		Activation(timeline, director, "Caption fuel", fuel, 12f, 2f);
+		Activation(timeline, director, "Caption ready", ready, 11.5f, 5.5f);
 		Activation(timeline, director, "Caption escaped", escaped, 23.5f, Duration - 23.5f);
-		Sound(timeline, director, wind, 0f, 8f);
 		Sound(timeline, director, charge_, 8f, 5f);
-		Sound(timeline, director, full, 12f, 1.5f);
-		Sound(timeline, director, ignition, 17f, 2f);
+		Sound(timeline, director, full, 12f, 0.8f);
+		Sound(timeline, director, ignition, 17f, 0.9f);
 		Sound(timeline, director, engine, 13.5f, 9.5f);
 
 		EditorUtility.SetDirty(timeline);
 		AssetDatabase.SaveAssets();
+		FlowUiSetup.TopBar(null, -1);   // sound toggle (spec §7.6), under the Ending canvas so the fade-in covers it
 		EditorSceneManager.SaveScene(scene, ScenePath);
 		if (!EditorBuildSettings.scenes.Any(s => s.path == ScenePath))
 			EditorBuildSettings.scenes = EditorBuildSettings.scenes.Concat(new[] { new EditorBuildSettingsScene(ScenePath, true) }).ToArray();
@@ -374,10 +378,13 @@ public static class EndingSceneBuilder {
 
 	static AudioSource Audio(string name, string clip) {
 		AudioSource source = new GameObject(name).AddComponent<AudioSource>();
-		source.clip = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/ThirdParty/KenneyAudio/" + clip + ".ogg");
+		source.clip = AudioSetup.Clip(clip);
 		source.playOnAwake = false;
 		source.spatialBlend = 0f;
 		source.volume = 0.6f;
+		SoundGroup group = source.gameObject.AddComponent<SoundGroup>();
+		group.group = SoundGroup.Group.Sfx;
+		group.baseVolume = 0.6f;
 		return source;
 	}
 
@@ -492,7 +499,11 @@ public static class EndingSceneBuilder {
 		TimelineClip clip = track.CreateDefaultClip();
 		((AudioPlayableAsset)clip.asset).clip = source.clip;
 		clip.start = start;
-		clip.duration = duration;
+		clip.duration = Mathf.Min(duration, source.clip.length);   // no loops: the beds are made as long as their part
+		// Beds (charge hum, engine) fade in and out; one-shots keep their attack, the ignition tail eases out.
+		bool bed = source.clip.length > 2f;
+		clip.easeInDuration = bed ? 0.3 : 0.0;
+		clip.easeOutDuration = bed ? 0.3 : source.clip.name == "ending_ignition" ? 0.2 : 0.0;
 		director.SetGenericBinding(track, source);
 	}
 
