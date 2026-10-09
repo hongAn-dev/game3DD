@@ -9,7 +9,7 @@ public class OverdriveTests {
 	public void PickupIsABoltThatNeverScores() {
 		GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Overdrive.prefab");
 		Assert.IsNotNull(prefab);
-		Assert.IsNotNull(prefab.GetComponent<OverdrivePickup>());
+		Assert.AreEqual(SupportKind.Overdrive, prefab.GetComponent<SupportPickup>().kind);
 		Assert.IsNull(prefab.GetComponentInChildren<Treasure>(true), "not part of the energy budget");
 		Assert.IsTrue(prefab.GetComponent<SphereCollider>().isTrigger);
 		Assert.IsNotNull(prefab.transform.Find("Model").GetComponent<EnergyBob>(), "the bolt spins, the trigger does not");

@@ -54,6 +54,27 @@ public static class PlayerHudSetup {
 		label.alignment = TextAnchor.MiddleCenter;
 		label.color = Color.white;
 		label.text = "100/100";
+		// Shield icon + seconds to the right of the bar (spec §6.2); hidden until a shield is active.
+		RectTransform shield = Rect("Shield", bar, new Vector2(56f, 24f));
+		shield.anchorMin = shield.anchorMax = new Vector2(1f, 0f);
+		shield.pivot = new Vector2(0f, 0f);
+		shield.anchoredPosition = new Vector2(2f, 0f);
+		Image icon = Rect("Icon", shield, new Vector2(22f, 22f)).gameObject.AddComponent<Image>();
+		((RectTransform)icon.transform).anchorMin = ((RectTransform)icon.transform).anchorMax = new Vector2(0f, 0.5f);
+		((RectTransform)icon.transform).anchoredPosition = new Vector2(11f, 0f);
+		icon.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/ThirdParty/RoboLacLoi/Sprites/shield_icon.png");
+		icon.preserveAspect = true;
+		Text seconds = Rect("Seconds", shield, new Vector2(30f, 24f)).gameObject.AddComponent<Text>();
+		((RectTransform)seconds.transform).anchorMin = ((RectTransform)seconds.transform).anchorMax = new Vector2(0f, 0.5f);
+		((RectTransform)seconds.transform).anchoredPosition = new Vector2(40f, 0f);
+		seconds.font = label.font;
+		seconds.fontSize = 20;
+		seconds.alignment = TextAnchor.MiddleLeft;
+		seconds.color = new Color32(140, 190, 255, 255);
+		seconds.text = "5";
+		shield.gameObject.SetActive(false);
+		health.shieldGroup = shield.gameObject;
+		health.shieldSeconds = seconds;
 		foreach (Graphic g in root.GetComponentsInChildren<Graphic>(true))
 			g.raycastTarget = false;
 		health.bar = bar;

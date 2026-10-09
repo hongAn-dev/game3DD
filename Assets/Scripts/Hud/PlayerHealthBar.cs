@@ -15,9 +15,13 @@ public class PlayerHealthBar : MonoBehaviour {
 	public RectTransform bar;    // moved over the robot each frame
 	public Image fill;           // horizontal filled image
 	public Text label;
+	public GameObject shieldGroup;   // shield icon + seconds beside the bar
+	public Text shieldSeconds;
 	public float aboveTop = 0.32f;   // metres above the top of the ball
 
 	Health health;
+	ShieldEffect shield;
+	int shownShield = -1;
 	Transform robot;
 	float radius = 0.5f;
 	Canvas canvas;
@@ -36,6 +40,7 @@ public class PlayerHealthBar : MonoBehaviour {
 		if (player != null) {
 			robot = player.transform;
 			health = player.GetComponent<Health>();
+			shield = player.GetComponent<ShieldEffect>();
 			SphereCollider sphere = player.GetComponent<SphereCollider>();
 			if (sphere != null)
 				radius = sphere.radius * robot.lossyScale.y;
@@ -58,6 +63,13 @@ public class PlayerHealthBar : MonoBehaviour {
 		RectTransformUtility.ScreenPointToLocalPointInRectangle((RectTransform)bar.parent, screen,
 			canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera, out local);
 		bar.anchoredPosition = local;
+		int seconds = shield != null && shield.Active ? Mathf.CeilToInt(shield.Remaining) : 0;
+		if (shieldGroup != null && seconds != shownShield) {
+			shownShield = seconds;
+			shieldGroup.SetActive(seconds > 0);
+			if (seconds > 0)
+				shieldSeconds.text = seconds.ToString();
+		}
 		if (shownHp == health.healthPoints)
 			return;   // no new label string every frame
 		shownHp = health.healthPoints;

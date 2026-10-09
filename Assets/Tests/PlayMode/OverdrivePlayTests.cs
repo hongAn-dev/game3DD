@@ -110,7 +110,7 @@ public class OverdrivePlayTests {
 		int max = 0;
 		float end = Time.time + 1.5f;
 		while (Time.time < end) {
-			max = Mathf.Max(max, Object.FindObjectsOfType<OverdrivePickup>().Length);
+			max = Mathf.Max(max, Object.FindObjectsOfType<SupportPickup>().Length);
 			yield return null;
 		}
 		Assert.AreEqual(1, max, "one at a time");

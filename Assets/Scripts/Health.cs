@@ -37,6 +37,10 @@ public class Health : MonoBehaviour {
 	public float InvulnerableLeft { get; private set; }
 	public event System.Action<float> Damaged;
 	public event System.Action<float> Healed;
+	public event System.Action Blocked;   // an enemy attack hit the shield
+
+	ShieldEffect shield;
+	bool shieldLooked;
 	
 
 	/// <summary>
@@ -107,6 +111,15 @@ public class Health : MonoBehaviour {
 		} else {
 			if (InvulnerableLeft > 0f || amount <= 0f)
 				return false;
+			if (!shieldLooked) {
+				shield = GetComponent<ShieldEffect>();
+				shieldLooked = true;
+			}
+			if (shield != null && shield.Active) {
+				if (Blocked != null)
+					Blocked();
+				return false;   // the attack is spent on the shield
+			}
 			InvulnerableLeft = InvulnerableSeconds;
 		}
 		float before = healthPoints;

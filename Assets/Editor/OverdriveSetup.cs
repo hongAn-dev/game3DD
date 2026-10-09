@@ -13,7 +13,7 @@ public static class OverdriveSetup {
 	const string PrefabPath = "Assets/Prefabs/Overdrive.prefab";
 	const string ModelPath = "Assets/ThirdParty/RoboLacLoi/Models/Overdrive.fbx";
 	const string IconPath = "Assets/ThirdParty/RoboLacLoi/Sprites/overdrive_icon.png";
-	public const float BoltHeight = 0.7f;
+	public const float BoltHeight = 0.6f;   // same size as the other pickups (spec §6.4)
 
 	[MenuItem("Tools/Robo Lac Loi/Apply Overdrive Setup")]
 	public static void Apply() {
@@ -44,23 +44,7 @@ public static class OverdriveSetup {
 	}
 
 	static GameObject BuildPrefab() {
-		GameObject root = new GameObject("Overdrive");
-		try {
-			SphereCollider trigger = root.AddComponent<SphereCollider>();
-			trigger.isTrigger = true;
-			trigger.radius = 0.6f;
-			root.AddComponent<OverdrivePickup>();
-			GameObject model = (GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(ModelPath), root.transform);
-			model.name = "Model";
-			Bounds b = model.GetComponentInChildren<Renderer>().bounds;
-			model.transform.localScale *= BoltHeight / b.size.y;
-			b = model.GetComponentInChildren<Renderer>().bounds;
-			model.transform.localPosition -= b.center;
-			model.AddComponent<EnergyBob>();
-			return PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
-		} finally {
-			Object.DestroyImmediate(root);
-		}
+		return SupportSetup.BuildPickup(PrefabPath, ModelPath, SupportKind.Overdrive, BoltHeight);
 	}
 
 	// Under the energy panel at the top right (below the zone name): bolt icon and the seconds left; hidden until
