@@ -61,16 +61,20 @@ public class BallUserControl : MonoBehaviour {
 		float v = CrossPlatformInputManager.GetAxis("Vertical");
 		jump = CrossPlatformInputManager.GetButton("Jump");
 
-		if (joystick != null) {
-			h = (h == 0) ? joystick.Horizontal : h;
-			v = (v == 0) ? joystick.Vertical : v;
-		}
+		Vector2 picked = PickInput(new Vector2(h, v), joystick != null ? new Vector2(joystick.Horizontal, joystick.Vertical) : Vector2.zero);
+		h = picked.x;
+		v = picked.y;
 
 		// Calculate move direction, keeping the analog magnitude of the stick.
 		if (cam != null)
 			move = CameraRelative(h, v, cam.forward, cam.right);
 		else
 			move = CameraRelative(h, v, Vector3.forward, Vector3.right);
+	}
+
+	/// <summary>One input source at a time: the keys when any key is held, otherwise the on-screen stick.</summary>
+	public static Vector2 PickInput(Vector2 keys, Vector2 stick) {
+		return keys.sqrMagnitude > 0f ? keys : stick;
 	}
 
 	/// <summary>

@@ -3,15 +3,19 @@ using UnityEngine.EventSystems;
 
 /// <summary>
 /// Fixed on-screen joystick. Only the pointer that pressed it steers it (spec §7), the stick keeps its analog
-/// magnitude (dead zone remapped, clamped to 1) and it resets on release, disable, focus loss and pause.
+/// magnitude (dead zone remapped, clamped to 1) and it resets on release, disable, focus loss, pause and whenever
+/// gameplay is not Playing (pause, dialogs, death, win, scene change).
 /// </summary>
 public class FixedJoystick : Joystick {
 
 	[Header("Fixed Joystick")]
 	[Range(0f, 0.5f)] public float deadZone = 0.1f;
 
-	// Pointer id that owns the stick, -1 when free.
-	private int activePointer = -1;
+	// uGUI uses -1 for the left mouse button, so ownership is a flag, not a sentinel id.
+	private bool owned;
+	private int activePointer;
+
+	public bool Owned { get { return owned; } }
 
 	/// <summary>Local point inside the background (pixels from its centre) to a stick vector of magnitude 0..1.</summary>
 	public static Vector2 ToInput(Vector2 local, float radius, float deadZone) {
@@ -25,19 +29,20 @@ public class FixedJoystick : Joystick {
 	}
 
 	public override void OnPointerDown(PointerEventData eventData) {
-		if (activePointer != -1)
+		if (owned || !GameFlow.IsGameplayActive)
 			return;
+		owned = true;
 		activePointer = eventData.pointerId;
 		Steer(eventData);
 	}
 
 	public override void OnDrag(PointerEventData eventData) {
-		if (eventData.pointerId == activePointer)
+		if (owned && eventData.pointerId == activePointer)
 			Steer(eventData);
 	}
 
 	public override void OnPointerUp(PointerEventData eventData) {
-		if (eventData.pointerId == activePointer)
+		if (owned && eventData.pointerId == activePointer)
 			ResetInput();
 	}
 
@@ -51,10 +56,15 @@ public class FixedJoystick : Joystick {
 	}
 
 	public void ResetInput() {
-		activePointer = -1;
+		owned = false;
 		inputVector = Vector2.zero;
 		if (handle != null)
 			handle.anchoredPosition = Vector2.zero;
+	}
+
+	void Update() {
+		if ((owned || inputVector != Vector2.zero) && !GameFlow.IsGameplayActive)
+			ResetInput();
 	}
 
 	void OnDisable() {

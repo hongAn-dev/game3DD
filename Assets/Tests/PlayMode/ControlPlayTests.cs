@@ -148,4 +148,41 @@ public class ControlPlayTests {
 		yield return null;
 		Assert.AreEqual(free, Vector3.Distance(orbit.transform.position, target.position + Vector3.up * 0.5f), 0.3f);
 	}
+
+	IEnumerator LoadLevel1() {
+		CampaignProgress.BeginRun(GameSettings.gameDifficulties.Normal);
+		GameSettings.showIntroLevelMessage = false;
+		SceneManager.LoadScene("Level1");
+		yield return null;
+		yield return null;
+	}
+
+	[UnityTest]
+	public IEnumerator MobileControlsStayVisibleOffDevice() {
+		yield return LoadLevel1();
+		FixedJoystick joystick = Object.FindObjectOfType<FixedJoystick>();
+		Assert.IsNotNull(joystick, "joystick active in the Editor/PC run");
+		Assert.IsTrue(joystick.isActiveAndEnabled);
+		Assert.IsNotNull(Object.FindObjectOfType<TouchLookArea>(), "look area active too");
+	}
+
+	[UnityTest]
+	public IEnumerator JoystickResetsWhenNotPlaying() {
+		yield return LoadLevel1();
+		FixedJoystick joystick = Object.FindObjectOfType<FixedJoystick>();
+		Canvas canvas = joystick.GetComponentInParent<Canvas>().rootCanvas;
+		Camera cam = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+		Vector2 centre = RectTransformUtility.WorldToScreenPoint(cam, joystick.background.position);
+		var press = new UnityEngine.EventSystems.PointerEventData(UnityEngine.EventSystems.EventSystem.current) {
+			pointerId = 0, position = centre + new Vector2(joystick.background.rect.width * 0.4f * canvas.scaleFactor, 0f) };
+		joystick.OnPointerDown(press);
+		Assert.Greater(joystick.inputVector.magnitude, 0.3f, "test steers the stick");
+		GameFlow.Pause();
+		yield return null;
+		Assert.AreEqual(Vector2.zero, joystick.inputVector, "pause drops the held vector");
+		Assert.IsFalse(joystick.Owned);
+		GameFlow.Resume();
+		yield return null;
+		Assert.AreEqual(Vector2.zero, joystick.inputVector, "nothing stale after resume");
+	}
 }

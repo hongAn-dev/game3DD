@@ -3,14 +3,19 @@ using UnityEngine.EventSystems;
 
 /// <summary>
 /// Transparent area on the right half of the mobile canvas: the pointer that starts a drag here turns the camera.
-/// Other pointers (the joystick finger sliding over, a second finger) are ignored until it lifts (spec §7).
+/// Other pointers (the joystick finger sliding over, a second finger) are ignored until it lifts; everything resets
+/// while gameplay is not Playing.
 /// </summary>
 public class TouchLookArea : MonoBehaviour, IPointerDownHandler, IDragHandler, IPointerUpHandler {
 
 	public static TouchLookArea Current { get; private set; }
 
-	private int activePointer = -1;
+	// uGUI uses -1 for the left mouse button, so ownership is a flag, not a sentinel id.
+	private bool owned;
+	private int activePointer;
 	private Vector2 delta;
+
+	public bool Owned { get { return owned; } }
 
 	/// <summary>Width of the area in screen pixels; a drag across all of it turns the camera 180 degrees.</summary>
 	public float Width {
@@ -28,18 +33,20 @@ public class TouchLookArea : MonoBehaviour, IPointerDownHandler, IDragHandler, I
 	}
 
 	public void OnPointerDown(PointerEventData eventData) {
-		if (activePointer == -1)
-			activePointer = eventData.pointerId;
+		if (owned || !GameFlow.IsGameplayActive)
+			return;
+		owned = true;
+		activePointer = eventData.pointerId;
 	}
 
 	public void OnDrag(PointerEventData eventData) {
 		// eventData.delta is already the distance moved this frame; no deltaTime scaling.
-		if (eventData.pointerId == activePointer)
+		if (owned && eventData.pointerId == activePointer)
 			delta += eventData.delta;
 	}
 
 	public void OnPointerUp(PointerEventData eventData) {
-		if (eventData.pointerId == activePointer)
+		if (owned && eventData.pointerId == activePointer)
 			ResetInput();
 	}
 
@@ -51,12 +58,17 @@ public class TouchLookArea : MonoBehaviour, IPointerDownHandler, IDragHandler, I
 	}
 
 	public void ResetInput() {
-		activePointer = -1;
+		owned = false;
 		delta = Vector2.zero;
 	}
 
 	void OnEnable() {
 		Current = this;
+	}
+
+	void Update() {
+		if ((owned || delta != Vector2.zero) && !GameFlow.IsGameplayActive)
+			ResetInput();
 	}
 
 	void OnDisable() {

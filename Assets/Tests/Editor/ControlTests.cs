@@ -89,6 +89,51 @@ public class ControlTests {
 	}
 
 	[Test]
+	public void PickInputUsesOneSource() {
+		Assert.AreEqual(new Vector2(1f, 0f), BallUserControl.PickInput(new Vector2(1f, 0f), new Vector2(0f, 1f)), "keys win whole, no X from keys + Y from stick");
+		Assert.AreEqual(new Vector2(0f, 0.6f), BallUserControl.PickInput(Vector2.zero, new Vector2(0f, 0.6f)));
+		Assert.AreEqual(Vector2.zero, BallUserControl.PickInput(Vector2.zero, Vector2.zero));
+	}
+
+	// uGUI gives the left mouse button pointer id -1: it must own the stick like any finger.
+	[Test]
+	public void JoystickOwnsTheMousePointer() {
+		FixedJoystick joystick = MakeJoystick();
+		joystick.OnPointerDown(Pointer(-1, new Vector2(80f, 0f), Vector2.zero));
+		Assert.IsTrue(joystick.Owned);
+		Vector2 held = joystick.inputVector;
+		Assert.Greater(held.magnitude, 0.5f);
+		joystick.OnPointerDown(Pointer(3, new Vector2(-80f, 0f), Vector2.zero));
+		joystick.OnDrag(Pointer(3, new Vector2(-80f, 0f), Vector2.zero));
+		Assert.AreEqual(held, joystick.inputVector, "a second pointer cannot steal the stick");
+		joystick.OnPointerUp(Pointer(3, Vector2.zero, Vector2.zero));
+		Assert.IsTrue(joystick.Owned);
+		joystick.OnDrag(Pointer(-1, new Vector2(0f, 90f), Vector2.zero));
+		Assert.Greater(joystick.inputVector.y, 0.5f);
+		joystick.OnPointerUp(Pointer(-1, Vector2.zero, Vector2.zero));
+		Assert.IsFalse(joystick.Owned);
+		Assert.AreEqual(Vector2.zero, joystick.inputVector);
+		Object.DestroyImmediate(joystick.gameObject);
+	}
+
+	[Test]
+	public void LookAreaOwnsTheMousePointer() {
+		TouchLookArea look = new GameObject("Look", typeof(RectTransform)).AddComponent<TouchLookArea>();
+		look.OnPointerDown(Pointer(-1, Vector2.zero, Vector2.zero));
+		Assert.IsTrue(look.Owned);
+		look.OnPointerDown(Pointer(5, Vector2.zero, Vector2.zero));
+		look.OnDrag(Pointer(5, Vector2.zero, new Vector2(40f, 0f)));
+		Assert.AreEqual(Vector2.zero, look.ConsumeDelta(), "the other finger does not turn the camera");
+		look.OnDrag(Pointer(-1, Vector2.zero, new Vector2(12f, 3f)));
+		Assert.AreEqual(new Vector2(12f, 3f), look.ConsumeDelta());
+		look.OnPointerUp(Pointer(5, Vector2.zero, Vector2.zero));
+		Assert.IsTrue(look.Owned);
+		look.OnPointerUp(Pointer(-1, Vector2.zero, Vector2.zero));
+		Assert.IsFalse(look.Owned);
+		Object.DestroyImmediate(look.gameObject);
+	}
+
+	[Test]
 	public void SafeAreaAnchorsForNotch() {
 		Rect anchors = SafeAreaFitter.Anchors(new Rect(100f, 0f, 2200f, 1080f), new Vector2(2400f, 1080f));
 		Assert.AreEqual(100f / 2400f, anchors.x, 0.0001f);
