@@ -236,7 +236,7 @@ public class GameManager : MonoBehaviour {
 			return;
 		score += amount;
 		if (canBeatLevel) {
-			mainScoreDisplay.text = score.ToString () + " / " + beatLevelScore.ToString ();
+			mainScoreDisplay.text = StoryText.EnergyLabel (score, beatLevelScore);
 		} else {
 			mainScoreDisplay.text = score.ToString ();
 		}

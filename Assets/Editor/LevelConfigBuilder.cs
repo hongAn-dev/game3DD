@@ -13,11 +13,11 @@ public static class LevelConfigBuilder {
 		if (!AssetDatabase.IsValidFolder(Folder))
 			AssetDatabase.CreateFolder("Assets/Resources", "Levels");
 
-		// Zone names and hazards follow spec §5.
-		Write("Level1", 1, "Bãi đáp hỏng", "Level2", 6, 3, 4, 2.5f, 3.5f, "Robo rơi xuống biển axit");
+		// Zone names follow spec §7.2 (scene IDs unchanged); hazards follow the first spec §5.
+		Write("Level1", 1, "Đảo hoang", "Level2", 6, 3, 4, 2.5f, 3.5f, "Robo rơi xuống biển axit");
 		Write("Level2", 2, "Trạm khai thác bỏ hoang", "Level3", 10, 5, 6, 2f, 3f, "Robo rơi xuống biển axit");
-		Write("Level3", 3, "Vùng địa nhiệt", "Level4", 14, 7, 8, 1.5f, 2.5f, "Robo chạm dung nham");
-		Write("Level4", 4, "Bãi phóng cũ", SceneRouter.EndingScene, 18, 8, 10, 1.5f, 2f, "Robo rơi xuống biển axit");
+		Write("Level3", 3, "Thung lũng dung nham", "Level4", 14, 7, 8, 1.5f, 2.5f, "Robo chạm dung nham");
+		Write("Level4", 4, "Bãi phóng bỏ hoang", SceneRouter.EndingScene, 18, 8, 10, 1.5f, 2f, "Robo rơi xuống biển axit");
 		// Energy batches (spec §5.1): cores per drop, upper bound included.
 		Batch("Level1", 1, 1);
 		Batch("Level2", 1, 2);
