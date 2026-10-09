@@ -290,6 +290,7 @@ public static class EndingSceneBuilder {
 
 		EditorUtility.SetDirty(timeline);
 		AssetDatabase.SaveAssets();
+		FlowUiSetup.TopBar(null, -1);   // sound toggle (spec §7.6), under the Ending canvas so the fade-in covers it
 		EditorSceneManager.SaveScene(scene, ScenePath);
 		if (!EditorBuildSettings.scenes.Any(s => s.path == ScenePath))
 			EditorBuildSettings.scenes = EditorBuildSettings.scenes.Concat(new[] { new EditorBuildSettingsScene(ScenePath, true) }).ToArray();

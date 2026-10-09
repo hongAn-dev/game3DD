@@ -30,6 +30,7 @@ public class SoundToggle : MonoBehaviour, IPointerEnterHandler, IPointerExitHand
 
 	public void Toggle() {
 		SoundSettings.SfxEnabled = !SoundSettings.SfxEnabled;
+		PlayerPrefs.Save();   // kept even if the app is killed right after
 		Show();
 	}
 

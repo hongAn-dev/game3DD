@@ -16,7 +16,17 @@ public class MainMenuPanels : MonoBehaviour {
 	public Slider ambience;
 
 	public void OpenGuide() {
-		dialog.Show(StoryText.Guide(), -1, "Đóng", null);
+		dialog.ShowClosable(StoryText.Guide(), "Đóng", null);
+	}
+
+	// Android Back / Escape closes the guide or the settings, never the app.
+	void Update() {
+		if (!Input.GetKeyDown(KeyCode.Escape))
+			return;
+		if (dialog.IsOpen)
+			dialog.Finish();
+		else if (settings.activeSelf)
+			CloseSettings();
 	}
 
 	public void OpenSettings() {

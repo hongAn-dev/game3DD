@@ -212,6 +212,8 @@ public class StoryPlayTests {
 		toggle.GetComponent<UnityEngine.UI.Button>().onClick.Invoke();
 		Assert.IsTrue(SoundSettings.SfxEnabled);
 		Assert.AreEqual(toggle.soundOn, toggle.icon.sprite);
+		Assert.AreEqual(1, clicks, "unmuting answers with one click (the click sound is wired, after the toggle)");
+		Assert.AreEqual(1, PlayerPrefs.GetInt(SoundSettings.SfxKey, 0), "saved");
 		Sfx.Played -= count;
 		SoundSettings.SfxEnabled = saved;
 	}
@@ -270,6 +272,8 @@ public class StoryPlayTests {
 		Assert.AreEqual(0.7f, SoundSettings.SfxVolume, 0.001f);
 		Assert.AreEqual(0.2f, SoundSettings.AmbienceVolume, 0.001f);
 		Assert.AreEqual(1.5f, ThirdPersonOrbitCamera.Sensitivity, 0.001f);
+		SoundSettings.Reload();
+		Assert.AreEqual(0.4f, SoundSettings.MusicVolume, 0.001f, "read back from the device");
 		panels.CloseSettings();
 		Assert.IsFalse(panels.settings.activeSelf);
 		SoundSettings.MusicVolume = music;
@@ -293,10 +297,32 @@ public class StoryPlayTests {
 		CollectionAssert.IsSubsetOf(new[] { "Robo lạc lối", "Vật phẩm hỗ trợ", "Vật phẩm tăng tốc", "Âm thanh và tạm dừng" }, titles);
 		Assert.AreEqual("Đóng", dialog.startButton.GetComponentInChildren<UnityEngine.UI.Text>().text);
 		dialog.Finish();
+		panels.OpenGuide();
+		Assert.IsTrue(dialog.skipButton.gameObject.activeSelf, "Đóng on the first page too");
+		Assert.AreEqual("Đóng", dialog.skipButton.GetComponentInChildren<UnityEngine.UI.Text>().text);
+		dialog.Skip();
+		Assert.IsFalse(dialog.IsOpen, "closed from page 1");
 		yield return null;
 		Assert.IsFalse(dialog.IsOpen);
 		Assert.AreEqual(SceneRouter.MainMenuScene, SceneManager.GetActiveScene().name);
 		Assert.IsFalse(CampaignProgress.IsActiveRun);
 		Assert.IsFalse(CampaignProgress.TutorialPending);
+	}
+
+	// A double tap on "Tiếp theo" must not also press "Bắt đầu" (same place) and skip the Đảo hoang card.
+	[UnityTest]
+	public IEnumerator DoubleTapDoesNotSkipTheLastPage() {
+		yield return NewGame();
+		for (int i = 0; i < 4; i++)
+			dialog.Next();
+		yield return new WaitForSecondsRealtime(DialogPanel.TapGuard + 0.05f);
+		dialog.nextButton.onClick.Invoke();
+		dialog.startButton.onClick.Invoke();   // second tap of the double tap
+		Assert.IsTrue(dialog.IsOpen);
+		Assert.AreEqual("Đảo hoang", dialog.title.text);
+		yield return new WaitForSecondsRealtime(DialogPanel.TapGuard + 0.05f);
+		dialog.startButton.onClick.Invoke();
+		Assert.IsFalse(dialog.IsOpen);
+		Assert.AreEqual(FlowState.Playing, GameFlow.State);
 	}
 }

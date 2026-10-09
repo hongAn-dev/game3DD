@@ -39,7 +39,7 @@ public static class FlowUiSetup {
 		EditorSceneManager.MarkSceneDirty(menu);
 		EditorSceneManager.SaveScene(menu);
 		var ending = EditorSceneManager.OpenScene("Assets/Scenes/Ending.unity", OpenSceneMode.Single);
-		TopBar(null);
+		TopBar(null, -1);
 		EditorSceneManager.MarkSceneDirty(ending);
 		EditorSceneManager.SaveScene(ending);
 		Debug.Log("FlowUiSetup: done");
@@ -49,7 +49,7 @@ public static class FlowUiSetup {
 		GameObject old = GameObject.Find("Story Canvas");
 		if (old != null)
 			Object.DestroyImmediate(old);
-		GameObject root = Canvas("Story Canvas", 40);
+		GameObject root = Canvas("Story Canvas", 70);   // over the top bar: its buttons never sit on the dialog box
 
 		RectTransform backdrop = Rect("Dialog", root.transform, Vector2.zero);
 		Stretch(backdrop);
@@ -71,8 +71,8 @@ public static class FlowUiSetup {
 
 		dialog.backButton = Button("Back Button", dialog.box, -490f, 320f, "Quay lại", dialog.Back);
 		dialog.skipButton = Button("Skip Button", dialog.box, -40f, 500f, "Bỏ qua hướng dẫn", dialog.Skip);
-		dialog.nextButton = Button("Next Button", dialog.box, 480f, 340f, "Tiếp theo", dialog.Next);
-		dialog.startButton = Button("Start Button", dialog.box, 480f, 340f, "Bắt đầu", dialog.Finish);
+		dialog.nextButton = Button("Next Button", dialog.box, 480f, 340f, "Tiếp theo", dialog.PressNext);
+		dialog.startButton = Button("Start Button", dialog.box, 480f, 340f, "Bắt đầu", dialog.PressFinish);
 		backdrop.gameObject.SetActive(false);
 		return dialog;
 	}
@@ -82,7 +82,7 @@ public static class FlowUiSetup {
 		GameObject old = GameObject.Find("Settings Canvas");
 		if (old != null)
 			Object.DestroyImmediate(old);
-		GameObject root = Canvas("Settings Canvas", 45);
+		GameObject root = Canvas("Settings Canvas", 70);
 		MainMenuPanels panels = root.AddComponent<MainMenuPanels>();
 		panels.dialog = dialog;
 
@@ -139,15 +139,18 @@ public static class FlowUiSetup {
 		rect.SetSiblingIndex(parent.Find("Play Button").GetSiblingIndex() + 1);
 	}
 
-	// Spec §7.6: 110×110 touch areas (≈ 48 dp) with 60-unit icons (≈ 26 dp), pause at the corner, sound 18 to its left,
-	// inside the safe area, above the pause panel (order 60 > 50) so the sound toggle works while paused.
-	const float Touch = 110f, Margin = 24f, Gap = 18f;
+	// Spec §7.6. The bar scales by height: 1080 units = the phone's short side, 360–411 dp, so 1 dp ≈ 3 units.
+	// 144×144 touch areas (48 dp), 78-unit icons (26 dp), pause at the corner, sound 24 (8 dp) to its left, inside the
+	// safe area, above the pause panel (60 > 50) so the sound toggle works while paused; dialogs (70) cover it.
+	public const float UnitsPerDp = 3f, Touch = 48f * UnitsPerDp, Margin = 24f, Gap = 8f * UnitsPerDp, Icon = 26f * UnitsPerDp;
 
-	static void TopBar(PauseController pause) {
+	/// <param name="pause">The level's pause controller, or null (menu, Ending: sound toggle only).</param>
+	/// <param name="order">Canvas order; the Ending draws it under its own canvas so the fade-in covers it.</param>
+	public static void TopBar(PauseController pause, int order = 60) {
 		GameObject old = GameObject.Find("Top Bar Canvas");
 		if (old != null)
 			Object.DestroyImmediate(old);
-		GameObject root = Canvas("Top Bar Canvas", 60);
+		GameObject root = Canvas("Top Bar Canvas", order);
 		RectTransform safe = Rect("Safe Area", root.transform, Vector2.zero);
 		Stretch(safe);
 		safe.gameObject.AddComponent<SafeAreaFitter>();
@@ -173,10 +176,23 @@ public static class FlowUiSetup {
 
 		if (pause != null) {
 			Image pauseIcon;
-			Button button = IconButton("Pause Button", safe, -Margin, Sprite("pause"), out pauseIcon);
-			UnityEventTools.AddPersistentListener(button.onClick, pause.Toggle);
-			pause.pauseButton = button.gameObject;
+			IconButton("Pause Button", safe, -Margin, Sprite("pause"), out pauseIcon);
+			WirePauseButton(pause);
 		}
+	}
+
+	/// <summary>Points the top bar's pause button at the level's PauseController (ControlSetup rebuilds that).</summary>
+	public static void WirePauseButton(PauseController pause) {
+		GameObject bar = GameObject.Find("Top Bar Canvas");
+		Transform t = bar != null ? bar.transform.Find("Safe Area/Pause Button") : null;
+		if (t == null)
+			return;
+		Button button = t.GetComponent<Button>();
+		for (int i = button.onClick.GetPersistentEventCount() - 1; i >= 0; i--)
+			if (button.onClick.GetPersistentMethodName(i) == "Toggle")
+				UnityEventTools.RemovePersistentListener(button.onClick, i);
+		UnityEventTools.AddPersistentListener(button.onClick, pause.Toggle);
+		pause.pauseButton = t.gameObject;
 	}
 
 	static Button IconButton(string name, Transform parent, float x, Sprite sprite, out Image icon) {
@@ -185,7 +201,8 @@ public static class FlowUiSetup {
 		rect.anchoredPosition = new Vector2(x, -Margin);
 		rect.gameObject.AddComponent<Image>();
 		Button button = rect.gameObject.AddComponent<Button>();
-		RectTransform iconRect = Rect("Icon", rect, new Vector2(60f, 60f));
+		button.navigation = new Navigation { mode = Navigation.Mode.None };   // a mouse click must not leave it selected for Enter/Space
+		RectTransform iconRect = Rect("Icon", rect, new Vector2(Icon, Icon));
 		icon = iconRect.gameObject.AddComponent<Image>();
 		icon.sprite = sprite;
 		icon.preserveAspect = true;

@@ -41,6 +41,7 @@ public static class ControlSetup {
 			MobileCanvas();
 			RobotUsesPrefabTuning();
 			PauseBackdropBlocks(pause);
+			FlowUiSetup.WirePauseButton(pause);   // the rebuilt controller keeps the top bar's pause button working
 			DecorationsIgnoreRays();
 			EditorSceneManager.MarkSceneDirty(scene);
 			EditorSceneManager.SaveScene(scene);
