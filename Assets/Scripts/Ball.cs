@@ -49,8 +49,9 @@ public class Ball : MonoBehaviour {
 		SphereCollider sphere = GetComponent<SphereCollider>();
 		if (sphere != null)
 			m_Radius = Mathf.Max(0.05f, sphere.radius * Mathf.Max(transform.lossyScale.x, transform.lossyScale.y, transform.lossyScale.z));
-		// Set the maximum angular velocity.
-		GetComponent<Rigidbody>().maxAngularVelocity = m_MaxAngularVelocity;
+		// Set the maximum angular velocity, high enough for the rolling spin at Overdrive speed (otherwise the spin is
+		// capped and the ball skids).
+		GetComponent<Rigidbody>().maxAngularVelocity = Mathf.Max(m_MaxAngularVelocity, m_MaxSpeed * Overdrive.SpeedBoost / m_Radius * 1.1f);
 	}
 
 	/// <summary>
@@ -77,12 +78,13 @@ public class Ball : MonoBehaviour {
 		// Clamp only the horizontal part of the velocity (an easing Overdrive lowers maxSpeed gradually).
 		if (horizontal.magnitude > maxSpeed)
 			horizontal = horizontal.normalized * maxSpeed;
-		if (!m_UseTorque) {
+		bool torqueDriving = m_UseTorque && input >= 0.1f;
+		if (!torqueDriving) {
 			// Set the new velocity directly (an AddForce would only show up next step, so the clamp and the spin below
 			// would act on the old speed) and, on the ground, spin exactly as fast as the ball rolls: otherwise contact
 			// friction turns part of every push and brake into spin and the real rates drop to ~5/7.
 			m_Rigidbody.velocity = new Vector3(horizontal.x, velocity.y, horizontal.z);
-			if (grounded)
+			if (grounded && !m_UseTorque)
 				m_Rigidbody.angularVelocity = Vector3.Cross(Vector3.up, horizontal) / m_Radius;
 		} else if (new Vector3(velocity.x, 0f, velocity.z).magnitude > maxSpeed) {
 			m_Rigidbody.velocity = new Vector3(horizontal.x, velocity.y, horizontal.z);

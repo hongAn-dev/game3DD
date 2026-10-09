@@ -93,6 +93,7 @@ public class ControlTests {
 		Assert.AreEqual(new Vector2(1f, 0f), BallUserControl.PickInput(new Vector2(1f, 0f), new Vector2(0f, 1f)), "keys win whole, no X from keys + Y from stick");
 		Assert.AreEqual(new Vector2(0f, 0.6f), BallUserControl.PickInput(Vector2.zero, new Vector2(0f, 0.6f)));
 		Assert.AreEqual(Vector2.zero, BallUserControl.PickInput(Vector2.zero, Vector2.zero));
+		Assert.AreEqual(new Vector2(0f, 1f), BallUserControl.PickInput(new Vector2(0.005f, 0f), new Vector2(0f, 1f)), "a decaying key axis does not hide the stick");
 	}
 
 	// uGUI gives the left mouse button pointer id -1: it must own the stick like any finger.
@@ -114,6 +115,33 @@ public class ControlTests {
 		Assert.IsFalse(joystick.Owned);
 		Assert.AreEqual(Vector2.zero, joystick.inputVector);
 		Object.DestroyImmediate(joystick.gameObject);
+	}
+
+	// Right/middle mouse drags are camera orbit/pan for the PC; they must not grab the stick or the look area.
+	[Test]
+	public void OnlyLeftButtonOrTouchTakesControl() {
+		FixedJoystick joystick = MakeJoystick();
+		var right = Pointer(-2, new Vector2(80f, 0f), Vector2.zero);
+		right.button = PointerEventData.InputButton.Right;
+		joystick.OnPointerDown(right);
+		Assert.IsFalse(joystick.Owned);
+		Assert.AreEqual(Vector2.zero, joystick.inputVector);
+		TouchLookArea look = new GameObject("Look", typeof(RectTransform)).AddComponent<TouchLookArea>();
+		var middle = Pointer(-3, Vector2.zero, Vector2.zero);
+		middle.button = PointerEventData.InputButton.Middle;
+		look.OnPointerDown(middle);
+		Assert.IsFalse(look.Owned);
+		Object.DestroyImmediate(joystick.gameObject);
+		Object.DestroyImmediate(look.gameObject);
+	}
+
+	[Test]
+	public void PauseBackdropBlocksTouches() {
+		foreach (LevelConfig level in LevelCatalog.All) {
+			EditorSceneManager.OpenScene("Assets/Scenes/" + level.levelId + ".unity", OpenSceneMode.Single);
+			PauseController pause = Object.FindObjectOfType<PauseController>(true);
+			Assert.IsTrue(pause.overlay.GetComponent<UnityEngine.UI.Image>().raycastTarget, level.levelId + ": taps behind the pause menu must not reach the HUD");
+		}
 	}
 
 	[Test]

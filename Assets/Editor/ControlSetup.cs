@@ -40,6 +40,7 @@ public static class ControlSetup {
 			OrbitCamera();
 			MobileCanvas(pause);
 			RobotUsesPrefabTuning();
+			PauseBackdropBlocks(pause);
 			DecorationsIgnoreRays();
 			EditorSceneManager.MarkSceneDirty(scene);
 			EditorSceneManager.SaveScene(scene);
@@ -88,6 +89,12 @@ public static class ControlSetup {
 			if (property != null && property.prefabOverride)
 				PrefabUtility.RevertPropertyOverride(property, InteractionMode.AutomatedAction);
 		}
+	}
+
+	// The pause dim keeps catching taps so the HUD pause button behind it cannot resume the game.
+	static void PauseBackdropBlocks(PauseController pause) {
+		GetOrAdd<ModalBackdrop>(pause.overlay);
+		pause.overlay.GetComponent<Image>().raycastTarget = true;
 	}
 
 	static bool Interactive(Transform t) {

@@ -97,6 +97,16 @@ public class ControlPlayTests {
 		Assert.LessOrEqual(travel.magnitude, 2.3f, "stop distance");
 	}
 
+	// Overdrive top speed (11 × 1.3) is reached and the ball rolls without skidding (spin not capped below v/r).
+	[UnityTest]
+	public IEnumerator OverdriveSpeedRollsWithoutSkidding() {
+		yield return FlatGround();
+		ball.SpeedMultiplier = Overdrive.SpeedBoost;
+		yield return Push(Vector3.forward, 2.5f);
+		Assert.Greater(Horizontal(), ball.MaxSpeed * Overdrive.SpeedBoost - 0.1f);
+		Assert.AreEqual(Horizontal() / 0.5f, body.angularVelocity.magnitude, 0.5f, "spin keeps up with the roll");
+	}
+
 	[UnityTest]
 	public IEnumerator SpeedCapDoesNotClampFalling() {
 		yield return FlatGround();

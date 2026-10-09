@@ -72,9 +72,12 @@ public class BallUserControl : MonoBehaviour {
 			move = CameraRelative(h, v, Vector3.forward, Vector3.right);
 	}
 
-	/// <summary>One input source at a time: the keys when any key is held, otherwise the on-screen stick.</summary>
+	/// <summary>
+	/// One input source at a time: the keys when a key is held, otherwise the on-screen stick. A key axis still
+	/// decaying after release (below 0.1 magnitude) does not count, so the stick answers at once.
+	/// </summary>
 	public static Vector2 PickInput(Vector2 keys, Vector2 stick) {
-		return keys.sqrMagnitude > 0f ? keys : stick;
+		return keys.sqrMagnitude > 0.01f ? keys : stick;
 	}
 
 	/// <summary>

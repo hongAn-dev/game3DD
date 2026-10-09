@@ -29,7 +29,8 @@ public class FixedJoystick : Joystick {
 	}
 
 	public override void OnPointerDown(PointerEventData eventData) {
-		if (owned || !GameFlow.IsGameplayActive)
+		// Touches report the left button; right/middle mouse drags belong to the camera's own orbit/zoom.
+		if (owned || !GameFlow.IsGameplayActive || eventData.button != PointerEventData.InputButton.Left)
 			return;
 		owned = true;
 		activePointer = eventData.pointerId;
