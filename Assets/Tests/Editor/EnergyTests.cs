@@ -54,21 +54,51 @@ public class EnergyTests {
 		return max - min;
 	}
 
+	// Spec §5.1, same on every difficulty.
 	[Test]
-	public void AllowedAliveShrinksWithRemainingNeed() {
-		Assert.AreEqual(5, EnergySpawnDirector.AllowedAlive(5, 6, 0));
-		Assert.AreEqual(1, EnergySpawnDirector.AllowedAlive(5, 6, 5));
-		Assert.AreEqual(0, EnergySpawnDirector.AllowedAlive(5, 6, 6));
-		Assert.AreEqual(0, EnergySpawnDirector.AllowedAlive(5, 6, 9));
+	public void EnergyConfigFollowsTheTable() {
+		int[] target = { 6, 10, 14, 18 }, atStart = { 3, 5, 7, 8 }, cap = { 4, 6, 8, 10 }, batchMin = { 1, 1, 2, 2 }, batchMax = { 1, 2, 3, 4 };
+		float[] intervalMin = { 2.5f, 2.0f, 1.5f, 1.5f }, intervalMax = { 3.5f, 3.0f, 2.5f, 2.0f };
+		for (int i = 0; i < 4; i++) {
+			LevelConfig c = LevelCatalog.All[i];
+			Assert.AreEqual(target[i], c.energyTarget, c.levelId);
+			Assert.AreEqual(atStart[i], c.energyAtStart, c.levelId);
+			Assert.AreEqual(cap[i], c.energyCap, c.levelId);
+			Assert.AreEqual(intervalMin[i], c.energyIntervalMin, 0.001f, c.levelId);
+			Assert.AreEqual(intervalMax[i], c.energyIntervalMax, 0.001f, c.levelId);
+			Assert.AreEqual(batchMin[i], c.energyBatchMin, c.levelId);
+			Assert.AreEqual(batchMax[i], c.energyBatchMax, c.levelId);
+		}
 	}
 
 	[Test]
-	public void PickPointPrefersFarFromCoresAndPlayer() {
-		var points = new List<Vector3> { new Vector3(0, 0, 0), new Vector3(10, 0, 0), new Vector3(20, 0, 0), new Vector3(2, 0, 0) };
-		var occupied = new List<Vector3> { new Vector3(0, 0, 0) };
-		// Player stands on (20,0,0): that point is too close; (10,0,0) is farthest from the occupied core.
-		Assert.AreEqual(1, EnergySpawnDirector.PickPoint(points, occupied, new Vector3(20, 0, 0), 4f));
-		Assert.AreEqual(-1, EnergySpawnDirector.PickPoint(new List<Vector3> { Vector3.zero }, occupied, new Vector3(50, 0, 0), 4f));
+	public void AllowedAliveCapsAtTenAndRemaining() {
+		Assert.AreEqual(4, EnergySpawnDirector.AllowedAlive(4, 6, 0));
+		Assert.AreEqual(10, EnergySpawnDirector.AllowedAlive(12, 18, 0), "never more than 10");
+		Assert.AreEqual(1, EnergySpawnDirector.AllowedAlive(10, 18, 17));
+		Assert.AreEqual(0, EnergySpawnDirector.AllowedAlive(10, 18, 18));
+		Assert.AreEqual(0, EnergySpawnDirector.AllowedAlive(10, 18, 20));
+	}
+
+	[Test]
+	public void SpawnCountUsesFreeSlots() {
+		Assert.AreEqual(1, EnergySpawnDirector.SpawnCount(4, 10, 7, 2), "only the free slot");
+		Assert.AreEqual(0, EnergySpawnDirector.SpawnCount(3, 2, 2, 0));
+		Assert.AreEqual(0, EnergySpawnDirector.SpawnCount(3, 2, 1, 2), "reservations count");
+		Assert.AreEqual(2, EnergySpawnDirector.SpawnCount(2, 8, 3, 1));
+	}
+
+	[Test]
+	public void RandomBatchIncludesTheUpperBound() {
+		bool sawMax = false, sawMin = false;
+		for (int i = 0; i < 500; i++) {
+			int n = EnergySpawnDirector.RandomBatch(2, 4);
+			Assert.That(n, Is.InRange(2, 4));
+			sawMax |= n == 4;
+			sawMin |= n == 2;
+		}
+		Assert.IsTrue(sawMax && sawMin);
+		Assert.AreEqual(1, EnergySpawnDirector.RandomBatch(1, 1));
 	}
 
 	[Test]
@@ -93,7 +123,7 @@ public class EnergyTests {
 		foreach (LevelConfig level in LevelCatalog.All) {
 			EditorSceneManager.OpenScene("Assets/Scenes/" + level.levelId + ".unity", OpenSceneMode.Single);
 			EnergySpawnDirector director = Object.FindObjectOfType<EnergySpawnDirector>();
-			Assert.LessOrEqual(director.landingPoints.Length, level.energyCap * 2 + 6, level.levelId);
+			Assert.LessOrEqual(director.landingPoints.Length, EnergySetup.PointTarget(level.order) + 2, level.levelId);
 			foreach (Transform point in director.landingPoints) {
 				RaycastHit hit;
 				Assert.IsTrue(Physics.Raycast(point.position + Vector3.up, Vector3.down, out hit, 4f, ~0, QueryTriggerInteraction.Ignore), point.name);
@@ -103,6 +133,51 @@ public class EnergyTests {
 					Assert.IsTrue(WalkableGrid.Ground(p.x, p.z, out near) && Mathf.Abs(near.point.y - hit.point.y) <= 1.5f,
 						level.levelId + " " + point.name + " sits on a ledge/prop top");
 				}
+			}
+		}
+	}
+
+	// Spec §5.2: at least 12 / 20 / 28 / 36 landing points.
+	[Test]
+	public void DirectorTimingsAreWrittenIntoEveryScene() {
+		foreach (LevelConfig level in LevelCatalog.All) {
+			EditorSceneManager.OpenScene("Assets/Scenes/" + level.levelId + ".unity", OpenSceneMode.Single);
+			EnergySpawnDirector d = Object.FindObjectOfType<EnergySpawnDirector>();
+			Assert.AreEqual(new[] { 0.35f, 0.5f, 12f, 3f, 2f }, new[] { d.markerDuration, d.dropDuration, d.staleDelay, d.minPlayerDistance, d.minSpacing }, level.levelId);
+			Assert.AreEqual(-1f, d.intervalOverride, level.levelId);
+		}
+	}
+
+	[Test]
+	public void LandingPointCountsMeetTheTarget() {
+		int[] target = { 12, 20, 28, 36 };
+		for (int i = 0; i < 4; i++) {
+			LevelConfig level = LevelCatalog.All[i];
+			EditorSceneManager.OpenScene("Assets/Scenes/" + level.levelId + ".unity", OpenSceneMode.Single);
+			Assert.GreaterOrEqual(Object.FindObjectOfType<EnergySpawnDirector>().landingPoints.Length, target[i], level.levelId);
+		}
+	}
+
+	[Test]
+	public void LandingPointsHaveAPathToTheStart() {
+		foreach (LevelConfig level in LevelCatalog.All) {
+			EditorSceneManager.OpenScene("Assets/Scenes/" + level.levelId + ".unity", OpenSceneMode.Single);
+			var nav = UnityEngine.AI.NavMesh.AddNavMeshData(Object.FindObjectOfType<NavMeshLoader>().data);
+			try {
+				Vector3 start = WalkableGrid.PlayerStart();
+				RaycastHit ground;
+				WalkableGrid.Ground(start.x, start.z, out ground);
+				UnityEngine.AI.NavMeshHit from;
+				Assert.IsTrue(UnityEngine.AI.NavMesh.SamplePosition(ground.point, out from, 3f, UnityEngine.AI.NavMesh.AllAreas), level.levelId);
+				foreach (Transform point in Object.FindObjectOfType<EnergySpawnDirector>().landingPoints) {
+					UnityEngine.AI.NavMeshHit to;
+					var path = new UnityEngine.AI.NavMeshPath();
+					Assert.IsTrue(UnityEngine.AI.NavMesh.SamplePosition(point.position, out to, 1.5f, UnityEngine.AI.NavMesh.AllAreas)
+						&& UnityEngine.AI.NavMesh.CalculatePath(from.position, to.position, UnityEngine.AI.NavMesh.AllAreas, path)
+						&& path.status == UnityEngine.AI.NavMeshPathStatus.PathComplete, level.levelId + " " + point.name + " cannot be reached");
+				}
+			} finally {
+				nav.Remove();
 			}
 		}
 	}

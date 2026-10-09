@@ -1,13 +1,16 @@
 using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.AI;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 
 public class EnergyPlayTests {
 
 	EnergySpawnDirector director;
+	Transform player;
 
 	IEnumerator Load(string level, GameSettings.gameDifficulties difficulty) {
 		CampaignProgress.BeginRun(difficulty);
@@ -16,40 +19,156 @@ public class EnergyPlayTests {
 		yield return null;
 		yield return null;
 		director = Object.FindObjectOfType<EnergySpawnDirector>();
+		player = GameObject.FindWithTag("Player").transform;
+		player.GetComponent<Health>().numberOfLives = 999;
+		EnemyDirector enemies = Object.FindObjectOfType<EnemyDirector>();
+		if (enemies != null)
+			enemies.enabled = false;
 	}
 
-	int Alive() {
-		return director.AliveCount;
+	[TearDown]
+	public void Reset() {
+		GameFlow.ResetForScene();
+	}
+
+	void ClearCores() {
+		foreach (Treasure t in Object.FindObjectsOfType<Treasure>())
+			Object.Destroy(t.gameObject);
+	}
+
+	// Path length from the robot's ground point to a position, as the director measures it.
+	float PathFromRobot(Vector3 to) {
+		float ground = float.MinValue;
+		foreach (RaycastHit hit in Physics.RaycastAll(player.position + Vector3.up, Vector3.down, 60f, ~0, QueryTriggerInteraction.Ignore))
+			if (hit.collider.attachedRigidbody == null)
+				ground = Mathf.Max(ground, hit.point.y);
+		NavMeshHit from, target;
+		if (!NavMesh.SamplePosition(new Vector3(player.position.x, ground, player.position.z), out from, 3f, NavMesh.AllAreas)
+			|| !NavMesh.SamplePosition(to, out target, 1.5f, NavMesh.AllAreas))
+			return float.MaxValue;
+		var path = new NavMeshPath();
+		NavMesh.CalculatePath(from.position, target.position, NavMesh.AllAreas, path);
+		return path.status == NavMeshPathStatus.PathComplete ? EnergySpawnDirector.PathLength(path) : float.MaxValue;
 	}
 
 	[UnityTest]
 	public IEnumerator StartsWithConfiguredCores() {
-		yield return Load("Level1", GameSettings.gameDifficulties.Easy);
-		Assert.AreEqual(LevelCatalog.Get("Level1").energyAtStart, Object.FindObjectsOfType<Treasure>().Length);
+		foreach (string level in new[] { "Level1", "Level2", "Level3", "Level4" }) {
+			yield return Load(level, GameSettings.gameDifficulties.Easy);
+			Assert.AreEqual(LevelCatalog.Get(level).energyAtStart, Object.FindObjectsOfType<Treasure>().Length, level);
+		}
 	}
 
 	[UnityTest]
-	public IEnumerator NeverExceedsCap() {
-		yield return Load("Level1", GameSettings.gameDifficulties.Easy);
+	public IEnumerator FirstCoreIsFourToTenMetresByPath() {
+		foreach (string level in new[] { "Level1", "Level2", "Level3", "Level4" }) {
+			yield return Load(level, GameSettings.gameDifficulties.Normal);
+			float nearest = Object.FindObjectsOfType<Treasure>().Select(t => PathFromRobot(t.transform.position)).Min();
+			Assert.That(nearest, Is.InRange(3.5f, 10.5f), level);
+		}
+	}
+
+	[UnityTest]
+	public IEnumerator NeverExceedsCapWithBatches() {
+		yield return Load("Level4", GameSettings.gameDifficulties.Normal);
 		director.intervalOverride = 0.2f;
-		int cap = LevelCatalog.Get("Level1").energyCap, max = 0;
-		float end = Time.time + 3f;
+		int cap = Mathf.Min(LevelCatalog.Get("Level4").energyCap, EnergySpawnDirector.MaxAlive), max = 0;
+		float end = Time.time + 4f;
 		while (Time.time < end) {
-			max = Mathf.Max(max, Alive());
+			max = Mathf.Max(max, director.AliveCount);
+			Assert.LessOrEqual(director.AliveCount, cap);
 			yield return null;
 		}
-		Assert.LessOrEqual(max, cap);
 		Assert.AreEqual(cap, max, "fills up to the cap");
+	}
+
+	[UnityTest]
+	public IEnumerator BatchesDropSeveralCores() {
+		yield return Load("Level4", GameSettings.gameDifficulties.Normal);
+		ClearCores();
+		director.intervalOverride = 0.1f;
+		int most = 0;
+		float end = Time.time + 1f;
+		while (Time.time < end) {
+			most = Mathf.Max(most, director.ReservedCount);
+			yield return null;
+		}
+		Assert.GreaterOrEqual(most, 2, "a batch reserves several points at once");
+	}
+
+	[UnityTest]
+	public IEnumerator BatchCoresNeverShareAPoint() {
+		yield return Load("Level4", GameSettings.gameDifficulties.Normal);
+		ClearCores();
+		director.intervalOverride = 0.1f;
+		float end = Time.time + 3f;
+		while (Time.time < end) {
+			List<Vector3> taken = director.Occupied();
+			for (int i = 0; i < taken.Count; i++)
+				for (int j = i + 1; j < taken.Count; j++)
+					Assert.GreaterOrEqual(Vector3.Distance(taken[i], taken[j]), 1.9f, "two cores on one point");
+			yield return null;
+		}
+	}
+
+	// Marker ~0.35 s then a 0.5 s fall; the trigger only turns on after landing. Batch test frames are long, so the
+	// bounds allow a few frames of detection/overshoot (measured with the largest frame time seen).
+	[UnityTest]
+	public IEnumerator MarkerAndFallTiming() {
+		yield return Load("Level1", GameSettings.gameDifficulties.Normal);
+		ClearCores();
+		director.intervalOverride = 0.1f;
+		float marked = -1f, frame = 0f;
+		while (marked < 0f) {
+			if (Object.FindObjectsOfType<GameObject>().Any(g => g.name == "Energy Landing Marker"))
+				marked = Time.time;
+			yield return null;
+		}
+		Treasure falling = null;
+		while (falling == null) {
+			frame = Mathf.Max(frame, Time.deltaTime);
+			falling = Object.FindObjectOfType<Treasure>();
+			yield return null;
+		}
+		float appeared = Time.time - marked;
+		Assert.IsFalse(falling.GetComponent<Collider>().enabled, "no pickup while falling");
+		while (!falling.GetComponent<Collider>().enabled) {
+			frame = Mathf.Max(frame, Time.deltaTime);
+			yield return null;
+		}
+		float landed = Time.time - marked;
+		Assert.That(appeared, Is.InRange(director.markerDuration - frame, director.markerDuration + 3f * frame), "marker ~0.35 s");
+		Assert.That(landed, Is.InRange(director.markerDuration + director.dropDuration - frame,
+			director.markerDuration + director.dropDuration + 4f * frame), "landed after 0.35 + 0.5 s");
+		Assert.AreEqual(0.35f, director.markerDuration, 0.001f);
+		Assert.AreEqual(0.5f, director.dropDuration, 0.001f);
+	}
+
+	[UnityTest]
+	public IEnumerator WinCancelsFallingCores() {
+		yield return Load("Level2", GameSettings.gameDifficulties.Normal);
+		ClearCores();
+		director.intervalOverride = 0.1f;
+		while (director.ReservedCount == 0)
+			yield return null;
+		int score = GameManager.gm.score;
+		int landed = Object.FindObjectsOfType<Treasure>().Count(t => t.GetComponent<Collider>().enabled);
+		GameFlow.CompleteLevel();
+		yield return new WaitForSeconds(1.5f);
+		Assert.AreEqual(0, director.ReservedCount);
+		Assert.IsFalse(Object.FindObjectsOfType<GameObject>().Any(g => g.name == "Energy Landing Marker"), "markers removed");
+		Assert.AreEqual(landed, Object.FindObjectsOfType<Treasure>().Length, "nothing landed after the win");
+		Assert.AreEqual(score, GameManager.gm.score);
 	}
 
 	[UnityTest]
 	public IEnumerator DirectorDoesNotSpawnWhilePaused() {
 		yield return Load("Level1", GameSettings.gameDifficulties.Easy);
 		director.intervalOverride = 0.1f;
-		int before = Alive();
+		int before = director.AliveCount;
 		GameFlow.Pause();
 		yield return new WaitForSecondsRealtime(1f);
-		int during = Alive();
+		int during = director.AliveCount;
 		GameFlow.Resume();
 		Assert.AreEqual(before, during);
 	}
@@ -59,32 +178,32 @@ public class EnergyPlayTests {
 		yield return Load("Level1", GameSettings.gameDifficulties.Easy);
 		director.intervalOverride = 0.2f;
 		yield return new WaitForSeconds(3f);
-		int cap = Alive();
+		int cap = director.AliveCount;
 		Object.Destroy(Object.FindObjectsOfType<Treasure>().First().gameObject);
 		yield return null;
-		Assert.AreEqual(cap - 1, Alive());
+		Assert.AreEqual(cap - 1, director.AliveCount);
 		yield return new WaitForSeconds(2f);
-		Assert.AreEqual(cap, Alive());
+		Assert.AreEqual(cap, director.AliveCount);
 	}
 
+	// Spec §5.2: nothing alive or falling for 3 s while short → one core near the robot.
 	[UnityTest]
-	public IEnumerator RefillsWhenNoCoreFor8s() {
-		yield return Load("Level1", GameSettings.gameDifficulties.Easy);
+	public IEnumerator FallbackWithinThreeSeconds() {
+		yield return Load("Level1", GameSettings.gameDifficulties.Normal);
 		director.intervalOverride = 1000f;
-		director.fallbackDelay = 0.5f;
-		foreach (Treasure t in Object.FindObjectsOfType<Treasure>())
-			Object.Destroy(t.gameObject);
-		yield return new WaitForSeconds(2.5f);
-		Assert.GreaterOrEqual(Object.FindObjectsOfType<Treasure>().Length, 1);
+		yield return new WaitForSeconds(1.5f);   // robot has landed
+		ClearCores();
+		yield return new WaitForSeconds(EnergySpawnDirector.FallbackDelay + 0.35f + 0.5f + 0.3f);
+		Treasure core = Object.FindObjectOfType<Treasure>();
+		Assert.IsNotNull(core);
+		Assert.LessOrEqual(PathFromRobot(core.transform.position), 18.5f, "near the robot");
 	}
 
 	[UnityTest]
 	public IEnumerator AtLastCoreOnlyOneIsAlive() {
 		yield return Load("Level1", GameSettings.gameDifficulties.Easy);
 		director.intervalOverride = 0.2f;
-		// Cores already on the map stay; with one core still needed no more than one is supplied.
-		foreach (Treasure t in Object.FindObjectsOfType<Treasure>())
-			Object.Destroy(t.gameObject);
+		ClearCores();
 		GameManager.gm.Collect(GameManager.gm.BeatLevelScore - 1);
 		yield return new WaitForSeconds(2f);
 		Assert.AreEqual(1, Object.FindObjectsOfType<Treasure>().Length);
@@ -94,40 +213,43 @@ public class EnergyPlayTests {
 	public IEnumerator HardDifficultyStillSpawnsEnergy() {
 		yield return Load("Level2", GameSettings.gameDifficulties.Hard);
 		director.intervalOverride = 0.2f;
-		foreach (Treasure t in Object.FindObjectsOfType<Treasure>())
-			Object.Destroy(t.gameObject);
+		ClearCores();
 		yield return new WaitForSeconds(2.5f);
 		Assert.GreaterOrEqual(Object.FindObjectsOfType<Treasure>().Length, 1);
 	}
 
-	static float NearestCoreToPlayer() {
-		Vector3 player = GameObject.FindWithTag("Player").transform.position;
-		return Object.FindObjectsOfType<Treasure>().Select(t => Vector3.Distance(t.transform.position, player)).DefaultIfEmpty(float.MaxValue).Min();
-	}
-
+	// Spec §5.2: 12 s without a pickup and no reachable core near → one far core is replaced near the robot.
 	[UnityTest]
-	public IEnumerator FirstCoreIsCloseToTheStart() {
-		foreach (string level in new[] { "Level1", "Level2", "Level3", "Level4" }) {
-			yield return Load(level, GameSettings.gameDifficulties.Normal);
-			Assert.LessOrEqual(NearestCoreToPlayer(), 25f, level);
-		}
-	}
-
-	[UnityTest]
-	public IEnumerator StaleCoreIsReplacedNearThePlayer() {
+	public IEnumerator StaleCoreReplacedNearTheRobot() {
 		yield return Load("Level4", GameSettings.gameDifficulties.Normal);
 		director.intervalOverride = 1000f;
 		director.staleDelay = 1f;
-		// Leave a single core, far away (stands in for one the robot cannot reach).
-		Vector3 player = GameObject.FindWithTag("Player").transform.position;
-		Treasure[] cores = Object.FindObjectsOfType<Treasure>().OrderBy(t => Vector3.Distance(t.transform.position, player)).ToArray();
+		yield return new WaitForSeconds(1.5f);   // robot has landed
+		Treasure[] cores = Object.FindObjectsOfType<Treasure>().OrderBy(t => PathFromRobot(t.transform.position)).ToArray();
 		for (int i = 0; i < cores.Length - 1; i++)
 			Object.Destroy(cores[i].gameObject);
 		Treasure far = cores[cores.Length - 1];
+		Assume.That(PathFromRobot(far.transform.position), Is.GreaterThan(18f), "the remaining core is far");
 		GameManager.gm.Collect(GameManager.gm.BeatLevelScore - 1);
 		yield return new WaitForSeconds(3f);
-		Assert.IsTrue(far == null, "the stale core is removed");
-		Assert.LessOrEqual(NearestCoreToPlayer(), 25f);
+		Assert.IsTrue(far == null, "the far core is recalled");
+		Treasure near = Object.FindObjectOfType<Treasure>();
+		Assert.IsNotNull(near);
+		Assert.LessOrEqual(PathFromRobot(near.transform.position), 18.5f);
 		Assert.AreEqual(1, Object.FindObjectsOfType<Treasure>().Length);
+	}
+
+	[UnityTest]
+	public IEnumerator DropsWhileRobotAirborne() {
+		yield return Load("Level1", GameSettings.gameDifficulties.Normal);
+		yield return new WaitForSeconds(1.5f);   // robot landed, its point is known
+		ClearCores();
+		Rigidbody body = player.GetComponent<Rigidbody>();
+		body.isKinematic = true;
+		body.position = player.position + Vector3.up * 20f;   // far above the ground
+		player.position = body.position;
+		director.intervalOverride = 0.1f;
+		yield return new WaitForSeconds(1.5f);
+		Assert.Greater(director.AliveCount, 0, "drops use the last valid robot point");
 	}
 }

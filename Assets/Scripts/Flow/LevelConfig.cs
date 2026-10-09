@@ -17,6 +17,9 @@ public class LevelConfig : ScriptableObject {
 	public int energyCap;
 	public float energyIntervalMin;
 	public float energyIntervalMax;
+	[Tooltip("Cores per drop batch, both bounds included.")]
+	public int energyBatchMin = 1;
+	public int energyBatchMax = 1;
 
 	[Header("Enemies per difficulty: Easy, Normal, Hard (enemyCap = creeps + bosses, alive + telegraphed)")]
 	public int[] enemyCap = new int[3];

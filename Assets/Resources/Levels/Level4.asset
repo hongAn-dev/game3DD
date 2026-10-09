@@ -17,10 +17,12 @@ MonoBehaviour:
   displayName: "B\xE3i ph\xF3ng c\u0169"
   nextScene: Ending
   energyTarget: 18
-  energyAtStart: 6
-  energyCap: 8
-  energyIntervalMin: 4
-  energyIntervalMax: 6
+  energyAtStart: 8
+  energyCap: 10
+  energyIntervalMin: 1.5
+  energyIntervalMax: 2
+  energyBatchMin: 2
+  energyBatchMax: 4
   enemyCap: 060000000700000008000000
   bossCap: 010000000100000001000000
   creepSpeed: 7.5

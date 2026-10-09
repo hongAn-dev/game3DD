@@ -18,9 +18,11 @@ MonoBehaviour:
   nextScene: Level2
   energyTarget: 6
   energyAtStart: 3
-  energyCap: 5
-  energyIntervalMin: 5
-  energyIntervalMax: 7
+  energyCap: 4
+  energyIntervalMin: 2.5
+  energyIntervalMax: 3.5
+  energyBatchMin: 1
+  energyBatchMax: 1
   enemyCap: 010000000100000001000000
   bossCap: 000000000000000000000000
   creepSpeed: 5

@@ -17,10 +17,12 @@ MonoBehaviour:
   displayName: "Tr\u1EA1m khai th\xE1c b\u1ECF hoang"
   nextScene: Level3
   energyTarget: 10
-  energyAtStart: 4
+  energyAtStart: 5
   energyCap: 6
-  energyIntervalMin: 5
-  energyIntervalMax: 7
+  energyIntervalMin: 2
+  energyIntervalMax: 3
+  energyBatchMin: 1
+  energyBatchMax: 2
   enemyCap: 020000000300000004000000
   bossCap: 000000000000000000000000
   creepSpeed: 6
