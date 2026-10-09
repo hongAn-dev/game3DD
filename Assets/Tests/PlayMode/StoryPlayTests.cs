@@ -190,4 +190,67 @@ public class StoryPlayTests {
 		foreach (GameObject hidden in GameManager.gm.hideOnResult)
 			Assert.IsFalse(hidden.activeSelf, hidden.name + " hidden");
 	}
+
+	// Spec §7.6: the icon and label flip at once, and muting plays no click for that tap.
+	[UnityTest]
+	public IEnumerator SoundToggleFlipsAtOnceWithoutClick() {
+		bool saved = SoundSettings.SfxEnabled;
+		SoundSettings.SfxEnabled = true;
+		yield return Playing("Level1");
+		yield return new WaitForSecondsRealtime(Sfx.Cooldown + 0.05f);
+		int clicks = 0;
+		System.Action<SfxEvent> count = e => { if (e == SfxEvent.UiClick) clicks++; };
+		Sfx.Played += count;
+		SoundToggle toggle = Object.FindObjectOfType<SoundToggle>();
+		Assert.AreEqual("Tắt hiệu ứng âm thanh", toggle.ActionLabel);
+		toggle.GetComponent<UnityEngine.UI.Button>().onClick.Invoke();
+		Assert.IsFalse(SoundSettings.SfxEnabled);
+		Assert.AreEqual(toggle.soundOff, toggle.icon.sprite);
+		Assert.AreEqual("Bật hiệu ứng âm thanh", toggle.ActionLabel);
+		Assert.AreEqual(0, clicks, "no click after muting");
+		Assert.AreEqual(0, Sfx.ActiveVoices);
+		toggle.GetComponent<UnityEngine.UI.Button>().onClick.Invoke();
+		Assert.IsTrue(SoundSettings.SfxEnabled);
+		Assert.AreEqual(toggle.soundOn, toggle.icon.sprite);
+		Sfx.Played -= count;
+		SoundSettings.SfxEnabled = saved;
+	}
+
+	[UnityTest]
+	public IEnumerator PauseButtonOnlyWhilePlaying() {
+		yield return Playing("Level1");
+		PauseController pause = Object.FindObjectOfType<PauseController>();
+		SoundToggle toggle = Object.FindObjectOfType<SoundToggle>();
+		Assert.IsTrue(pause.pauseButton.activeInHierarchy);
+		pause.pauseButton.GetComponent<UnityEngine.UI.Button>().onClick.Invoke();
+		yield return null;
+		Assert.AreEqual(FlowState.Paused, GameFlow.State);
+		Assert.IsFalse(pause.pauseButton.activeInHierarchy, "no second pause panel");
+		Assert.IsTrue(toggle.gameObject.activeInHierarchy, "sound toggle still usable while paused");
+		pause.Resume();
+		yield return null;
+		Assert.IsTrue(pause.pauseButton.activeInHierarchy);
+		GameFlow.Die("test");
+		yield return null;
+		Assert.IsFalse(pause.pauseButton.activeInHierarchy, "locked on the result panel");
+		Assert.IsTrue(toggle.gameObject.activeInHierarchy);
+	}
+
+	[UnityTest]
+	public IEnumerator BackWhilePausedResumes() {
+		yield return Playing("Level1");
+		PauseController pause = Object.FindObjectOfType<PauseController>();
+		pause.Toggle();   // Android Back / Escape while playing
+		Assert.AreEqual(FlowState.Paused, GameFlow.State);
+		pause.Toggle();   // Back again = Tiếp tục
+		Assert.AreEqual(FlowState.Playing, GameFlow.State);
+		pause.Toggle();
+		UnityEngine.UI.Button exit = pause.overlay.GetComponentsInChildren<UnityEngine.UI.Button>()
+			.First(b => b.GetComponentInChildren<UnityEngine.UI.Text>().text == "Thoát về menu");
+		exit.onClick.Invoke();
+		yield return null;
+		yield return null;
+		Assert.AreEqual(SceneRouter.MainMenuScene, SceneManager.GetActiveScene().name);
+		Assert.IsFalse(CampaignProgress.IsActiveRun, "leaving ends the run");
+	}
 }

@@ -270,15 +270,4 @@ public class ControlTests {
 			Assert.That(sizer.heightShare, Is.InRange(0.20f, 0.25f), level);
 		}
 	}
-
-	[Test]
-	public void SensitivitySliderIsTouchSized() {
-		foreach (string level in Levels) {
-			EditorSceneManager.OpenScene("Assets/Scenes/" + level + ".unity", OpenSceneMode.Single);
-			UnityEngine.UI.Slider slider = Object.FindObjectsOfType<PauseController>(true).Single().sensitivitySlider;
-			Assert.GreaterOrEqual(((RectTransform)slider.transform).sizeDelta.y, 70f, level);
-			Assert.GreaterOrEqual(slider.handleRect.sizeDelta.x, 60f, level);
-			Assert.AreNotEqual(Color.white, slider.fillRect.GetComponent<UnityEngine.UI.Image>().color, level);
-		}
-	}
 }

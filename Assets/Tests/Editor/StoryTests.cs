@@ -110,4 +110,51 @@ public class StoryTests {
 			}
 		}
 	}
+
+	static RectTransform Rect(Component c) {
+		return (RectTransform)c.transform;
+	}
+
+	// Spec §7.6: sound toggle left of pause, top right inside the safe area; icon ≈ 24–28 dp, touch ≥ 48 dp, ≥ 8 dp
+	// apart (at the 1080-unit height-scaled canvas 1 dp ≈ 2.25 units on a 1080p phone: 48 dp ≈ 108, 8 dp ≈ 18 → use
+	// 110 and 18).
+	[Test]
+	public void TopRightButtonsLayout() {
+		foreach (string scene in new[] { "Level1", "Level2", "Level3", "Level4", "MainMenu", "Ending" }) {
+			EditorSceneManager.OpenScene("Assets/Scenes/" + scene + ".unity", OpenSceneMode.Single);
+			SoundToggle sound = Object.FindObjectsOfType<SoundToggle>(true).Single();
+			Assert.IsNotNull(sound.GetComponentsInParent<SafeAreaFitter>(true).FirstOrDefault(), scene + " sound inside the safe area");
+			Assert.AreEqual(Vector2.one, Rect(sound).anchorMin, scene);
+			Assert.GreaterOrEqual(Mathf.Min(Rect(sound).sizeDelta.x, Rect(sound).sizeDelta.y), 110f, scene + " touch area");
+			Assert.That(Rect(sound.icon).sizeDelta.x, Is.InRange(54f, 64f), scene + " icon");
+			Assert.AreEqual(1f, sound.GetComponentsInParent<CanvasScaler>(true)[0].matchWidthOrHeight, scene);
+			Assert.Greater(sound.GetComponentsInParent<Canvas>(true).Last().sortingOrder, 50, scene + " above the pause panel");
+			PauseController pause = Object.FindObjectOfType<PauseController>(true);
+			if (scene.StartsWith("Level")) {
+				RectTransform p = Rect(pause.pauseButton.transform), q = Rect(sound);
+				Assert.AreEqual(q.parent, p.parent, scene);
+				Assert.AreEqual(Vector2.one, p.anchorMin, scene);
+				Assert.GreaterOrEqual(Mathf.Min(p.sizeDelta.x, p.sizeDelta.y), 110f, scene + " pause touch area");
+				float gap = (p.anchoredPosition.x - p.sizeDelta.x) - q.anchoredPosition.x;
+				Assert.GreaterOrEqual(gap, 18f, scene + " sound sits left of pause with a gap");
+				Assert.AreEqual(new Vector2(0.5f, 1f), Rect(GameObject.Find("Score Canvas").transform).anchorMin, scene + " energy panel moved to the top centre");
+				Assert.IsNull(GameObject.Find("Mobile Canvas").transform.Find("Safe Area/Pause Button"), scene + " old pause button gone");
+			} else {
+				Assert.IsNull(pause, scene + " has no gameplay pause");
+			}
+		}
+	}
+
+	[Test]
+	public void PausePanelHasTwoButtons() {
+		foreach (LevelConfig level in LevelCatalog.All) {
+			EditorSceneManager.OpenScene("Assets/Scenes/" + level.levelId + ".unity", OpenSceneMode.Single);
+			PauseController pause = Object.FindObjectOfType<PauseController>(true);
+			CollectionAssert.AreEqual(new[] { "Tiếp tục", "Thoát về menu" },
+				pause.overlay.GetComponentsInChildren<Button>(true).Select(b => b.GetComponentInChildren<Text>(true).text).ToArray(), level.levelId);
+			var texts = pause.overlay.GetComponentsInChildren<Text>(true).Where(t => t.GetComponentsInParent<Button>(true).Length == 0).Select(t => t.text).ToArray();
+			CollectionAssert.AreEquivalent(new[] { "Tạm dừng", StoryText.PauseNote }, texts, level.levelId);
+			Assert.IsEmpty(pause.overlay.GetComponentsInChildren<Slider>(true), level.levelId + " settings live in the main menu");
+		}
+	}
 }

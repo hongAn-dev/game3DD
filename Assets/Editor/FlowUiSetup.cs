@@ -7,7 +7,8 @@ using UnityEngine.UI;
 
 /// <summary>
 /// Spec §7 UI: builds the story dialog ("Story Canvas") in Level1..4 and the main menu, wires it to GameManager and
-/// removes the old timed intro card. The canvas scales by height (1080 units on every phone), so the 1440-wide box
+/// removes the old timed intro card; builds the top-right bar ("Top Bar Canvas": sound toggle, plus the pause button in
+/// levels) in the levels, the main menu and the Ending, and moves the energy panel to the top centre. The canvas scales by height (1080 units on every phone), so the 1440-wide box
 /// fits 16:9 and wider screens; the body font is the largest (≤ 40, ≥ 32) at which every story page fits.
 /// Rebuilt from scratch on every run. Run UiTheme.Apply afterwards for the panel and button look.
 /// </summary>
@@ -25,6 +26,8 @@ public static class FlowUiSetup {
 				&& PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(t.gameObject) == "Assets/Prefabs/IntroBeatLevelCanvas.prefab").ToList())
 				Object.DestroyImmediate(t.gameObject);
 			manager.dialog = Dialog();
+			TopBar(Object.FindObjectOfType<PauseController>(true));
+			ScorePanelToTheCentre();
 			manager.hideOnResult = new[] { Object.FindObjectsOfType<Camera>(true).Single(c => c.name == "Minimap Camera").gameObject,
 				Object.FindObjectOfType<PlayerHealthBar>(true).gameObject };
 			EditorSceneManager.MarkSceneDirty(scene);
@@ -32,8 +35,13 @@ public static class FlowUiSetup {
 		}
 		var menu = EditorSceneManager.OpenScene("Assets/Scenes/MainMenu.unity", OpenSceneMode.Single);
 		Dialog();
+		TopBar(null);
 		EditorSceneManager.MarkSceneDirty(menu);
 		EditorSceneManager.SaveScene(menu);
+		var ending = EditorSceneManager.OpenScene("Assets/Scenes/Ending.unity", OpenSceneMode.Single);
+		TopBar(null);
+		EditorSceneManager.MarkSceneDirty(ending);
+		EditorSceneManager.SaveScene(ending);
 		Debug.Log("FlowUiSetup: done");
 	}
 
@@ -67,6 +75,82 @@ public static class FlowUiSetup {
 		dialog.startButton = Button("Start Button", dialog.box, 480f, 340f, "Bắt đầu", dialog.Finish);
 		backdrop.gameObject.SetActive(false);
 		return dialog;
+	}
+
+	// Spec §7.6: 110×110 touch areas (≈ 48 dp) with 60-unit icons (≈ 26 dp), pause at the corner, sound 18 to its left,
+	// inside the safe area, above the pause panel (order 60 > 50) so the sound toggle works while paused.
+	const float Touch = 110f, Margin = 24f, Gap = 18f;
+
+	static void TopBar(PauseController pause) {
+		GameObject old = GameObject.Find("Top Bar Canvas");
+		if (old != null)
+			Object.DestroyImmediate(old);
+		GameObject root = Canvas("Top Bar Canvas", 60);
+		RectTransform safe = Rect("Safe Area", root.transform, Vector2.zero);
+		Stretch(safe);
+		safe.gameObject.AddComponent<SafeAreaFitter>();
+
+		Image soundIcon;
+		Button sound = IconButton("Sound Button", safe, -(Margin + Touch + Gap), Sprite("sound_on"), out soundIcon);
+		SoundToggle toggle = sound.gameObject.AddComponent<SoundToggle>();
+		toggle.icon = soundIcon;
+		toggle.soundOn = Sprite("sound_on");
+		toggle.soundOff = Sprite("sound_off");
+		RectTransform tip = Rect("Sound Tooltip", sound.transform, new Vector2(420f, 64f));
+		tip.anchorMin = tip.anchorMax = tip.pivot = new Vector2(1f, 1f);
+		tip.anchoredPosition = new Vector2(0f, -Touch - 8f);
+		Image tipBack = tip.gameObject.AddComponent<Image>();
+		tipBack.color = new Color32(14, 19, 26, 230);
+		tipBack.raycastTarget = false;
+		toggle.tooltip = tip.gameObject;
+		toggle.tooltipText = Label("Tooltip Text", tip, Vector2.zero, new Vector2(400f, 60f), "SemiBold", 30);
+		toggle.tooltipText.text = "Tắt hiệu ứng âm thanh";
+		tip.gameObject.SetActive(false);
+		// The toggle's listener first: muting happens before the click sound would play (UiTheme appends it).
+		UnityEventTools.AddPersistentListener(sound.onClick, toggle.Toggle);
+
+		if (pause != null) {
+			Image pauseIcon;
+			Button button = IconButton("Pause Button", safe, -Margin, Sprite("pause"), out pauseIcon);
+			UnityEventTools.AddPersistentListener(button.onClick, pause.Toggle);
+			pause.pauseButton = button.gameObject;
+		}
+	}
+
+	static Button IconButton(string name, Transform parent, float x, Sprite sprite, out Image icon) {
+		RectTransform rect = Rect(name, parent, new Vector2(Touch, Touch));
+		rect.anchorMin = rect.anchorMax = rect.pivot = Vector2.one;
+		rect.anchoredPosition = new Vector2(x, -Margin);
+		rect.gameObject.AddComponent<Image>();
+		Button button = rect.gameObject.AddComponent<Button>();
+		RectTransform iconRect = Rect("Icon", rect, new Vector2(60f, 60f));
+		icon = iconRect.gameObject.AddComponent<Image>();
+		icon.sprite = sprite;
+		icon.preserveAspect = true;
+		icon.raycastTarget = false;
+		return button;
+	}
+
+	static Sprite Sprite(string name) {
+		string path = "Assets/ThirdParty/RoboLacLoi/Sprites/" + name + ".png";
+		TextureImporter importer = (TextureImporter)AssetImporter.GetAtPath(path);
+		if (importer.textureType != TextureImporterType.Sprite) {
+			importer.textureType = TextureImporterType.Sprite;
+			importer.alphaIsTransparency = true;
+			importer.mipmapEnabled = false;
+			importer.SaveAndReimport();
+		}
+		return AssetDatabase.LoadAssetAtPath<Sprite>(path);
+	}
+
+	// The energy panel (MainCanvas, 800×600 reference) leaves the top-right corner to the buttons.
+	static void ScorePanelToTheCentre() {
+		RectTransform panel = (RectTransform)GameObject.Find("Score Canvas").transform;
+		panel.anchorMin = panel.anchorMax = new Vector2(0.5f, 1f);
+		panel.anchoredPosition = new Vector2(0f, -22f);
+		panel.sizeDelta = new Vector2(250f, panel.sizeDelta.y);
+		if (PrefabUtility.IsPartOfPrefabInstance(panel))
+			PrefabUtility.RecordPrefabInstancePropertyModifications(panel);
 	}
 
 	// Largest body size from 40 down to 32 at which every page (tutorial, guide, level cards) fits the body rect.

@@ -109,7 +109,7 @@ public class FlowPlayTests {
 		ending.Complete();
 		Assert.IsTrue(ending.completionPanel.activeSelf);
 		var labels = new System.Collections.Generic.List<string>();
-		foreach (UnityEngine.UI.Button b in Object.FindObjectsOfType<UnityEngine.UI.Button>())
+		foreach (UnityEngine.UI.Button b in ending.completionPanel.GetComponentsInChildren<UnityEngine.UI.Button>())
 			labels.Add(b.GetComponentInChildren<UnityEngine.UI.Text>().text);
 		CollectionAssert.AreEquivalent(new[] { "Chơi lại", "Menu chính" }, labels);
 	}

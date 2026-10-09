@@ -469,13 +469,17 @@ public static class UiTheme {
 			// Re-runs keep the label in step with LevelConfig (zone names changed in T4).
 			if (zoneTitle.Length > 0)
 				zoneT.GetComponent<Text>().text = zoneTitle.ToUpperInvariant();
+			// Centred under the top-centre panel (the top-right corner belongs to the sound and pause buttons).
 			RectTransform zoneRect = (RectTransform)zoneT;
-			zoneRect.anchorMin = zoneRect.anchorMax = new Vector2(1f, 0f);
-			zoneRect.pivot = new Vector2(1f, 1f);
-			zoneRect.anchoredPosition = new Vector2(-4f, -6f);
+			zoneRect.anchorMin = zoneRect.anchorMax = new Vector2(0.5f, 0f);
+			zoneRect.pivot = new Vector2(0.5f, 1f);
+			zoneRect.anchoredPosition = new Vector2(0f, -6f);
 			zoneRect.sizeDelta = new Vector2(320f, 24f);
-			zoneT.GetComponent<Text>().alignment = TextAnchor.UpperRight;
+			zoneT.GetComponent<Text>().alignment = TextAnchor.UpperCenter;
 		}
+		// "Năng lượng: 18/18" fits the 250-wide panel right of the core icon.
+		score.fontSize = 22;
+		((RectTransform)score.transform.parent).anchoredPosition = new Vector2(18f, 0f);
 		return true;
 	}
 
