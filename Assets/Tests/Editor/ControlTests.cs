@@ -133,6 +133,42 @@ public class ControlTests {
 		Object.DestroyImmediate(look.gameObject);
 	}
 
+	static readonly string[] Tuning = { "m_MaxSpeed", "m_AccelerationRate", "m_Brake", "m_UseTorque" };
+
+	[Test]
+	public void RobotTuningIs11_24_30() {
+		var ball = new SerializedObject(AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Player.prefab").GetComponent<Ball>());
+		Assert.AreEqual(11f, ball.FindProperty("m_MaxSpeed").floatValue);
+		Assert.AreEqual(24f, ball.FindProperty("m_AccelerationRate").floatValue);
+		Assert.AreEqual(30f, ball.FindProperty("m_Brake").floatValue);
+		Assert.IsFalse(ball.FindProperty("m_UseTorque").boolValue);
+		foreach (LevelConfig level in LevelCatalog.All) {
+			EditorSceneManager.OpenScene("Assets/Scenes/" + level.levelId + ".unity", OpenSceneMode.Single);
+			GameObject player = GameObject.FindWithTag("Player");
+			foreach (PropertyModification m in PrefabUtility.GetPropertyModifications(player) ?? new PropertyModification[0])
+				Assert.IsFalse(m.target is Ball && System.Array.IndexOf(Tuning, m.propertyPath) >= 0,
+					level.levelId + " overrides " + m.propertyPath + " on the robot");
+		}
+	}
+
+	static bool Interactive(Transform t) {
+		for (; t != null; t = t.parent)
+			foreach (MonoBehaviour b in t.GetComponents<MonoBehaviour>())
+				if (b is UnityEngine.UI.Selectable || b is IEventSystemHandler)
+					return true;
+		return false;
+	}
+
+	// Decorative images/texts and the minimap must not catch touches meant for the camera swipe.
+	[Test]
+	public void OnlyInteractiveGraphicsCatchRays() {
+		foreach (LevelConfig level in LevelCatalog.All) {
+			EditorSceneManager.OpenScene("Assets/Scenes/" + level.levelId + ".unity", OpenSceneMode.Single);
+			foreach (UnityEngine.UI.Graphic g in Object.FindObjectsOfType<UnityEngine.UI.Graphic>(true))
+				Assert.IsFalse(g.raycastTarget && !Interactive(g.transform), level.levelId + ": " + g.name + " (" + g.GetType().Name + ") blocks touches");
+		}
+	}
+
 	[Test]
 	public void SafeAreaAnchorsForNotch() {
 		Rect anchors = SafeAreaFitter.Anchors(new Rect(100f, 0f, 2200f, 1080f), new Vector2(2400f, 1080f));

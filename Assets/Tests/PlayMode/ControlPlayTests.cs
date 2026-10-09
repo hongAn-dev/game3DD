@@ -65,6 +65,38 @@ public class ControlPlayTests {
 		Assert.Less(Horizontal(), cap * 0.25f);
 	}
 
+	// Spec §3.2: 90% of top speed within 0.5 s on flat ground.
+	[UnityTest]
+	public IEnumerator ReachesNinetyPercentInHalfASecond() {
+		yield return FlatGround();
+		yield return Push(Vector3.zero, 0.3f);   // settle on the ground
+		float start = Time.time;
+		while (Horizontal() < ball.MaxSpeed * 0.9f && Time.time - start < 2f) {
+			yield return new WaitForFixedUpdate();
+			ball.Move(Vector3.forward, false);
+		}
+		Assert.AreEqual(11f, ball.MaxSpeed, 0.01f);
+		Assert.LessOrEqual(Time.time - start, 0.52f);
+	}
+
+	// Spec §3.2: from 11 m/s, releasing the stick stops the robot in about 0.4 s and no more than 2.3 m.
+	[UnityTest]
+	public IEnumerator StopsWithin2_3Metres() {
+		yield return FlatGround();
+		yield return Push(Vector3.forward, 2f);
+		Assert.Greater(Horizontal(), 10.8f);
+		Vector3 from = body.position;
+		float start = Time.time;
+		while (Horizontal() > 0.05f && Time.time - start < 2f) {
+			yield return new WaitForFixedUpdate();
+			ball.Move(Vector3.zero, false);
+		}
+		Vector3 travel = body.position - from;
+		travel.y = 0f;
+		Assert.LessOrEqual(Time.time - start, 0.45f, "stop time");
+		Assert.LessOrEqual(travel.magnitude, 2.3f, "stop distance");
+	}
+
 	[UnityTest]
 	public IEnumerator SpeedCapDoesNotClampFalling() {
 		yield return FlatGround();

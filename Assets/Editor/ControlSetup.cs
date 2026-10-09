@@ -7,8 +7,9 @@ using UnityEngine.UI;
 
 /// <summary>
 /// Wires the spec §7 controls into Level1..4: orbit camera on the Main Camera (minimap keeps a fixed SmoothFollow),
-/// safe-area joystick + right-half look area + pause button on the mobile canvas, a pause overlay canvas, and
-/// Rigidbody interpolation on the player. Idempotent. Run UiTheme.Apply afterwards.
+/// safe-area joystick + right-half look area + pause button on the mobile canvas, a pause overlay canvas, the robot
+/// tuning (11 m/s, acceleration 24, brake 30, no torque; no per-scene overrides) with Rigidbody interpolation, and no
+/// raycasts on decorative graphics (they would swallow camera swipes). Idempotent. Run UiTheme.Apply afterwards.
 /// </summary>
 public static class ControlSetup {
 
@@ -17,6 +18,12 @@ public static class ControlSetup {
 		GameObject contents = PrefabUtility.LoadPrefabContents("Assets/Prefabs/Player.prefab");
 		try {
 			contents.GetComponent<Rigidbody>().interpolation = RigidbodyInterpolation.Interpolate;
+			var ball = new SerializedObject(contents.GetComponent<Ball>());
+			ball.FindProperty("m_MaxSpeed").floatValue = 11f;
+			ball.FindProperty("m_AccelerationRate").floatValue = 24f;
+			ball.FindProperty("m_Brake").floatValue = 30f;
+			ball.FindProperty("m_UseTorque").boolValue = false;
+			ball.ApplyModifiedPropertiesWithoutUndo();
 			PrefabUtility.SaveAsPrefabAsset(contents, "Assets/Prefabs/Player.prefab");
 		} finally {
 			PrefabUtility.UnloadPrefabContents(contents);
@@ -28,6 +35,8 @@ public static class ControlSetup {
 			StyleSlider(pause.sensitivitySlider);
 			OrbitCamera();
 			MobileCanvas(pause);
+			RobotUsesPrefabTuning();
+			DecorationsIgnoreRays();
 			EditorSceneManager.MarkSceneDirty(scene);
 			EditorSceneManager.SaveScene(scene);
 			Debug.Log("ControlSetup: " + level.levelId);
@@ -57,6 +66,36 @@ public static class ControlSetup {
 		orbit.target = player.transform;
 		foreach (SmoothFollow other in Object.FindObjectsOfType<SmoothFollow>(true))
 			other.AllowUserInput = false;
+	}
+
+	static readonly string[] Tuning = { "m_MaxSpeed", "m_AccelerationRate", "m_Brake", "m_UseTorque" };
+
+	// Scenes must not override the robot tuning, or prefab changes silently do nothing there.
+	static void RobotUsesPrefabTuning() {
+		var ball = new SerializedObject(GameObject.FindWithTag("Player").GetComponent<Ball>());
+		foreach (string name in Tuning) {
+			SerializedProperty property = ball.FindProperty(name);
+			if (property.prefabOverride)
+				PrefabUtility.RevertPropertyOverride(property, InteractionMode.AutomatedAction);
+		}
+	}
+
+	static bool Interactive(Transform t) {
+		for (; t != null; t = t.parent)
+			foreach (MonoBehaviour b in t.GetComponents<MonoBehaviour>())
+				if (b is Selectable || b is UnityEngine.EventSystems.IEventSystemHandler)
+					return true;
+		return false;
+	}
+
+	// Only buttons, sliders, the joystick and the look area catch touches; texts, frames and the minimap do not.
+	static void DecorationsIgnoreRays() {
+		foreach (Graphic graphic in Object.FindObjectsOfType<Graphic>(true))
+			if (graphic.raycastTarget && !Interactive(graphic.transform)) {
+				graphic.raycastTarget = false;
+				if (PrefabUtility.IsPartOfPrefabInstance(graphic))
+					PrefabUtility.RecordPrefabInstancePropertyModifications(graphic);
+			}
 	}
 
 	// Unity's fake null breaks '??' on components, so check explicitly.
