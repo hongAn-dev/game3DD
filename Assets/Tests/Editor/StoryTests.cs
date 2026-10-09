@@ -1,6 +1,8 @@
 using System.Linq;
 using NUnit.Framework;
+using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class StoryTests {
 
@@ -73,5 +75,39 @@ public class StoryTests {
 	[Test]
 	public void HudLabelReadsNangLuong() {
 		Assert.AreEqual("Năng lượng: 3/10", StoryText.EnergyLabel(3, 10));
+	}
+
+	static void AssertFits(Text text, string value) {
+		Vector2 size = text.rectTransform.rect.size;
+		TextGenerationSettings settings = text.GetGenerationSettings(size);
+		settings.horizontalOverflow = HorizontalWrapMode.Wrap;
+		settings.verticalOverflow = VerticalWrapMode.Overflow;
+		float height = new TextGenerator().GetPreferredHeight(value, settings) / text.pixelsPerUnit;
+		Assert.LessOrEqual(height, size.y, text.name + ": " + value);
+	}
+
+	// Spec §7.4: no cut text. The dialog canvas scales by height (1080 units on every phone) and the box fits the
+	// narrowest accepted width (16:9 = 1920 units); 18:9 and 20:9 only add width.
+	[Test]
+	public void EveryPageFitsAt16_9And20_9() {
+		var pages = StoryText.Tutorial(LevelCatalog.Get("Level1")).Concat(StoryText.Guide()).ToList();
+		foreach (LevelConfig level in LevelCatalog.All)
+			pages.Add(StoryText.LevelCard(level));
+		foreach (string scene in new[] { "Level1", "Level2", "Level3", "Level4", "MainMenu" }) {
+			EditorSceneManager.OpenScene("Assets/Scenes/" + scene + ".unity", OpenSceneMode.Single);
+			DialogPanel dialog = Object.FindObjectOfType<DialogPanel>(true);
+			Assert.IsNotNull(dialog, scene);
+			CanvasScaler scaler = dialog.GetComponentsInParent<CanvasScaler>(true)[0];
+			Assert.AreEqual(1f, scaler.matchWidthOrHeight, scene + " scales by height");
+			Assert.AreEqual(new Vector2(1920f, 1080f), scaler.referenceResolution);
+			RectTransform box = (RectTransform)dialog.box.transform;
+			Assert.LessOrEqual(box.sizeDelta.x, 1920f - 2 * 80f, scene + " box width with safe-area margins");
+			Assert.LessOrEqual(box.sizeDelta.y, 1080f - 2 * 60f, scene + " box height");
+			Assert.GreaterOrEqual(dialog.body.fontSize, 32, scene + " readable body");
+			foreach (StoryPage page in pages) {
+				AssertFits(dialog.title, page.title);
+				AssertFits(dialog.body, page.body);
+			}
+		}
 	}
 }

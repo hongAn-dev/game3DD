@@ -94,7 +94,8 @@ public class EndingController : MonoBehaviour {
 
 	public void PlayAgain() {
 		AudioListener.pause = false;
-		SceneRouter.StartCampaign(CampaignProgress.IsActiveRun ? CampaignProgress.Difficulty : GameSettings.difficulty);
+		// A replay goes straight to the first level's card; the full tutorial is for New Game.
+		SceneRouter.StartCampaign(CampaignProgress.IsActiveRun ? CampaignProgress.Difficulty : GameSettings.difficulty, false);
 	}
 
 	public void BackToMenu() {

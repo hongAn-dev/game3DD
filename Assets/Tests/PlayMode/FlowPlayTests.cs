@@ -60,10 +60,11 @@ public class FlowPlayTests {
 	public IEnumerator CampaignRouteReachesEndingOnce() {
 		foreach (string level in new[] { "Level1", "Level2", "Level3", "Level4" }) {
 			Assert.AreEqual(level, SceneManager.GetActiveScene().name);
-			// Next() shows the intro card (FlowState.Intro, time frozen); pickups count only once it is over.
-			float playing = Time.realtimeSinceStartup + 4f;
-			while (GameFlow.State != FlowState.Playing && Time.realtimeSinceStartup < playing)
-				yield return null;
+			// Next() shows the intro card (FlowState.Intro, time frozen) until "Bắt đầu"; pickups count only after it.
+			DialogPanel dialog = Object.FindObjectOfType<DialogPanel>(true);
+			Assert.AreEqual(level != "Level1", dialog.IsOpen, level + " intro card");
+			dialog.Finish();
+			Assert.AreEqual(FlowState.Playing, GameFlow.State);
 			GameManager.gm.Collect(GameManager.gm.BeatLevelScore);
 			yield return null;
 			yield return null;
@@ -117,23 +118,6 @@ public class FlowPlayTests {
 		float end = Time.realtimeSinceStartup + seconds;
 		while (GameFlow.State != state && Time.realtimeSinceStartup < end)
 			yield return null;
-	}
-
-	[UnityTest]
-	public IEnumerator TappingIntroCardStartsPlayThroughGameFlow() {
-		GameSettings.showIntroLevelMessage = true;
-		SceneManager.LoadScene("Level1");
-		yield return null;
-		yield return WaitForState(FlowState.Intro, 2f);
-		Assert.AreEqual(FlowState.Intro, GameFlow.State);
-
-		Object.FindObjectOfType<UIButtonResumeGame>(true).resumeGame();
-		yield return null;
-		yield return null;
-
-		Assert.AreEqual(FlowState.Playing, GameFlow.State);
-		Assert.AreEqual(1f, Time.timeScale);
-		Assert.IsFalse(GameManager.gm.introBeatLevelCanvas.activeSelf, "card hides as soon as it is tapped");
 	}
 
 	[UnityTest]

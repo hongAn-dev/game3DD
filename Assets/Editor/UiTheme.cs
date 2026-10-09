@@ -169,7 +169,6 @@ public static class UiTheme {
 			}
 		}
 
-		changed |= FitIntroCard(root);
 		changed |= FitFinalScreen(root);
 		return changed;
 	}
@@ -233,14 +232,14 @@ public static class UiTheme {
 		}
 
 		bool heading = text.name == "Game Title" || text.name == "Congratulations Text" || text.name == "Lost Title"
-			|| text.name == "Score Text" || text.name == "Intro Level Text" || text.name == "EndGameScore Text";
+			|| text.name == "Score Text" || text.name == "Dialog Title" || text.name == "EndGameScore Text";
 		text.font = heading ? fonts.bold : text.name == "Subtitle" ? fonts.medium : fonts.semiBold;
 
 		Color color = TextColor;
 		string difficulty = DifficultyOf(text.transform);
 		if (difficulty != null)
 			color = DifficultyColors[difficulty];
-		else if (text.name == "Zone Text")
+		else if (text.name == "Zone Text" || text.name == "Dialog Title")
 			color = Cyan;
 		else if (text.transform.parent != null && text.transform.parent.parent != null && text.transform.parent.parent.name == "Overdrive Indicator")
 			color = OverdriveYellow;
@@ -456,23 +455,6 @@ public static class UiTheme {
 			zoneRect.sizeDelta = new Vector2(320f, 24f);
 			zoneT.GetComponent<Text>().alignment = TextAnchor.UpperRight;
 		}
-		return true;
-	}
-
-	// The intro card shows the zone name and goal on two lines inside a 460x210 box on an 800-wide canvas.
-	static bool FitIntroCard(GameObject root) {
-		Text intro = root.GetComponentsInChildren<Text>(true).FirstOrDefault(t => t.name == "Intro Level Text");
-		if (intro == null)
-			return false;
-		intro.rectTransform.sizeDelta = new Vector2(420f, 180f);
-		intro.lineSpacing = 1.1f;
-		intro.supportRichText = true;
-		// The text is set at runtime; size the font for the longest zone name and goal.
-		string runtime = intro.text;
-		intro.text = LevelCatalog.All.OrderByDescending(l => l.displayName.Length).First().displayName.ToUpperInvariant() + "\nTHU 100 LÕI NĂNG LƯỢNG";
-		intro.fontSize = 40;
-		ShrinkToFit(intro);
-		intro.text = runtime;
 		return true;
 	}
 

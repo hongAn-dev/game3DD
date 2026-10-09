@@ -15,9 +15,10 @@ public static class SceneRouter {
 		SceneManager.LoadScene(scene);
 	}
 
-	/// <summary>New Game: resets the campaign and starts the first level with its intro card.</summary>
-	public static void StartCampaign(GameSettings.gameDifficulties difficulty) {
+	/// <summary>New Game: resets the campaign and starts the first level with the tutorial (or only its intro card).</summary>
+	public static void StartCampaign(GameSettings.gameDifficulties difficulty, bool tutorial) {
 		CampaignProgress.BeginRun(difficulty);
+		CampaignProgress.TutorialPending = tutorial;
 		GameSettings.showIntroLevelMessage = true;
 		Load(LevelCatalog.First.levelId);
 	}

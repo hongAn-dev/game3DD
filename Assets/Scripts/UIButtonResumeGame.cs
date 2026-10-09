@@ -11,11 +11,7 @@ public class UIButtonResumeGame : MonoBehaviour {
 	/// </summary>
 	public void resumeGame()
 	{
-		// Closes the game.
-		// Through GameFlow so state and timeScale stay in sync (tapping the intro card starts play).
-		if (GameFlow.State == FlowState.Intro)
-			GameFlow.Enter(FlowState.Playing);
-		else
-			GameFlow.Resume();
+		// Through GameFlow so state and timeScale stay in sync; intro dialogs start play only from their own button.
+		GameFlow.Resume();
 	}
 }

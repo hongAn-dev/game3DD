@@ -164,18 +164,6 @@ public class ThemeEditorTests {
 	}
 
 	[Test]
-	public void IntroCardFitsLongestZoneAndGoal() {
-		GameObject prefab = PrefabUtility.LoadPrefabContents("Assets/Prefabs/IntroBeatLevelCanvas.prefab");
-		try {
-			Text intro = prefab.GetComponentsInChildren<Text>(true).First(t => t.name == "Intro Level Text");
-			intro.text = LevelCatalog.All.OrderByDescending(l => l.displayName.Length).First().displayName.ToUpperInvariant() + "\nTHU 100 LÕI NĂNG LƯỢNG";
-			AssertFits(intro);
-		} finally {
-			PrefabUtility.UnloadPrefabContents(prefab);
-		}
-	}
-
-	[Test]
 	public void FinalScreenTextsFitAndDoNotOverlap() {
 		EditorSceneManager.OpenScene("Assets/Scenes/Level4.unity", OpenSceneMode.Single);
 		Text[] texts = Object.FindObjectsOfType<Text>(true)
@@ -223,7 +211,7 @@ public class ThemeEditorTests {
 
 	[Test]
 	public void PanelTextIsReadableOnItsBox() {
-		foreach (string name in new[] { "IntroBeatLevelCanvas", "BeatLevelUICanvas", "GameOver Canvas" }) {
+		foreach (string name in new[] { "BeatLevelUICanvas", "GameOver Canvas" }) {
 			GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/" + name + ".prefab");
 			Image box = prefab.GetComponentsInChildren<Image>(true).First(i => i.name == "BoxBackground");
 			foreach (Text text in prefab.GetComponentsInChildren<Text>(true).Where(t => t.GetComponentInParent<Button>() == null))

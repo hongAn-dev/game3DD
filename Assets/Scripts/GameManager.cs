@@ -44,14 +44,8 @@ public class GameManager : MonoBehaviour {
 	float fadeStart;
 	SoundGroup musicGroup;
 
-	[Tooltip("Only need to set if canBeatLevel is set to true.")]
-	public GameObject introBeatLevelCanvas;
-
-	[Tooltip("Only need to set if canBeatLevel is set to true.")]
-	public Text introBeatLevelText;
-
-	private float introBeatLevelTextDuration = 2.0f;
-	private float introSavedTime;
+	[Tooltip("Story dialog: New Game tutorial and the level's intro card.")]
+	public DialogPanel dialog;
 
 	private Health playerHealth;
 
@@ -105,12 +99,7 @@ public class GameManager : MonoBehaviour {
 				beatLevelScore = config.energyTarget;
 
 			beatLevelCanvas.SetActive (false);
-			// Show intro level goal message (Only at first level load, doesnt show after a gameover)
-			if (GameSettings.showIntroLevelMessage) {
-				introBeatLevelText.text = "<color=#2EE6E6>" + (config != null ? config.displayName : "").ToUpperInvariant () + "</color>\nTHU " + beatLevelScore.ToString () + " LÕI NĂNG LƯỢNG";
-				GameSettings.showIntroLevelMessage = false;
-				StartCoroutine (ShowIntroBeatLevelCanvas ());
-			}
+			StartStory ();
 		}
 
 		// Setup score display.
@@ -119,20 +108,25 @@ public class GameManager : MonoBehaviour {
 	}
 
 	/// <summary>
-	/// Show intro level message with information about the coins that needs to be collected by the user to beat the level.
+	/// Spec §7.3/§7.4: after New Game the tutorial (its last page is the first level's card), otherwise the level's card
+	/// on its first entry in this run; nothing on Retry. Gameplay stays frozen (Intro) until "Bắt đầu".
 	/// </summary>
-	public IEnumerator ShowIntroBeatLevelCanvas() {
-		introBeatLevelCanvas.SetActive (true);
-		mainCanvas.SetActive (false);
+	void StartStory () {
+		bool tutorial = config != null && config == LevelCatalog.First && CampaignProgress.TutorialPending;
+		bool card = config != null && GameSettings.showIntroLevelMessage && !CampaignProgress.IntroSeen (config.levelId);
+		CampaignProgress.TutorialPending = false;
+		GameSettings.showIntroLevelMessage = false;
+		if (dialog == null || (!tutorial && !card))
+			return;
 		GameFlow.Enter (FlowState.Intro);
-		// Ends early when the card is tapped (UIButtonResumeGame moves GameFlow to Playing).
-		float end = Time.realtimeSinceStartup + introBeatLevelTextDuration;
-		while (GameFlow.State == FlowState.Intro && Time.realtimeSinceStartup < end)
-			yield return null;
-		if (GameFlow.State == FlowState.Intro)
-			GameFlow.Enter (FlowState.Playing);
-		introBeatLevelCanvas.SetActive (false);
-		mainCanvas.SetActive (true);
+		mainCanvas.SetActive (false);
+		StoryPage[] pages = tutorial ? StoryText.Tutorial (config) : new[] { StoryText.LevelCard (config) };
+		dialog.Show (pages, tutorial ? pages.Length - 1 : -1, "Bắt đầu", () => {
+			CampaignProgress.MarkIntroSeen (config.levelId);
+			mainCanvas.SetActive (true);
+			if (GameFlow.State == FlowState.Intro)
+				GameFlow.Enter (FlowState.Playing);
+		});
 	}
 
 	/// <summary>
