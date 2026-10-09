@@ -5,7 +5,8 @@ using UnityEngine.SceneManagement;
 /// The one way to play a sound effect (spec §8.2): looks the clip up in AudioCatalog and plays it on a pooled 2D
 /// voice. At most MaxVoices at once and MaxPerEvent of the same event, Cooldown seconds between two of one event;
 /// important feedback (hits, boss, results) may take over the oldest decorative voice. Nothing plays while SFX are
-/// muted. Voices survive scene loads only for UI clicks (the click that loaded the scene).
+/// muted. Voices survive scene loads only for UI clicks (the click that loaded the scene) and the campaign win cue
+/// (it plays on into the Ending).
 /// </summary>
 public static class Sfx {
 
@@ -41,8 +42,8 @@ public static class Sfx {
 	}
 
 	public static bool Important(SfxEvent e) {
-		return e == SfxEvent.RobotHit || e == SfxEvent.RobotDown || e == SfxEvent.BossWarn || e == SfxEvent.BossStrike
-			|| e == SfxEvent.Lose || e == SfxEvent.ShieldBlock;
+		return e == SfxEvent.RobotHit || e == SfxEvent.BossWarn || e == SfxEvent.BossStrike || e == SfxEvent.ShieldBlock
+			|| e == SfxEvent.Lose || e == SfxEvent.LevelWin || e == SfxEvent.CampaignWin;
 	}
 }
 
@@ -69,7 +70,24 @@ public class SfxHost : MonoBehaviour {
 			voices[i].ignoreListenerPause = true;   // UI feedback still works in the pause menu
 			voices[i].Stop();   // a freshly added source counts as playing (playOnAwake) until stopped
 		}
-		SceneManager.sceneLoaded += (scene, mode) => StopAll(true);
+		SceneManager.sceneLoaded += SceneLoaded;
+		SoundSettings.Changed += Rescale;
+	}
+
+	void OnDestroy() {
+		SceneManager.sceneLoaded -= SceneLoaded;
+		SoundSettings.Changed -= Rescale;
+	}
+
+	void SceneLoaded(Scene scene, LoadSceneMode mode) {
+		StopAll(true);
+	}
+
+	// A new SFX volume applies to voices already playing too.
+	void Rescale() {
+		for (int i = 0; i < voices.Length; i++)
+			if (voices[i].isPlaying)
+				voices[i].volume = catalog.Volume(playing[i]) * SoundSettings.SfxVolume;
 	}
 
 	public int Active {
@@ -114,9 +132,9 @@ public class SfxHost : MonoBehaviour {
 		return true;
 	}
 
-	public void StopAll(bool keepClicks) {
+	public void StopAll(bool sceneChange) {
 		for (int i = 0; i < voices.Length; i++)
-			if (!(keepClicks && playing[i] == SfxEvent.UiClick))
+			if (!(sceneChange && (playing[i] == SfxEvent.UiClick || playing[i] == SfxEvent.CampaignWin)))
 				voices[i].Stop();
 	}
 }

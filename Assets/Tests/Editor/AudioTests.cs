@@ -42,6 +42,8 @@ public class AudioTests {
 
 	[Test]
 	public void SettingsPersistAndDefaultOn() {
+		bool savedSfx = SoundSettings.SfxEnabled;
+		float savedMusic = SoundSettings.MusicVolume;
 		PlayerPrefs.DeleteKey(SoundSettings.SfxKey);
 		SoundSettings.Reload();
 		Assert.IsTrue(SoundSettings.SfxEnabled, "on at first run");
@@ -53,7 +55,8 @@ public class AudioTests {
 		SoundSettings.MusicVolume = 0.4f;
 		SoundSettings.Reload();
 		Assert.AreEqual(0.4f, SoundSettings.MusicVolume, 0.001f);
-		SoundSettings.MusicVolume = 1f;
+		SoundSettings.MusicVolume = savedMusic;
+		SoundSettings.SfxEnabled = savedSfx;
 	}
 
 	// Spec §8.1: the harsh loop is gone (asset, scenes, prefabs, Timeline, builders) and no AudioClip reference dangles.
@@ -153,8 +156,12 @@ public class AudioTests {
 			foreach (TimelineClip clip in track.GetClips()) {
 				AudioClip audio = ((AudioPlayableAsset)clip.asset).clip;
 				StringAssert.StartsWith(AudioSetup.Folder, AssetDatabase.GetAssetPath(audio), track.name);
-				Assert.That(clip.easeInDuration, Is.InRange(0.2, 0.5), track.name + " fade in");
-				Assert.That(clip.easeOutDuration, Is.InRange(0.2, 0.5), track.name + " fade out");
+				Assert.IsFalse(((AudioPlayableAsset)clip.asset).loop, track.name + " loops (a baked fade would dip)");
+				Assert.LessOrEqual(clip.duration, audio.length + 0.001, track.name);
+				if (audio.name == "ending_charge" || audio.name == "ending_engine") {
+					Assert.That(clip.easeInDuration, Is.InRange(0.2, 0.5), track.name + " fade in");
+					Assert.That(clip.easeOutDuration, Is.InRange(0.2, 0.5), track.name + " fade out");
+				}
 				names.Add(audio.name);
 			}
 		}

@@ -13,6 +13,14 @@ public class SoundGroup : MonoBehaviour {
 	[Tooltip("Authored volume before the group setting.")]
 	public float baseVolume = 1f;
 
+	float fade = 1f;
+
+	/// <summary>Runtime fade (0..1, e.g. music fading out on a result) kept across settings changes.</summary>
+	public float Fade {
+		get { return fade; }
+		set { fade = Mathf.Clamp01(value); Apply(); }
+	}
+
 	AudioSource source;
 
 	void Awake() {
@@ -35,6 +43,6 @@ public class SoundGroup : MonoBehaviour {
 
 	public void Apply() {
 		if (source != null)
-			source.volume = baseVolume * GroupVolume();
+			source.volume = baseVolume * GroupVolume() * fade;
 	}
 }

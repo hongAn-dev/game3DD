@@ -84,7 +84,6 @@ write('overdrive_on', mix(tone(698.5, 0.32, 0.01, 0.12, 'warm', bend=0.8), noise
 write('overdrive_off', tone(1174.7, 0.26, 0.01, 0.09, 'warm', bend=-0.5))
 # --- hits / enemies ---
 write('robot_hit', mix(tone(140, 0.24, 0.002, 0.07, bend=-0.4), noise(0.08, 2500, 800, 0.001, 0.025)))
-write('robot_down', mix(tone(180, 0.6, 0.004, 0.22, 'warm', bend=-0.6), noise(0.25, 1800, 300, 0.002, 0.08)))
 write('creep_attack', noise(0.24, 600, 3200, 0.03, 0.08))
 write('boss_warn', mix(tone(392, 0.2, 0.01, 0.12, 'warm'), tone(523.3, 0.22, 0.01, 0.12, 'warm'), offsets=[0, 0.2]))
 write('boss_strike', mix(tone(95, 0.42, 0.003, 0.14, bend=-0.3), noise(0.18, 1500, 400, 0.002, 0.06)))
@@ -94,13 +93,13 @@ write('lose', mix(tone(392, 0.3, 0.01, 0.15, 'warm'), tone(329.6, 0.3, 0.01, 0.1
 write('level_win', mix(*[tone(f, 0.35, 0.006, 0.16, 'warm') for f in (523.3, 659.3, 784.0, 1046.5)], offsets=[0, 0.14, 0.28, 0.45]))
 write('campaign_win', mix(*[tone(f, 0.5, 0.006, 0.25, 'warm') for f in (523.3, 659.3, 784.0, 1046.5, 1318.5, 1568.0)],
                           offsets=[0, 0.16, 0.32, 0.5, 0.7, 0.95]))
-# --- ending ---
-write('ending_charge', fade(mix(*[tone(f, 2.6, 0.8, 3.0, 'warm', bend=0.25) for f in (220, 330, 440)]), 0.4, 0.5))
+# --- ending (beds are as long as their part of the scene, no baked fades: the Timeline eases fade them) ---
+write('ending_charge', mix(*[tone(f, 5.0, 0.6, 30.0, 'warm', bend=0.25) for f in (220, 330, 440)]))
 write('ending_ignition', fade(mix(tone(110, 0.9, 0.01, 0.3, bend=-0.2), noise(0.9, 800, 2200, 0.05, 0.4)), 0.02, 0.3))
-write('ending_engine', fade(mix(noise(6.0, 900, 1400, 0.4, 20.0), [0.25 * v for v in tone(160, 6.0, 0.4, 20.0, 'warm')]), 0.5, 0.5))
-# --- ambience beds (seamless loops, very soft) ---
-write('ambience_acid', loop(mix(noise(9.0, 350, 450, 1.0, 60.0),
+write('ending_engine', mix(noise(9.5, 900, 1400, 0.05, 60.0), [0.25 * v for v in tone(160, 9.5, 0.05, 60.0, 'warm')]))
+# --- ambience beds (seamless loops, very soft; no attack, or the crossfade would dip each loop) ---
+write('ambience_acid', loop(mix(noise(9.0, 350, 450, 0.001, 60.0),
                                 *[[0.25 * v for v in tone(rng.uniform(900, 1500), 0.08, 0.005, 0.02)] for _ in range(10)],
                                 offsets=[0.0] + [rng.uniform(0.5, 8.0) for _ in range(10)]), 1.0))
-write('ambience_station', loop(mix(noise(9.0, 250, 320, 1.0, 60.0), [0.15 * v for v in tone(220, 9.0, 1.0, 60.0, 'warm', vibrato=0.002)]), 1.0))
+write('ambience_station', loop(mix(noise(9.0, 250, 320, 0.001, 60.0), [0.15 * v for v in tone(220, 9.0, 0.001, 60.0, 'warm', vibrato=0.002)]), 1.0))
 print('SFX_OK')

@@ -18,8 +18,14 @@ public class AudioPlayTests {
 		return played.Count(p => p == e);
 	}
 
+	bool savedSfx;
+	float savedMusic, savedSfxVolume;
+
 	[UnitySetUp]
 	public IEnumerator On() {
+		savedSfx = SoundSettings.SfxEnabled;
+		savedMusic = SoundSettings.MusicVolume;
+		savedSfxVolume = SoundSettings.SfxVolume;
 		played.Clear();
 		Sfx.Played += Record;
 		SoundSettings.SfxEnabled = true;
@@ -31,8 +37,10 @@ public class AudioPlayTests {
 	public void Off() {
 		Sfx.Played -= Record;
 		GameFlow.ResetForScene();
-		SoundSettings.SfxEnabled = true;
 		Sfx.StopAll();
+		SoundSettings.SfxEnabled = savedSfx;
+		SoundSettings.MusicVolume = savedMusic;
+		SoundSettings.SfxVolume = savedSfxVolume;
 	}
 
 	[UnityTest]
@@ -43,9 +51,22 @@ public class AudioPlayTests {
 		Assert.IsTrue(Sfx.Play(SfxEvent.Lose));
 		yield return new WaitForSecondsRealtime(0.15f);
 		Assert.IsFalse(Sfx.Play(SfxEvent.Lose), "at most two voices of one event");
-		foreach (SfxEvent e in System.Enum.GetValues(typeof(SfxEvent)))
-			Sfx.Play(e);
-		Assert.LessOrEqual(Sfx.ActiveVoices, Sfx.MaxVoices);
+		yield return null;
+	}
+
+	// All 8 voices busy: a decorative sound is refused, important feedback takes over the oldest decorative voice.
+	[UnityTest]
+	public IEnumerator FullPoolRefusesDecorAndLetsImportantSteal() {
+		var decor = new[] { SfxEvent.EnergyPickup, SfxEvent.Heal, SfxEvent.ShieldOn, SfxEvent.ShieldOff, SfxEvent.OverdriveOn,
+			SfxEvent.OverdriveOff, SfxEvent.CreepAttack };
+		foreach (SfxEvent e in decor)
+			Assert.IsTrue(Sfx.Play(e), e.ToString());
+		Assert.IsTrue(Sfx.Play(SfxEvent.Lose));
+		Assert.AreEqual(Sfx.MaxVoices, Sfx.ActiveVoices);
+		Assert.IsFalse(Sfx.Play(SfxEvent.UiClick), "no voice left for decoration");
+		Assert.IsTrue(Sfx.Play(SfxEvent.BossWarn), "important steals a decorative voice");
+		Assert.IsTrue(Sfx.Play(SfxEvent.RobotHit));
+		Assert.AreEqual(Sfx.MaxVoices, Sfx.ActiveVoices);
 		yield return null;
 	}
 
@@ -131,6 +152,9 @@ public class AudioPlayTests {
 		Assert.That(half, Is.EqualTo(1f - elapsed).Within(0.2f), "linear in time, not per frame");
 		yield return new WaitForSecondsRealtime(GameManager.MusicFade * 0.5f + 0.6f);
 		Assert.AreEqual(0f, music.volume, 0.001f);
+		SoundSettings.SfxEnabled = false;   // the sound toggle on the result screen
+		SoundSettings.SfxEnabled = true;
+		Assert.AreEqual(0f, music.volume, 0.001f, "music stays faded after a settings change");
 		Assert.AreEqual(1, Count(SfxEvent.LevelWin));
 		Assert.AreEqual(0, Count(SfxEvent.Lose));
 	}
@@ -140,9 +164,28 @@ public class AudioPlayTests {
 		yield return Level1();
 		player.GetComponent<Health>().TakeDamage(0f, DamageKind.FatalHazard);
 		yield return new WaitForSecondsRealtime(GameManager.MusicFade + 0.6f);
-		Assert.AreEqual(1, Count(SfxEvent.Lose));
-		Assert.AreEqual(1, Count(SfxEvent.RobotDown));
+		Assert.AreEqual(1, Count(SfxEvent.Lose), "the one death cue");
+		Assert.AreEqual(0, Count(SfxEvent.RobotHit), "the lethal hit adds no second cue");
 		Assert.AreEqual(0, Count(SfxEvent.LevelWin));
 		Assert.AreEqual(0f, GameManager.gm.backgroundMusic.volume, 0.001f);
+	}
+
+	// SFX mute silences the Ending's cinematic sources, never music or ambience.
+	[UnityTest]
+	public IEnumerator MuteReachesEndingSourcesButNotMusic() {
+		yield return Level1();
+		AudioSource music = GameManager.gm.backgroundMusic, ambience = GameManager.gm.transform.Find("Ambient").GetComponent<AudioSource>();
+		float m = music.volume, a = ambience.volume;
+		SoundSettings.SfxEnabled = false;
+		Assert.AreEqual(m, music.volume, 0.0001f);
+		Assert.AreEqual(a, ambience.volume, 0.0001f);
+		SoundSettings.SfxEnabled = true;
+		SceneManager.LoadScene("Ending");
+		yield return null;
+		yield return null;
+		AudioSource engine = GameObject.Find("Audio Engine").GetComponent<AudioSource>();
+		Assert.Greater(engine.volume, 0f);
+		SoundSettings.SfxEnabled = false;
+		Assert.AreEqual(0f, engine.volume);
 	}
 }

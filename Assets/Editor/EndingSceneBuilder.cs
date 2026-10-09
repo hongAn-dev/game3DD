@@ -493,11 +493,12 @@ public static class EndingSceneBuilder {
 		AudioTrack track = timeline.CreateTrack<AudioTrack>(null, source.name);
 		TimelineClip clip = track.CreateDefaultClip();
 		((AudioPlayableAsset)clip.asset).clip = source.clip;
-		((AudioPlayableAsset)clip.asset).loop = duration > source.clip.length;   // the charge hum and engine fill their part
 		clip.start = start;
-		clip.duration = duration;
-		clip.easeInDuration = 0.3;
-		clip.easeOutDuration = 0.3;
+		clip.duration = Mathf.Min(duration, source.clip.length);   // no loops: the beds are made as long as their part
+		// Beds (charge hum, engine) fade in and out; one-shots keep their attack, the ignition tail eases out.
+		bool bed = source.clip.length > 2f;
+		clip.easeInDuration = bed ? 0.3 : 0.0;
+		clip.easeOutDuration = bed ? 0.3 : source.clip.name == "ending_ignition" ? 0.2 : 0.0;
 		director.SetGenericBinding(track, source);
 	}
 

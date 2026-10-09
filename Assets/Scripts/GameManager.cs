@@ -42,6 +42,7 @@ public class GameManager : MonoBehaviour {
 	public const float MusicFade = 1f;
 	float fadeFrom;
 	float fadeStart;
+	SoundGroup musicGroup;
 
 	[Tooltip("Only need to set if canBeatLevel is set to true.")]
 	public GameObject introBeatLevelCanvas;
@@ -147,7 +148,10 @@ public class GameManager : MonoBehaviour {
 			case gameStates.BeatLevel:
 				// Fade by time, not per frame; the result cue already played once when the state began.
 				float left = 1f - (Time.unscaledTime - fadeStart) / MusicFade;
-				if (backgroundMusic != null)
+				// Through the music's SoundGroup so a sound-settings change on the result screen keeps it faded.
+				if (musicGroup != null)
+					musicGroup.Fade = left;
+				else if (backgroundMusic != null)
 					backgroundMusic.volume = fadeFrom * Mathf.Max (0f, left);
 				if (left <= 0f) {
 					// If pass on current level should show set to true to show the intro message on the next level.
@@ -202,6 +206,7 @@ public class GameManager : MonoBehaviour {
 	void BeginResult (SfxEvent cue) {
 		Sfx.Play (cue);
 		fadeFrom = backgroundMusic != null ? backgroundMusic.volume : 0f;
+		musicGroup = backgroundMusic != null ? backgroundMusic.GetComponent<SoundGroup> () : null;
 		fadeStart = Time.unscaledTime;
 	}
 
@@ -213,8 +218,9 @@ public class GameManager : MonoBehaviour {
 		canvas.sortingOrder = 1000;
 		UnityEngine.UI.Image black = overlay.GetComponent<UnityEngine.UI.Image> ();
 		black.raycastTarget = false;
-		for (float t = 0f; t < 0.75f; t += Time.unscaledDeltaTime) {
-			black.color = new Color (0f, 0f, 0f, t / 0.75f);
+		// As long as the music fade; the campaign win cue plays on into the Ending.
+		for (float t = 0f; t < MusicFade; t += Time.unscaledDeltaTime) {
+			black.color = new Color (0f, 0f, 0f, t / MusicFade);
 			yield return null;
 		}
 		black.color = Color.black;
