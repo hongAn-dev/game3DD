@@ -14,10 +14,10 @@ public static class LevelConfigBuilder {
 			AssetDatabase.CreateFolder("Assets/Resources", "Levels");
 
 		// Zone names and hazards follow spec §5.
-		Write("Level1", 1, "Bãi đáp hỏng", "Level2", 6, 3, 5, 5f, 7f, new[] { 2, 3, 4 }, new[] { 1, 1, 1 }, "Robo rơi xuống biển axit");
-		Write("Level2", 2, "Trạm khai thác bỏ hoang", "Level3", 10, 4, 6, 5f, 7f, new[] { 4, 5, 6 }, new[] { 1, 1, 1 }, "Robo rơi xuống biển axit");
-		Write("Level3", 3, "Vùng địa nhiệt", "Level4", 14, 5, 7, 4f, 6f, new[] { 6, 7, 8 }, new[] { 2, 2, 2 }, "Robo chạm dung nham");
-		Write("Level4", 4, "Bãi phóng cũ", SceneRouter.EndingScene, 18, 6, 8, 4f, 6f, new[] { 8, 9, 10 }, new[] { 2, 2, 2 }, "Robo rơi xuống biển axit");
+		Write("Level1", 1, "Bãi đáp hỏng", "Level2", 6, 3, 5, 5f, 7f, "Robo rơi xuống biển axit");
+		Write("Level2", 2, "Trạm khai thác bỏ hoang", "Level3", 10, 4, 6, 5f, 7f, "Robo rơi xuống biển axit");
+		Write("Level3", 3, "Vùng địa nhiệt", "Level4", 14, 5, 7, 4f, 6f, "Robo chạm dung nham");
+		Write("Level4", 4, "Bãi phóng cũ", SceneRouter.EndingScene, 18, 6, 8, 4f, 6f, "Robo rơi xuống biển axit");
 		// Enemies (spec §4.1-§4.3): caps (creep + boss), Normal speed/damage, creep timings, quiet time.
 		Enemies("Level1", new[] { 1, 1, 1 }, 0, 5.0f, 0f, 10, 0, 0.65f, 1.00f, 8f);
 		Enemies("Level2", new[] { 2, 3, 4 }, 0, 6.0f, 0f, 12, 0, 0.60f, 0.95f, 6f);
@@ -43,7 +43,7 @@ public static class LevelConfigBuilder {
 	}
 
 	static void Write(string id, int order, string name, string next, int target, int atStart, int cap,
-		float intervalMin, float intervalMax, int[] enemyCap, int[] bossCap, string hazardMessage) {
+		float intervalMin, float intervalMax, string hazardMessage) {
 		string path = Folder + "/" + id + ".asset";
 		LevelConfig config = AssetDatabase.LoadAssetAtPath<LevelConfig>(path);
 		if (config == null) {
@@ -59,8 +59,6 @@ public static class LevelConfigBuilder {
 		config.energyCap = cap;
 		config.energyIntervalMin = intervalMin;
 		config.energyIntervalMax = intervalMax;
-		config.enemyCap = enemyCap;
-		config.bossCap = bossCap;
 		config.hazardDeathMessage = hazardMessage;
 		EditorUtility.SetDirty(config);
 	}

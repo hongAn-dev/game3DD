@@ -109,9 +109,10 @@ public class Health : MonoBehaviour {
 				return false;
 			InvulnerableLeft = InvulnerableSeconds;
 		}
+		float before = healthPoints;
 		healthPoints = Mathf.Clamp(healthPoints - amount, 0f, maxHealth);
 		if (Damaged != null)
-			Damaged(amount);
+			Damaged(before - healthPoints);   // what was actually lost
 		return true;
 	}
 
@@ -119,9 +120,10 @@ public class Health : MonoBehaviour {
 	public bool Heal(float amount) {
 		if (!GameFlow.IsGameplayActive || healthPoints <= 0f || healthPoints >= maxHealth || amount <= 0f)
 			return false;
+		float before = healthPoints;
 		healthPoints = Mathf.Min(maxHealth, healthPoints + amount);
 		if (Healed != null)
-			Healed(amount);
+			Healed(healthPoints - before);   // what was actually restored
 		return true;
 	}
 

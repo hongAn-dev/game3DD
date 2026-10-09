@@ -21,6 +21,7 @@ public class PlayerHealthBar : MonoBehaviour {
 	Transform robot;
 	float radius = 0.5f;
 	Canvas canvas;
+	float shownHp = -1f;
 
 	public static Color ColorFor(float fraction) {
 		return fraction > 0.5f ? Green : fraction > 0.25f ? Yellow : Red;
@@ -57,6 +58,9 @@ public class PlayerHealthBar : MonoBehaviour {
 		RectTransformUtility.ScreenPointToLocalPointInRectangle((RectTransform)bar.parent, screen,
 			canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera, out local);
 		bar.anchoredPosition = local;
+		if (shownHp == health.healthPoints)
+			return;   // no new label string every frame
+		shownHp = health.healthPoints;
 		float fraction = health.maxHealth > 0f ? Mathf.Clamp01(health.healthPoints / health.maxHealth) : 0f;
 		fill.fillAmount = fraction;
 		fill.color = ColorFor(fraction);

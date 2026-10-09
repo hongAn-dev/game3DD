@@ -27,7 +27,7 @@ public static class PlayerHudSetup {
 		GameObject root = new GameObject("Robo HUD Canvas", typeof(Canvas), typeof(CanvasScaler));
 		Canvas canvas = root.GetComponent<Canvas>();
 		canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-		canvas.sortingOrder = 5;   // above the world, under the HUD panels and pause overlay
+		canvas.sortingOrder = -1;   // drawn before the HUD/mobile canvases (order 0), dialogs and the pause overlay
 		CanvasScaler scaler = root.GetComponent<CanvasScaler>();
 		scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
 		scaler.referenceResolution = new Vector2(1920f, 1080f);

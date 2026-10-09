@@ -59,6 +59,7 @@ public class EnemyBrain : MonoBehaviour {
 	public Vector3[] patrolPoints = new Vector3[0];
 
 	public EnemyState State { get; private set; }
+	public float DistanceToTarget { get; private set; }
 	public AttackKind CurrentAttack { get; private set; }
 
 	NavMeshAgent agent;
@@ -199,6 +200,7 @@ public class EnemyBrain : MonoBehaviour {
 		stateTime += Time.deltaTime;
 		UpdateRunSpeed();
 		float distance = FlatDistance(target.position);
+		DistanceToTarget = distance;
 
 		switch (State) {
 		case EnemyState.Idle:
@@ -222,6 +224,10 @@ public class EnemyBrain : MonoBehaviour {
 		case EnemyState.Chase:
 			if (distance > loseRadius) {
 				Enter(EnemyState.Return);
+				break;
+			}
+			if (EnemyDirector.Current != null && !EnemyDirector.Current.HoldsChase(this)) {
+				Enter(EnemyState.Patrol);   // a closer enemy took this token
 				break;
 			}
 			Repath(true);

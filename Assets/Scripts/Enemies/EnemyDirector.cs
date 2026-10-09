@@ -62,15 +62,30 @@ public class EnemyDirector : MonoBehaviour {
 		return (elapsed >= 12f && score >= 0.3f * target) || elapsed >= 30f;
 	}
 
-	/// <summary>Asks for one of the chase tokens; true if this enemy may chase. Already holding one counts.</summary>
+	/// <summary>
+	/// Asks for one of the chase tokens; true if this enemy may chase. Already holding one counts. When all tokens
+	/// are taken, a requester closer to the robot takes the token of a chaser that has fallen behind (beyond its
+	/// detect radius); that chaser notices through HoldsChase and goes back to patrolling.
+	/// </summary>
 	public bool RequestChase(EnemyBrain brain) {
 		chasers.RemoveAll(b => b == null);
 		if (chasers.Contains(brain))
 			return true;
-		if (chasers.Count >= maxChasers)
-			return false;
+		if (chasers.Count >= maxChasers) {
+			EnemyBrain trailing = null;
+			foreach (EnemyBrain c in chasers)
+				if (c.DistanceToTarget > c.detectRadius && (trailing == null || c.DistanceToTarget > trailing.DistanceToTarget))
+					trailing = c;
+			if (trailing == null || trailing.DistanceToTarget <= brain.DistanceToTarget)
+				return false;
+			chasers.Remove(trailing);
+		}
 		chasers.Add(brain);
 		return true;
+	}
+
+	public bool HoldsChase(EnemyBrain brain) {
+		return chasers.Contains(brain);
 	}
 
 	public void ReleaseChase(EnemyBrain brain) {
@@ -100,6 +115,7 @@ public class EnemyDirector : MonoBehaviour {
 		GameObject p = GameObject.FindWithTag("Player");
 		player = p != null ? p.transform : null;
 		ScheduleNext();
+		timer = nextInterval;   // the first enemy comes as soon as the quiet time ends
 	}
 
 	void ScheduleNext() {
@@ -144,17 +160,27 @@ public class EnemyDirector : MonoBehaviour {
 		return true;
 	}
 
-	bool Valid(Vector3 point, Vector3 robot) {
+	// Cheap checks first (robot distance, enemies, pending spawns, cores/items), the NavMesh path last.
+	bool Valid(Vector3 point, Vector3 robot, List<Vector3> taken) {
 		if (Vector3.Distance(point, player.position) < minPlayerDistance)
 			return false;
-		foreach (Vector3 pending in pendingPoints)
-			if (Vector3.Distance(pending, point) < minEnemySpacing)
-				return false;
-		foreach (EnemyBrain brain in FindObjectsOfType<EnemyBrain>())
-			if (Vector3.Distance(brain.transform.position, point) < minEnemySpacing)
+		foreach (Vector3 other in taken)
+			if (Vector3.Distance(other, point) < minEnemySpacing)
 				return false;
 		var path = new NavMeshPath();
 		return NavMesh.CalculatePath(point, robot, NavMesh.AllAreas, path) && path.status == NavMeshPathStatus.PathComplete;
+	}
+
+	// Everything a new enemy must not appear on: enemies, telegraphed spawns, energy cores/drops and items.
+	List<Vector3> Taken() {
+		var taken = new List<Vector3>(pendingPoints);
+		Prune();
+		foreach (EnemyBrain brain in bosses) taken.Add(brain.transform.position);
+		foreach (EnemyBrain brain in creeps) taken.Add(brain.transform.position);
+		EnergySpawnDirector energy = GetComponent<EnergySpawnDirector>();
+		if (energy != null)
+			taken.AddRange(energy.Occupied());
+		return taken;
 	}
 
 	// A random valid spawn point: on the NavMesh, far enough from the robot, with a path to it, not on an enemy.
@@ -163,10 +189,11 @@ public class EnemyDirector : MonoBehaviour {
 		Vector3 robot;
 		if (!RobotOnMesh(out robot))
 			return false;   // robot airborne/off the mesh: try again next time
+		List<Vector3> taken = Taken();
 		var options = new List<Vector3>();
 		foreach (Transform t in spawnPoints) {
 			NavMeshHit hit;
-			if (t != null && NavMesh.SamplePosition(t.position, out hit, 1.5f, NavMesh.AllAreas) && Valid(hit.position, robot))
+			if (t != null && NavMesh.SamplePosition(t.position, out hit, 1.5f, NavMesh.AllAreas) && Valid(hit.position, robot, taken))
 				options.Add(hit.position);
 		}
 		if (options.Count == 0)
@@ -233,9 +260,12 @@ public class EnemyDirector : MonoBehaviour {
 		Vector3 robot;
 		int valid = 0, withPath = 0;
 		if (RobotOnMesh(out robot)) {
-			foreach (Transform t in spawnPoints)
-				if (t != null && Valid(t.position, robot))
+			List<Vector3> taken = Taken();
+			foreach (Transform t in spawnPoints) {
+				NavMeshHit hit;
+				if (t != null && NavMesh.SamplePosition(t.position, out hit, 1.5f, NavMesh.AllAreas) && Valid(hit.position, robot, taken))
 					valid++;
+			}
 			foreach (EnemyBrain brain in FindObjectsOfType<EnemyBrain>()) {
 				var path = new NavMeshPath();
 				if (NavMesh.CalculatePath(brain.transform.position, robot, NavMesh.AllAreas, path) && path.status == NavMeshPathStatus.PathComplete)

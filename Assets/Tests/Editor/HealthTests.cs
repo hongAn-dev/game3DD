@@ -45,6 +45,19 @@ public class HealthTests {
 	}
 
 	[Test]
+	public void EventsReportWhatWasApplied() {
+		float damaged = 0f, healed = 0f;
+		health.Damaged += a => damaged = a;
+		health.Healed += a => healed = a;
+		health.healthPoints = 10f;
+		health.TakeDamage(18f, DamageKind.EnemyAttack);
+		Assert.AreEqual(10f, damaged, "only the HP that was left");
+		health.healthPoints = 90f;
+		health.Heal(25f);
+		Assert.AreEqual(10f, healed, "only up to max");
+	}
+
+	[Test]
 	public void FatalHazardIgnoresInvulnerability() {
 		health.TakeDamage(10f, DamageKind.EnemyAttack);
 		Assert.IsTrue(health.TakeDamage(0f, DamageKind.FatalHazard));

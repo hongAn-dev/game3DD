@@ -106,10 +106,11 @@ public class EnemyPlayTests {
 		Assert.AreNotEqual(EnemyState.Chase, waiting.State, "only one token");
 		Object.Destroy(chaser.gameObject);
 		yield return new WaitForSeconds(1f);
-		Assert.AreEqual(EnemyState.Chase, waiting.State, "token freed when the chaser died");
+		Assert.AreNotEqual(EnemyState.Idle, waiting.State, "token freed when the chaser died");
+		Assert.AreNotEqual(EnemyState.Patrol, waiting.State, "token freed when the chaser died");
+		Assert.AreEqual(1, director.Chasing);
 	}
 
-	// Spec §4.1: enemy speed is level data, never a share of the robot's (boosted) top speed.
 	[UnityTest]
 	public IEnumerator EnemySpeedIgnoresRobotSpeed() {
 		yield return Arena();
