@@ -41,6 +41,8 @@ public class EnemyBrain : MonoBehaviour {
 	public string attackClip = "";
 
 	public Transform target;
+	[Tooltip("Patrol stops (energy landing points near home), set by EnemyDirector; empty = wander near home.")]
+	public Vector3[] patrolPoints = new Vector3[0];
 
 	public EnemyState State { get; private set; }
 
@@ -88,8 +90,24 @@ public class EnemyBrain : MonoBehaviour {
 		Enter(EnemyState.Idle);
 	}
 
+	// Chase token from the director (spec §4.2: at most 2 or 3 enemies chase at once); no director = no limit.
+	bool MayChase() {
+		return EnemyDirector.Current == null || EnemyDirector.Current.RequestChase(this);
+	}
+
+	void ReleaseToken() {
+		if (EnemyDirector.Current != null)
+			EnemyDirector.Current.ReleaseChase(this);
+	}
+
+	void OnDestroy() {
+		ReleaseToken();
+	}
+
 	void Enter(EnemyState next) {
 		State = next;
+		if (next == EnemyState.Idle || next == EnemyState.Patrol || next == EnemyState.Return || next == EnemyState.Disabled)
+			ReleaseToken();
 		stateTime = 0f;
 		bool attacking = next == EnemyState.Windup || next == EnemyState.Strike || next == EnemyState.Recover;
 		if (agent.isOnNavMesh)
@@ -144,17 +162,18 @@ public class EnemyBrain : MonoBehaviour {
 
 		switch (State) {
 		case EnemyState.Idle:
-			if (distance <= detectRadius)
+			if (distance <= detectRadius && MayChase())
 				Enter(EnemyState.Chase);
 			else if (stateTime > 2f)
 				Enter(EnemyState.Patrol);
 			break;
 		case EnemyState.Patrol:
-			if (distance <= detectRadius) {
+			if (distance <= detectRadius && MayChase()) {
 				Enter(EnemyState.Chase);
 			} else if (stateTime > 6f || (!agent.pathPending && agent.remainingDistance < 1f)) {
 				NavMeshHit hit;
-				Vector3 random = home + Quaternion.Euler(0f, Random.Range(0f, 360f), 0f) * Vector3.forward * Random.Range(2f, 8f);
+				Vector3 random = patrolPoints.Length > 0 ? patrolPoints[Random.Range(0, patrolPoints.Length)]
+					: home + Quaternion.Euler(0f, Random.Range(0f, 360f), 0f) * Vector3.forward * Random.Range(2f, 8f);
 				if (NavMesh.SamplePosition(random, out hit, 2f, NavMesh.AllAreas))
 					agent.SetDestination(hit.position);
 				stateTime = 0f;
@@ -191,7 +210,7 @@ public class EnemyBrain : MonoBehaviour {
 		case EnemyState.Return:
 			Repath(false);
 			// Back home, or at least 3 s of retreat, before chasing again (no chase/retreat flapping when stuck).
-			if (distance <= detectRadius && stateTime > 3f)
+			if (distance <= detectRadius && stateTime > 3f && MayChase())
 				Enter(EnemyState.Chase);
 			else if (!agent.pathPending && agent.remainingDistance < 1f)
 				Enter(EnemyState.Idle);

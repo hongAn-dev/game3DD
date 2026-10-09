@@ -41,9 +41,9 @@ public static class EnemySetup {
 			director.bossPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(BossPath);
 			director.creepPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(CreepPath);
 			director.telegraphMaterial = telegraph;
-			// Level1 teaches the controls first: its boss waits for two cores or 30 s (spec §5/§6.2).
-			director.bossAfterScore = level.levelId == "Level1" ? 2 : 0;
-			director.bossAfterTime = level.levelId == "Level1" ? 30f : 8f;
+			director.intervalMin = 2f;
+			director.intervalMax = 3f;
+			director.minPlayerDistance = 8f;
 			director.spawnPoints = SpawnPoints(data).ToArray();
 			EditorSceneManager.MarkSceneDirty(scene);
 			EditorSceneManager.SaveScene(scene);

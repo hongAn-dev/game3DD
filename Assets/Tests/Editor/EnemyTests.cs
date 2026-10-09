@@ -125,6 +125,16 @@ public class EnemyTests {
 		}
 	}
 
+	// Spec §4.2: boss after at least 12 s and 30% of the energy target, or after 30 s regardless.
+	[Test]
+	public void BossGateOpensAt12sWith30PercentOrAt30s() {
+		Assert.IsFalse(EnemyDirector.BossGateOpen(11.9f, 14, 14));
+		Assert.IsTrue(EnemyDirector.BossGateOpen(12f, 5, 14));
+		Assert.IsFalse(EnemyDirector.BossGateOpen(12f, 4, 14));
+		Assert.IsFalse(EnemyDirector.BossGateOpen(29.9f, 0, 14));
+		Assert.IsTrue(EnemyDirector.BossGateOpen(30f, 0, 14));
+	}
+
 	[Test]
 	public void EnemyAccelerationAndTurnInRange() {
 		EnemyBrain creep = Prefab("Enemy - Crater").GetComponent<EnemyBrain>();

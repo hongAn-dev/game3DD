@@ -93,6 +93,22 @@ public class EnemyPlayTests {
 		Assert.AreEqual(1, Hits, "one strike = one hit");
 	}
 
+	// One chase token: the second creep waits until the chaser is gone, then takes over.
+	[UnityTest]
+	public IEnumerator ChaseTokenReleasedWhenChaserDies() {
+		yield return Arena();
+		EnemyDirector director = new GameObject("Director").AddComponent<EnemyDirector>();
+		director.maxChasers = 1;
+		EnemyBrain a = Spawn("Enemy - Crater", new Vector3(6f, 0f, 0f)), b = Spawn("Enemy - Crater", new Vector3(-6f, 0f, 0f));
+		yield return new WaitForSeconds(0.5f);
+		EnemyBrain chaser = a.State == EnemyState.Chase ? a : b, waiting = chaser == a ? b : a;
+		Assert.AreEqual(EnemyState.Chase, chaser.State);
+		Assert.AreNotEqual(EnemyState.Chase, waiting.State, "only one token");
+		Object.Destroy(chaser.gameObject);
+		yield return new WaitForSeconds(1f);
+		Assert.AreEqual(EnemyState.Chase, waiting.State, "token freed when the chaser died");
+	}
+
 	// Spec §4.1: enemy speed is level data, never a share of the robot's (boosted) top speed.
 	[UnityTest]
 	public IEnumerator EnemySpeedIgnoresRobotSpeed() {
