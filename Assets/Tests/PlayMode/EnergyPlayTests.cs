@@ -63,8 +63,7 @@ public class EnergyPlayTests {
 	public IEnumerator FirstCoreIsFourToTenMetresByPath() {
 		foreach (string level in new[] { "Level1", "Level2", "Level3", "Level4" }) {
 			yield return Load(level, GameSettings.gameDifficulties.Normal);
-			float nearest = Object.FindObjectsOfType<Treasure>().Select(t => PathFromRobot(t.transform.position)).Min();
-			Assert.That(nearest, Is.InRange(3.5f, 10.5f), level);
+			Assert.That(PathFromRobot(director.FirstCorePoint), Is.InRange(3.5f, 10.5f), level + ": the first starting core");
 		}
 	}
 
@@ -86,14 +85,11 @@ public class EnergyPlayTests {
 	public IEnumerator BatchesDropSeveralCores() {
 		yield return Load("Level4", GameSettings.gameDifficulties.Normal);
 		ClearCores();
-		director.intervalOverride = 0.1f;
-		int most = 0;
-		float end = Time.time + 1f;
-		while (Time.time < end) {
-			most = Mathf.Max(most, director.ReservedCount);
-			yield return null;
-		}
-		Assert.GreaterOrEqual(most, 2, "a batch reserves several points at once");
+		director.intervalOverride = 50f;
+		yield return null;
+		director.ForceBatch();
+		yield return null;
+		Assert.That(director.ReservedCount, Is.InRange(2, 4), "one L4 batch reserves 2-4 points in the same frame");
 	}
 
 	[UnityTest]
@@ -179,9 +175,12 @@ public class EnergyPlayTests {
 		director.intervalOverride = 0.2f;
 		yield return new WaitForSeconds(3f);
 		int cap = director.AliveCount;
+		director.intervalOverride = 100f;   // no refill in the same frame while checking the freed slot
 		Object.Destroy(Object.FindObjectsOfType<Treasure>().First().gameObject);
 		yield return null;
 		Assert.AreEqual(cap - 1, director.AliveCount);
+		director.intervalOverride = 0.2f;
+		director.ForceBatch();
 		yield return new WaitForSeconds(2f);
 		Assert.AreEqual(cap, director.AliveCount);
 	}

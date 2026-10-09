@@ -50,6 +50,9 @@ public class EnemyDirector : MonoBehaviour {
 
 	public int AliveCount { get { Prune(); return bosses.Count + creeps.Count + pendingBosses + pendingCreeps; } }
 	public int BossCount { get { Prune(); return bosses.Count + pendingBosses; } }
+	/// <summary>Telegraphed (not yet spawned) enemy points; energy drops avoid them.</summary>
+	public IReadOnlyList<Vector3> PendingSpawns { get { return pendingPoints; } }
+
 	public int Chasing { get { chasers.RemoveAll(b => b == null); return chasers.Count; } }
 
 	void Prune() {

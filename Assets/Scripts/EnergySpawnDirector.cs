@@ -47,6 +47,15 @@ public class EnergySpawnDirector : MonoBehaviour {
 	OverdriveDirector boost;
 	Vector3 robotPoint;
 	bool robotPointValid;
+	static readonly RaycastHit[] GroundHits = new RaycastHit[16];
+
+	/// <summary>Where the first starting core went (tests check its path distance).</summary>
+	internal Vector3 FirstCorePoint { get; private set; }
+
+	/// <summary>Tests: run a batch on the next Update.</summary>
+	internal void ForceBatch() {
+		timer = float.MaxValue;
+	}
 
 	/// <summary>Cores on the map plus cores marked or falling.</summary>
 	public int AliveCount {
@@ -139,11 +148,15 @@ public class EnergySpawnDirector : MonoBehaviour {
 		foreach (Treasure t in FindObjectsOfType<Treasure>())
 			Destroy(t.gameObject);   // guards scenes that still hold authored cores
 		int want = Mathf.Min(config.energyAtStart, AllowedAlive(config.energyCap, config.energyTarget, Score()));
+		List<Candidate> candidates = Candidates();
 		for (int n = 0; n < want; n++) {
 			Vector3 point;
-			if (!Pick(n == 0 ? firstCorePath : nearPath, n == 0, out point))
+			if (!Pick(candidates, n == 0 ? firstCorePath : nearPath, n == 0, out point))
 				break;
+			if (n == 0)
+				FirstCorePoint = point;
 			alive.Add(Instantiate(corePrefab, point, Quaternion.identity).GetComponent<Treasure>());
+			Taken(candidates, point);
 		}
 	}
 
@@ -161,9 +174,10 @@ public class EnergySpawnDirector : MonoBehaviour {
 		if (player == null)
 			return;
 		float ground = float.MinValue;
-		foreach (RaycastHit hit in Physics.RaycastAll(player.position + Vector3.up, Vector3.down, 60f, ~0, QueryTriggerInteraction.Ignore))
-			if (hit.collider.attachedRigidbody == null)
-				ground = Mathf.Max(ground, hit.point.y);
+		int count = Physics.RaycastNonAlloc(player.position + Vector3.up, Vector3.down, GroundHits, 60f, ~0, QueryTriggerInteraction.Ignore);
+		for (int i = 0; i < count; i++)
+			if (GroundHits[i].collider.attachedRigidbody == null)
+				ground = Mathf.Max(ground, GroundHits[i].point.y);
 		NavMeshHit nav;
 		if (ground > float.MinValue && player.position.y - ground < 2f
 			&& NavMesh.SamplePosition(new Vector3(player.position.x, ground, player.position.z), out nav, 3f, NavMesh.AllAreas)) {
@@ -188,7 +202,11 @@ public class EnergySpawnDirector : MonoBehaviour {
 		if (!robotPointValid)
 			return result;
 		List<Vector3> taken = Occupied();
-		EnemyBrain[] enemies = FindObjectsOfType<EnemyBrain>();
+		var enemies = new List<Vector3>();
+		foreach (EnemyBrain e in FindObjectsOfType<EnemyBrain>())
+			enemies.Add(e.transform.position);
+		if (EnemyDirector.Current != null)
+			enemies.AddRange(EnemyDirector.Current.PendingSpawns);   // telegraphed enemy spawns too
 		var path = new NavMeshPath();
 		foreach (Transform t in landingPoints) {
 			if (t == null || Vector3.Distance(t.position, player.position) < minPlayerDistance)
@@ -199,8 +217,8 @@ public class EnergySpawnDirector : MonoBehaviour {
 			if (isolation < minSpacing)
 				continue;
 			bool nearEnemy = false;
-			foreach (EnemyBrain e in enemies)
-				nearEnemy |= Vector3.Distance(e.transform.position, t.position) < minSpacing;
+			foreach (Vector3 e in enemies)
+				nearEnemy |= Vector3.Distance(e, t.position) < minSpacing;
 			if (nearEnemy)
 				continue;
 			NavMeshHit nav;
@@ -218,8 +236,27 @@ public class EnergySpawnDirector : MonoBehaviour {
 	/// most isolated candidates.
 	/// </summary>
 	bool Pick(Vector2 band, bool near, out Vector3 point) {
+		return Pick(Candidates(), band, near, out point);
+	}
+
+	// Removes candidates the new core makes too close, and lowers the isolation of the rest (one candidate scan per
+	// batch instead of one per core).
+	void Taken(List<Candidate> candidates, Vector3 point) {
+		for (int i = candidates.Count - 1; i >= 0; i--) {
+			float d = Vector3.Distance(candidates[i].point, point);
+			if (d < minSpacing) {
+				candidates.RemoveAt(i);
+			} else {
+				Candidate c = candidates[i];
+				c.isolation = Mathf.Min(c.isolation, d);
+				candidates[i] = c;
+			}
+		}
+	}
+
+	bool Pick(List<Candidate> candidates, Vector2 band, bool near, out Vector3 point) {
 		point = Vector3.zero;
-		List<Candidate> all = Candidates();
+		var all = new List<Candidate>(candidates);
 		if (all.Count == 0)
 			return false;
 		if (near) {
@@ -288,11 +325,13 @@ public class EnergySpawnDirector : MonoBehaviour {
 		ScheduleNext();
 		// One batch per interval; what does not fit is dropped (no backlog).
 		int n = SpawnCount(RandomBatch(config.energyBatchMin, config.energyBatchMax), allowed, alive.Count, reserved.Count);
+		List<Candidate> candidates = n > 0 ? Candidates() : null;
 		for (int i = 0; i < n; i++) {
 			Vector3 point;
-			if (!Pick(nearPath, i == 0, out point))
+			if (!Pick(candidates, nearPath, i == 0, out point))
 				break;
-			Drop(point);   // reserves the point at once, so the next core of the batch sees it
+			Drop(point);   // reserves the point at once
+			Taken(candidates, point);   // and the next core of the batch sees it
 		}
 	}
 
