@@ -7,7 +7,7 @@ using UnityEngine;
 /// </summary>
 public struct EnemyProfile {
 
-	// Boss slam timings (spec §4.3); the L4 dash comes with the boss attack controller.
+	// Boss slam timings (spec §4.3); the L4 dash numbers live on the boss prefab (EnemySetup), not per difficulty.
 	public const float BossWindup = 0.9f, BossStrike = 0.15f, BossRecover = 1.5f;
 	public const float CreepStrike = 0.10f, EasyExtraWindup = 0.10f;
 

@@ -60,6 +60,7 @@ public class EnemyBrain : MonoBehaviour {
 
 	public EnemyState State { get; private set; }
 	public float DistanceToTarget { get; private set; }
+	public int HitAttempts { get; private set; }   // strikes that reached Hit (one per attack at most)
 	public AttackKind CurrentAttack { get; private set; }
 
 	NavMeshAgent agent;
@@ -72,6 +73,7 @@ public class EnemyBrain : MonoBehaviour {
 	Vector3 slamCentre;
 	float dashTravel, dashDone;
 	bool nextIsDash;
+	Vector3 dashStart;
 	string currentClip = "";
 	static readonly RaycastHit[] SightHits = new RaycastHit[16];
 
@@ -153,12 +155,8 @@ public class EnemyBrain : MonoBehaviour {
 			if (CurrentAttack == AttackKind.Dash) {
 				dashTravel = DashTravel(lockedForward);
 				dashDone = 0f;
-				if (dashTelegraph != null) {
-					// The strip shows exactly where the dash will go: its width and its (obstacle-limited) length.
-					dashTelegraph.transform.position = transform.position + lockedForward * dashTravel * 0.5f + Vector3.up * 0.05f;
-					dashTelegraph.transform.rotation = Quaternion.LookRotation(lockedForward);
-					dashTelegraph.transform.localScale = new Vector3(dashWidth, 1f, dashTravel);
-				}
+				dashStart = transform.position;
+				PinDashStrip();
 			}
 			PlayClip(attackClip);
 			break;
@@ -258,8 +256,10 @@ public class EnemyBrain : MonoBehaviour {
 			transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(lockedForward), turnSpeed * Time.deltaTime);
 			if (telegraph != null && CurrentAttack == AttackKind.Strike)
 				telegraph.transform.localScale = Vector3.one * Mathf.Lerp(0.4f, 1f, stateTime / windup);
-			else if (telegraph != null)
+			else if (telegraph != null && CurrentAttack == AttackKind.Slam)
 				telegraph.transform.position = slamCentre + Vector3.up * 0.04f;   // stays on the ground while the boss turns
+			if (CurrentAttack == AttackKind.Dash)
+				PinDashStrip();   // the strip is a child of the turning boss: keep it on the locked line
 			if (stateTime >= (CurrentAttack == AttackKind.Dash ? dashWindup : windup))
 				Enter(EnemyState.Strike);
 			break;
@@ -267,9 +267,11 @@ public class EnemyBrain : MonoBehaviour {
 			if (CurrentAttack == AttackKind.Dash) {
 				// Straight along the locked line; only the agent moves the root and it cannot leave the NavMesh.
 				float step = Mathf.Min(dashSpeed * Time.deltaTime, dashTravel - dashDone);
+				Vector3 before = transform.position;
 				agent.Move(lockedForward * step);
 				dashDone += step;
-				if (!hitDone && BossAttacks.TouchesDash(transform.position, target.position, agent.radius + 0.7f))
+				// Swept test over this frame's segment (a long frame cannot skip the robot), as wide as the drawn strip.
+				if (!hitDone && BossAttacks.TouchesDash(before, transform.position, target.position, dashWidth * 0.5f + 0.5f))
 					Hit();
 				if (dashDone >= dashTravel - 0.001f) {
 					nextIsDash = false;
@@ -278,7 +280,7 @@ public class EnemyBrain : MonoBehaviour {
 				break;
 			}
 			if (CurrentAttack == AttackKind.Slam) {
-				if (!hitDone && BossAttacks.InSlam(slamCentre, slamRadius, target.position)
+				if (!hitDone && SameLevel() && BossAttacks.InSlam(slamCentre, slamRadius, target.position)
 					&& BossAttacks.Clear(slamCentre + Vector3.up * 0.5f, target.position, SightHits))
 					Hit();
 			} else if (!hitDone && distance <= attackRange && Vector3.Angle(lockedForward, FlatTo(target.position)) <= attackAngle
@@ -303,6 +305,27 @@ public class EnemyBrain : MonoBehaviour {
 				Enter(EnemyState.Idle);
 			break;
 		}
+	}
+
+	void PinDashStrip() {
+		if (dashTelegraph == null)
+			return;
+		// Exactly where the dash will go: its width and its (obstacle-limited) length, from where it started.
+		dashTelegraph.transform.position = dashStart + lockedForward * dashTravel * 0.5f + Vector3.up * 0.05f;
+		dashTelegraph.transform.rotation = Quaternion.LookRotation(lockedForward);
+		Vector3 parent = dashTelegraph.transform.parent != null ? dashTelegraph.transform.parent.lossyScale : Vector3.one;
+		dashTelegraph.transform.localScale = new Vector3(dashWidth / parent.x, 1f, dashTravel / parent.z);
+	}
+
+	// The robot stands on the boss's terrain level: its ground (under it, ignoring moving bodies) is within 0.6 m of the
+	// boss's ground. A ledge or a lower floor is another level (the NavMesh climb limit is 0.4 m).
+	bool SameLevel() {
+		float ground = float.MinValue;
+		int count = Physics.RaycastNonAlloc(target.position + Vector3.up * 0.1f, Vector3.down, SightHits, 30f, ~0, QueryTriggerInteraction.Ignore);
+		for (int i = 0; i < count; i++)
+			if (SightHits[i].collider.attachedRigidbody == null)
+				ground = Mathf.Max(ground, SightHits[i].point.y);
+		return ground > float.MinValue && Mathf.Abs(ground - transform.position.y) <= 0.6f;
 	}
 
 	// How far a dash along dir can go on continuous NavMesh (stops short of obstacles/edges), at most dashLength.
@@ -367,6 +390,7 @@ public class EnemyBrain : MonoBehaviour {
 
 	void Hit() {
 		hitDone = true;
+		HitAttempts++;
 		if (targetHealth == null || targetHealth.healthPoints <= 0f)
 			return;
 		if (targetHealth.TakeDamage(damage, DamageKind.EnemyAttack) && targetHealth.healthPoints <= 0f)

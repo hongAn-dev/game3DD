@@ -141,23 +141,21 @@ public class BossPlayTests {
 		Assert.AreEqual(EnemyState.Windup, boss.State);
 	}
 
+	// Both attacks possible (2.8 m: inside slam range, beyond the 2.5 m dash minimum): after a slam the dash wins.
 	[UnityTest]
 	public IEnumerator L4BossAlternatesSlamAndDash() {
 		yield return Arena();
-		EnemyBrain boss = Boss("Level4", new Vector3(0f, 0f, 4.5f));
+		EnemyBrain boss = Boss("Level4", new Vector3(0f, 0f, 2.8f));
 		var attacks = new System.Collections.Generic.List<AttackKind>();
 		EnemyState last = boss.State;
-		float end = Time.time + 12f;
-		while (Time.time < end && attacks.Count < 3) {
+		float end = Time.time + 8f;
+		while (Time.time < end && attacks.Count < 2) {
 			if (boss.State == EnemyState.Windup && last != EnemyState.Windup)
 				attacks.Add(boss.CurrentAttack);
 			last = boss.State;
 			yield return null;
 		}
-		Assert.GreaterOrEqual(attacks.Count, 2, "attacked at least twice");
-		CollectionAssert.Contains(attacks, AttackKind.Dash);
-		CollectionAssert.Contains(attacks, AttackKind.Slam);
-		Assert.AreNotEqual(attacks[0], attacks[1], "alternates");
+		CollectionAssert.AreEqual(new[] { AttackKind.Slam, AttackKind.Dash }, attacks, "slam first (preferred when both are ready), then the dash");
 	}
 
 	[UnityTest]
@@ -182,9 +180,9 @@ public class BossPlayTests {
 		EnemyBrain boss = Boss("Level4", new Vector3(0f, 0f, 5.5f));
 		yield return WaitForDashWindup(boss, 3f);
 		float startZ = boss.transform.position.z;
+		Assert.Less(boss.dashTelegraph.transform.localScale.z, boss.dashLength - 0.5f, "the strip is cut short by the wall");
 		yield return WaitFor(boss, EnemyState.Recover, 3f);
 		Assert.Greater(boss.transform.position.z, 0.6f + 0.5f, "stopped before the wall, body not inside it");
-		Assert.Less(startZ - boss.transform.position.z, boss.dashLength + 0.01f);
 	}
 
 	[UnityTest]
@@ -194,6 +192,7 @@ public class BossPlayTests {
 		yield return WaitForDashWindup(boss, 3f);
 		yield return WaitFor(boss, EnemyState.Recover, 3f);
 		yield return null;
+		Assert.AreEqual(1, boss.HitAttempts, "one dash checks one hit, even while overlapping for several frames");
 		Assert.AreEqual(1, hits, "one dash, one hit");
 		Assert.AreEqual(30f, lastDamage, 0.01f, "L4 Normal dash damage");
 	}
@@ -209,5 +208,40 @@ public class BossPlayTests {
 		Bounds strip = boss.dashTelegraph.GetComponentInChildren<Renderer>().bounds;
 		Assert.AreEqual(boss.dashWidth, strip.size.x, 0.15f, "width (dash runs along z)");
 		Assert.That(strip.size.z, Is.InRange(2f, boss.dashLength + 0.05f), "length");
+	}
+
+	// The boss starts turned ~25° away: the strip must follow the locked line while the boss turns in the windup.
+	[UnityTest]
+	public IEnumerator DashStripStaysOnTheLockedLine() {
+		yield return Arena();
+		Vector3 at = new Vector3(0f, 0f, 4.5f);
+#if UNITY_EDITOR
+		GameObject enemy = (GameObject)Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Enemy - Monster.prefab"),
+			at, Quaternion.LookRotation(Quaternion.Euler(0f, 25f, 0f) * Flat(player.transform.position - at)));
+		EnemyBrain boss = enemy.GetComponent<EnemyBrain>();
+		boss.target = player.transform;
+		boss.Configure(EnemyProfile.For(LevelCatalog.Get("Level4"), GameSettings.gameDifficulties.Normal, true));
+#else
+		EnemyBrain boss = null;
+#endif
+		yield return WaitForDashWindup(boss, 3f);
+		Vector3 locked = Flat(player.transform.position - boss.transform.position).normalized;
+		yield return new WaitForSeconds(0.4f);   // the boss has finished turning
+		Vector3 strip = Flat(boss.dashTelegraph.transform.forward).normalized;
+		Assert.Less(Vector3.Angle(strip, locked), 3f, "strip points along the dash");
+		Vector3 centre = Flat(boss.dashTelegraph.transform.position - boss.transform.position);
+		Assert.Less(Vector3.Angle(centre, locked), 3f, "strip lies on the dash line");
+	}
+
+	// A robot on a 1.2 m block (another terrain level) inside the circle is not hit, even with a clear line.
+	[UnityTest]
+	public IEnumerator BossSlamIgnoresAnotherLevel() {
+		yield return Arena(new[] { new Vector3(0f, 0.6f, -0.35f), new Vector3(2f, 1.2f, 1.3f) });
+		Move(new Vector3(0f, 1.7f, 0f));
+		EnemyBrain boss = Boss("Level3", new Vector3(0f, 0f, 2.6f));
+		yield return WaitFor(boss, EnemyState.Windup, 2f);
+		yield return WaitFor(boss, EnemyState.Recover, 2f);
+		yield return null;
+		Assert.AreEqual(0, hits, "not the same terrain level");
 	}
 }

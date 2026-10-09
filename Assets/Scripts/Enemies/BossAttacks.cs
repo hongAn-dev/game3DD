@@ -20,13 +20,17 @@ public static class BossAttacks {
 		return d.magnitude <= radius;
 	}
 
-	/// <summary>The dashing boss touches the robot (flat distance within reach, same terrain level).</summary>
-	public static bool TouchesDash(Vector3 boss, Vector3 robot, float reach) {
-		Vector3 d = robot - boss;
-		if (Mathf.Abs(d.y) > 2.5f)
+	/// <summary>
+	/// The dashing boss, moving from 'from' to 'to' this frame, touches the robot: flat distance from the robot to that
+	/// segment within reach (strip half-width + robot radius), same terrain level.
+	/// </summary>
+	public static bool TouchesDash(Vector3 from, Vector3 to, Vector3 robot, float reach) {
+		if (Mathf.Abs(robot.y - to.y) > 2.5f)
 			return false;
-		d.y = 0f;
-		return d.magnitude <= reach;
+		Vector2 a = new Vector2(from.x, from.z), b = new Vector2(to.x, to.z), p = new Vector2(robot.x, robot.z);
+		Vector2 ab = b - a;
+		float t = ab.sqrMagnitude > 0.0001f ? Mathf.Clamp01(Vector2.Dot(p - a, ab) / ab.sqrMagnitude) : 0f;
+		return Vector2.Distance(p, a + ab * t) <= reach;
 	}
 
 	/// <summary>Line of sight from just above the slam centre to the robot, ignoring moving bodies (robot, enemies).</summary>
