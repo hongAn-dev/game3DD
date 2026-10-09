@@ -88,9 +88,21 @@ public class EnemyPlayTests {
 		EnemyBrain boss = Spawn("Enemy - Monster", new Vector3(0f, 0f, 1.6f));
 		yield return WaitFor(boss, EnemyState.Windup, 2f);
 		Assert.AreEqual(0, Hits, "no damage before the strike");
-		yield return WaitFor(boss, EnemyState.Recover, 1f);
+		yield return WaitFor(boss, EnemyState.Recover, 2f);
 		yield return null;   // Health counts the life on its next Update
 		Assert.AreEqual(1, Hits, "one strike = one hit");
+	}
+
+	// Spec §4.1: enemy speed is level data, never a share of the robot's (boosted) top speed.
+	[UnityTest]
+	public IEnumerator EnemySpeedIgnoresRobotSpeed() {
+		yield return Arena();
+		player.GetComponent<Ball>().SpeedMultiplier = Overdrive.SpeedBoost;
+		EnemyBrain creep = Spawn("Enemy - Crater", new Vector3(0f, 0f, 10f));
+		creep.Configure(new EnemyProfile { speed = 6f, damage = 12, windup = 0.6f, strike = 0.1f, recover = 0.95f });
+		yield return null;
+		Assert.AreEqual(6f, creep.GetComponent<NavMeshAgent>().speed, 0.001f);
+		Assert.AreEqual(12, creep.damage);
 	}
 
 	[UnityTest]
@@ -99,7 +111,7 @@ public class EnemyPlayTests {
 		EnemyBrain creep = Spawn("Enemy - Crater", new Vector3(0f, 0f, 1.1f));
 		yield return WaitFor(creep, EnemyState.Windup, 2f);
 		player.transform.position = new Vector3(0f, 0.5f, -5f);   // out of range before the strike
-		yield return WaitFor(creep, EnemyState.Recover, 1f);
+		yield return WaitFor(creep, EnemyState.Recover, 2f);
 		yield return null;
 		Assert.AreEqual(0, Hits);
 	}

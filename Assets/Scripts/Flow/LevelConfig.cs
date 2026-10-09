@@ -18,9 +18,19 @@ public class LevelConfig : ScriptableObject {
 	public float energyIntervalMin;
 	public float energyIntervalMax;
 
-	[Header("Enemies per difficulty: Easy, Normal, Hard")]
+	[Header("Enemies per difficulty: Easy, Normal, Hard (enemyCap = creeps + bosses, alive + telegraphed)")]
 	public int[] enemyCap = new int[3];
 	public int[] bossCap = new int[3];
+
+	[Header("Enemy Normal values (EnemyProfile scales them per difficulty)")]
+	public float creepSpeed;
+	public float bossSpeed;
+	public int creepDamage;
+	public int bossDamage;
+	public float creepWindup;
+	public float creepRecover;
+	[Tooltip("Gameplay seconds after the intro before the first enemy.")]
+	public float quietTime = 5f;
 
 	[Header("Hazard")]
 	public string hazardDeathMessage;

@@ -71,15 +71,68 @@ public class EnemyTests {
 		}
 	}
 
+	static readonly GameSettings.gameDifficulties[] Difficulties = { GameSettings.gameDifficulties.Easy, GameSettings.gameDifficulties.Normal, GameSettings.gameDifficulties.Hard };
+
+	// Spec §4.1: max simultaneous enemies (creep + boss) per level and difficulty; no boss in L1-L2.
 	[Test]
-	public void SpeedsAndTimingsFollowSpec() {
-		EnemyBrain boss = Prefab("Enemy - Monster").GetComponent<EnemyBrain>();
+	public void CapsFollowTheDifficultyTable() {
+		int[][] total = { new[] { 1, 1, 1 }, new[] { 2, 3, 4 }, new[] { 4, 5, 6 }, new[] { 6, 7, 8 } };
+		int[] boss = { 0, 0, 1, 1 };
+		for (int i = 0; i < 4; i++) {
+			LevelConfig c = LevelCatalog.All[i];
+			CollectionAssert.AreEqual(total[i], c.enemyCap, c.levelId);
+			CollectionAssert.AreEqual(new[] { boss[i], boss[i], boss[i] }, c.bossCap, c.levelId);
+		}
+	}
+
+	// Spec §4.1: Normal values per level; Easy speed x0.9 damage x0.8, Hard speed x1.1 damage x1.2, rounded.
+	[Test]
+	public void ProfilesFollowTheSpeedAndDamageTable() {
+		float[] creepSpeed = { 5.0f, 6.0f, 6.8f, 7.5f };
+		int[][] creepDamage = { new[] { 8, 10, 12 }, new[] { 10, 12, 14 }, new[] { 12, 15, 18 }, new[] { 14, 18, 22 } };
+		float[] speedMul = { 0.9f, 1f, 1.1f };
+		for (int i = 0; i < 4; i++)
+			for (int d = 0; d < 3; d++) {
+				EnemyProfile p = EnemyProfile.For(LevelCatalog.All[i], Difficulties[d], false);
+				Assert.AreEqual(creepSpeed[i] * speedMul[d], p.speed, 0.001f, "creep speed L" + (i + 1) + " d" + d);
+				Assert.AreEqual(creepDamage[i][d], p.damage, "creep damage L" + (i + 1) + " d" + d);
+				Assert.Less(p.speed, 11f, "slower than the robot");
+			}
+		float[] bossSpeed = { 6.5f, 7.2f };
+		int[][] bossDamage = { new[] { 20, 25, 30 }, new[] { 24, 30, 36 } };
+		for (int i = 0; i < 2; i++)
+			for (int d = 0; d < 3; d++) {
+				EnemyProfile p = EnemyProfile.For(LevelCatalog.All[i + 2], Difficulties[d], true);
+				Assert.AreEqual(bossSpeed[i] * speedMul[d], p.speed, 0.001f, "boss speed L" + (i + 3) + " d" + d);
+				Assert.AreEqual(bossDamage[i][d], p.damage, "boss damage L" + (i + 3) + " d" + d);
+			}
+	}
+
+	// Spec §4.3: creep windup 0.65/0.60/0.55/0.50 (+0.10 on Easy, Hard unchanged), strike 0.10, recover 1.0..0.85.
+	[Test]
+	public void CreepTimingsFollowTheLevel() {
+		float[] windup = { 0.65f, 0.60f, 0.55f, 0.50f };
+		float[] recover = { 1.0f, 0.95f, 0.90f, 0.85f };
+		for (int i = 0; i < 4; i++) {
+			EnemyProfile easy = EnemyProfile.For(LevelCatalog.All[i], GameSettings.gameDifficulties.Easy, false);
+			EnemyProfile normal = EnemyProfile.For(LevelCatalog.All[i], GameSettings.gameDifficulties.Normal, false);
+			EnemyProfile hard = EnemyProfile.For(LevelCatalog.All[i], GameSettings.gameDifficulties.Hard, false);
+			Assert.AreEqual(windup[i], normal.windup, 0.001f);
+			Assert.AreEqual(windup[i] + 0.10f, easy.windup, 0.001f);
+			Assert.AreEqual(windup[i], hard.windup, 0.001f);
+			Assert.AreEqual(0.10f, normal.strike, 0.001f);
+			Assert.AreEqual(recover[i], normal.recover, 0.001f);
+		}
+	}
+
+	[Test]
+	public void EnemyAccelerationAndTurnInRange() {
 		EnemyBrain creep = Prefab("Enemy - Crater").GetComponent<EnemyBrain>();
-		CollectionAssert.AreEqual(new[] { 0.70f, 0.85f, 1.00f }, boss.speedFactor);
-		CollectionAssert.AreEqual(new[] { 0.80f, 0.95f, 1.05f }, creep.speedFactor);
-		Assert.AreEqual(9f * 0.85f, EnemyBrain.Speed(boss.speedFactor, GameSettings.gameDifficulties.Normal, 9f), 0.001f);
-		Assert.AreEqual(new[] { 0.55f, 0.15f, 0.8f }, new[] { boss.windup, boss.strike, boss.recover });
-		Assert.AreEqual(new[] { 0.35f, 0.10f, 0.7f }, new[] { creep.windup, creep.strike, creep.recover });
+		EnemyBrain boss = Prefab("Enemy - Monster").GetComponent<EnemyBrain>();
+		Assert.That(creep.acceleration, Is.InRange(12f, 16f));
+		Assert.That(boss.acceleration, Is.InRange(10f, 14f));
+		Assert.That(creep.turnSpeed, Is.InRange(240f, 360f));
+		Assert.That(boss.turnSpeed, Is.InRange(240f, 360f));
 		Assert.IsNotNull(boss.telegraph);
 		Assert.IsNotNull(creep.telegraph);
 	}

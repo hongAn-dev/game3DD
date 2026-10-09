@@ -33,6 +33,7 @@ public class EnemyDirector : MonoBehaviour {
 	readonly List<GameObject> markers = new List<GameObject>();
 	int pendingBosses, pendingCreeps;
 	int cap, bossCap;
+	LevelConfig config;
 	float elapsed, timer, nextInterval;
 	Transform player;
 
@@ -45,7 +46,7 @@ public class EnemyDirector : MonoBehaviour {
 	}
 
 	void Start() {
-		LevelConfig config = LevelCatalog.Get(SceneManager.GetActiveScene().name);
+		config = LevelCatalog.Get(SceneManager.GetActiveScene().name);
 		if (config == null) {
 			enabled = false;
 			return;
@@ -123,6 +124,7 @@ public class EnemyDirector : MonoBehaviour {
 			yield break;
 		GameObject enemy = Instantiate(boss ? bossPrefab : creepPrefab, point, Quaternion.LookRotation(player != null ? Flat(player.position - point) : Vector3.forward));
 		EnemyBrain brain = enemy.GetComponent<EnemyBrain>();
+		brain.Configure(EnemyProfile.For(config, GameSettings.difficulty, boss));
 		(boss ? bosses : creeps).Add(brain);
 	}
 

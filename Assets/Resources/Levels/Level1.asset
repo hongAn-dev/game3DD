@@ -21,6 +21,13 @@ MonoBehaviour:
   energyCap: 5
   energyIntervalMin: 5
   energyIntervalMax: 7
-  enemyCap: 020000000300000004000000
-  bossCap: 010000000100000001000000
+  enemyCap: 010000000100000001000000
+  bossCap: 000000000000000000000000
+  creepSpeed: 5
+  bossSpeed: 0
+  creepDamage: 10
+  bossDamage: 0
+  creepWindup: 0.65
+  creepRecover: 1
+  quietTime: 8
   hazardDeathMessage: "Robo r\u01A1i xu\u1ED1ng bi\u1EC3n axit"

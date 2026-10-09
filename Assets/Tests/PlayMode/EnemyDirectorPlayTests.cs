@@ -75,16 +75,4 @@ public class EnemyDirectorPlayTests {
 		}
 	}
 
-	[UnityTest]
-	public IEnumerator Level1BossWaitsForPractice() {
-		yield return Load("Level1", GameSettings.gameDifficulties.Normal);
-		director.quietTime = 0f;
-		director.intervalOverride = 0.1f;
-		yield return new WaitForSeconds(3f);
-		Assert.IsFalse(Object.FindObjectsOfType<EnemyBrain>().Any(IsBoss), "no boss before two cores");
-		Assert.Greater(Object.FindObjectsOfType<EnemyBrain>().Length, 0, "creeps still come");
-		GameManager.gm.score = 2;
-		yield return new WaitForSeconds(2f);
-		Assert.IsTrue(Object.FindObjectsOfType<EnemyBrain>().Any(IsBoss), "boss after two cores");
-	}
 }

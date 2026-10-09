@@ -159,13 +159,16 @@ public static class EnemySetup {
 			float radius = Mathf.Clamp(Mathf.Min(b.size.x, b.size.z) * 0.5f, 0.5f, 0.9f);
 			Body(root, BossHeight, radius, BossHeight / 2f);
 			EnemyBrain brain = Brain(root);
-			brain.speedFactor = new[] { 0.70f, 0.85f, 1.00f };
-			brain.windup = 0.55f;
-			brain.strike = 0.15f;
-			brain.recover = 0.8f;
+			// Defaults = L3 Normal; EnemyDirector applies the level profile when it spawns the boss.
+			brain.speed = 6.5f;
+			brain.damage = 25;
+			brain.windup = EnemyProfile.BossWindup;
+			brain.strike = EnemyProfile.BossStrike;
+			brain.recover = EnemyProfile.BossRecover;
+			brain.turnSpeed = 270f;
 			brain.attackRange = radius + RobotRadius + 0.9f;
 			brain.attackAngle = 50f;
-			brain.acceleration = 16f;
+			brain.acceleration = 12f;
 			brain.idleClip = "Idle";
 			brain.runClip = "Run";
 			brain.attackClip = "Attack";
@@ -204,13 +207,16 @@ public static class EnemySetup {
 
 			Body(root, Mathf.Max(b.size.y, 0.5f), 0.4f, Mathf.Max(b.size.y, 0.5f) / 2f);
 			EnemyBrain brain = Brain(root);
-			brain.speedFactor = new[] { 0.80f, 0.95f, 1.05f };
-			brain.windup = 0.35f;
-			brain.strike = 0.10f;
-			brain.recover = 0.7f;
+			// Defaults = L2 Normal; EnemyDirector applies the level profile when it spawns the creep.
+			brain.speed = 6f;
+			brain.damage = 12;
+			brain.windup = 0.60f;
+			brain.strike = EnemyProfile.CreepStrike;
+			brain.recover = 0.95f;
+			brain.turnSpeed = 300f;
 			brain.attackRange = 0.4f + RobotRadius + 0.5f;
 			brain.attackAngle = 45f;
-			brain.acceleration = 20f;
+			brain.acceleration = 14f;
 			brain.idleClip = brain.runClip = brain.attackClip = "";
 			brain.telegraph = Telegraph(root, brain.attackRange, telegraph);
 			PrefabUtility.SaveAsPrefabAsset(root, CreepPath);

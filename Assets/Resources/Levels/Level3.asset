@@ -21,6 +21,13 @@ MonoBehaviour:
   energyCap: 7
   energyIntervalMin: 4
   energyIntervalMax: 6
-  enemyCap: 060000000700000008000000
-  bossCap: 020000000200000002000000
+  enemyCap: 040000000500000006000000
+  bossCap: 010000000100000001000000
+  creepSpeed: 6.8
+  bossSpeed: 6.5
+  creepDamage: 15
+  bossDamage: 25
+  creepWindup: 0.55
+  creepRecover: 0.9
+  quietTime: 5
   hazardDeathMessage: "Robo ch\u1EA1m dung nham"

@@ -13,10 +13,10 @@ public enum EnemyState { Idle, Patrol, Chase, Windup, Strike, Recover, Return, D
 [RequireComponent(typeof(NavMeshAgent))]
 public class EnemyBrain : MonoBehaviour {
 
-	[Header("Speed = factor × robot top speed (Easy, Normal, Hard)")]
-	public float[] speedFactor = { 0.8f, 0.95f, 1.05f };
+	[Header("Movement (absolute; EnemyDirector applies the level profile)")]
+	public float speed = 6f;
 	public float acceleration = 14f;
-	public float turnSpeed = 360f;
+	public float turnSpeed = 300f;
 
 	[Header("Senses")]
 	public float detectRadius = 26f;
@@ -54,8 +54,15 @@ public class EnemyBrain : MonoBehaviour {
 	string currentClip = "";
 	static readonly RaycastHit[] SightHits = new RaycastHit[16];
 
-	public static float Speed(float[] factor, GameSettings.gameDifficulties difficulty, float robotTopSpeed) {
-		return factor[(int)difficulty] * robotTopSpeed;
+	/// <summary>Level/difficulty numbers (EnemyProfile). Call right after spawning; also works after Start.</summary>
+	public void Configure(EnemyProfile profile) {
+		speed = profile.speed;
+		damage = profile.damage;
+		windup = profile.windup;
+		strike = profile.strike;
+		recover = profile.recover;
+		if (agent != null)
+			agent.speed = speed;
 	}
 
 	void Start() {
@@ -70,8 +77,7 @@ public class EnemyBrain : MonoBehaviour {
 			targetHealth = target.GetComponent<Health>();
 			targetBody = target.GetComponent<Rigidbody>();
 		}
-		Ball ball = target != null ? target.GetComponent<Ball>() : null;
-		agent.speed = Speed(speedFactor, GameSettings.difficulty, ball != null ? ball.MaxSpeed : 9f);
+		agent.speed = speed;
 		agent.acceleration = acceleration;
 		agent.angularSpeed = turnSpeed;
 		agent.stoppingDistance = attackRange * 0.5f;
