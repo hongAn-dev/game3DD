@@ -63,4 +63,47 @@ public class SupportTests {
 		Assert.IsNotNull(shield.bubbleMaterial);
 		Assert.That(shield.bubbleMaterial.color.a, Is.InRange(0.2f, 0.3f), "20-30% opacity");
 	}
+
+	// Spec §6.3: support budget and odds per level.
+	[Test]
+	public void SupportConfigFollowsTheTable() {
+		int[] cap = { 1, 2, 3, 3 };
+		float[] min = { 10f, 8f, 7f, 6f }, max = { 14f, 12f, 10f, 9f };
+		for (int i = 0; i < 4; i++) {
+			LevelConfig c = LevelCatalog.All[i];
+			Assert.AreEqual(cap[i], c.supportCap, c.levelId);
+			Assert.AreEqual(min[i], c.supportIntervalMin, 0.001f, c.levelId);
+			Assert.AreEqual(max[i], c.supportIntervalMax, 0.001f, c.levelId);
+			CollectionAssert.AreEqual(i == 0 ? new[] { 40f, 40f, 20f, 0f } : new[] { 30f, 35f, 20f, 15f }, c.supportWeights, c.levelId);
+			Assert.AreEqual(i == 0 ? 5f : -1f, c.firstShieldAfter, c.levelId);
+		}
+	}
+
+	[Test]
+	public void ChooseFollowsTheWeights() {
+		float[] w = { 30f, 35f, 20f, 15f };
+		Assert.AreEqual(SupportKind.Shield, SupportSpawnDirector.Choose(w, 0.29f));
+		Assert.AreEqual(SupportKind.Heal10, SupportSpawnDirector.Choose(w, 0.30f));
+		Assert.AreEqual(SupportKind.Heal10, SupportSpawnDirector.Choose(w, 0.649f));
+		Assert.AreEqual(SupportKind.Heal20, SupportSpawnDirector.Choose(w, 0.65f));
+		Assert.AreEqual(SupportKind.Overdrive, SupportSpawnDirector.Choose(w, 0.85f));
+		Assert.AreEqual(SupportKind.Overdrive, SupportSpawnDirector.Choose(w, 0.9999f));
+		Assert.AreEqual(SupportKind.Heal20, SupportSpawnDirector.Choose(new[] { 40f, 40f, 20f, 0f }, 0.9999f), "no Overdrive in Level1");
+	}
+
+	[Test]
+	public void OneSupportDirectorPerLevelAndNoOverdriveDirector() {
+		Assert.IsNull(System.Type.GetType("OverdriveDirector, Assembly-CSharp"), "the old Overdrive spawner is gone");
+		foreach (LevelConfig level in LevelCatalog.All) {
+			UnityEditor.SceneManagement.EditorSceneManager.OpenScene("Assets/Scenes/" + level.levelId + ".unity", UnityEditor.SceneManagement.OpenSceneMode.Single);
+			SupportSpawnDirector d = Object.FindObjectOfType<SupportSpawnDirector>();
+			Assert.IsNotNull(d, level.levelId);
+			Assert.IsNotNull(d.shieldPrefab);
+			Assert.IsNotNull(d.heal10Prefab);
+			Assert.IsNotNull(d.heal20Prefab);
+			Assert.IsNotNull(d.overdrivePrefab);
+			foreach (MonoBehaviour m in Object.FindObjectsOfType<MonoBehaviour>(true))
+				Assert.IsNotNull(m, level.levelId + " has a missing script");
+		}
+	}
 }

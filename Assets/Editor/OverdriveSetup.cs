@@ -4,9 +4,9 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// Overdrive (spec §9): builds Assets/Prefabs/Overdrive.prefab (static trigger root, spinning bolt child), adds the
-/// OverdriveDirector to Level2+ (removed from Level1) and an "Overdrive Indicator" (bolt icon + seconds) to every
-/// level's energy panel. Re-runnable. Run UiTheme.Apply first (it creates the panel's "Zone Text").
+/// Overdrive (spec §9, §6.3): builds Assets/Prefabs/Overdrive.prefab (SupportPickup kind Overdrive, 0.6 m bolt) and
+/// an "Overdrive Indicator" (bolt icon + seconds) in every level's energy panel. The SupportSpawnDirector drops it from
+/// Level2 on. Re-runnable. Run UiTheme.Apply first (it creates the panel's "Zone Text") and again after.
 /// </summary>
 public static class OverdriveSetup {
 
@@ -23,20 +23,11 @@ public static class OverdriveSetup {
 			icon.alphaIsTransparency = true;
 			icon.SaveAndReimport();
 		}
-		GameObject prefab = BuildPrefab();
+		BuildPrefab();
 		Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(IconPath);
 		foreach (LevelConfig level in LevelCatalog.All) {
 			var scene = EditorSceneManager.OpenScene("Assets/Scenes/" + level.levelId + ".unity", OpenSceneMode.Single);
-			GameManager manager = Object.FindObjectOfType<GameManager>();
-			OverdriveDirector director = manager.GetComponent<OverdriveDirector>();
-			if (level.order >= 2) {
-				if (director == null)
-					director = manager.gameObject.AddComponent<OverdriveDirector>();
-				director.pickupPrefab = prefab;
-			} else if (director != null) {
-				Object.DestroyImmediate(director);
-			}
-			Indicator(sprite);
+			Indicator(sprite);   // Overdrive itself now comes from SupportSpawnDirector (SupportSetup)
 			EditorSceneManager.MarkSceneDirty(scene);
 			EditorSceneManager.SaveScene(scene);
 		}

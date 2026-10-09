@@ -32,4 +32,13 @@ MonoBehaviour:
   creepWindup: 0.5
   creepRecover: 0.85
   quietTime: 5
+  supportCap: 3
+  supportIntervalMin: 6
+  supportIntervalMax: 9
+  supportWeights:
+  - 30
+  - 35
+  - 20
+  - 15
+  firstShieldAfter: -1
   hazardDeathMessage: "Robo r\u01A1i xu\u1ED1ng bi\u1EC3n axit"

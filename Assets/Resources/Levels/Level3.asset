@@ -32,4 +32,13 @@ MonoBehaviour:
   creepWindup: 0.55
   creepRecover: 0.9
   quietTime: 5
+  supportCap: 3
+  supportIntervalMin: 7
+  supportIntervalMax: 10
+  supportWeights:
+  - 30
+  - 35
+  - 20
+  - 15
+  firstShieldAfter: -1
   hazardDeathMessage: "Robo ch\u1EA1m dung nham"

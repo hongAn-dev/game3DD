@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.AI;
@@ -149,6 +150,129 @@ public class SupportPlayTests {
 			Assert.AreEqual(100f, health.healthPoints);
 		} finally {
 			nav.Remove();
+		}
+	}
+
+	SupportSpawnDirector support;
+
+	IEnumerator Load(string level) {
+		CampaignProgress.BeginRun(GameSettings.gameDifficulties.Normal);
+		GameSettings.showIntroLevelMessage = false;
+		SceneManager.LoadScene(level);
+		yield return null;
+		yield return null;
+		player = GameObject.FindWithTag("Player");
+		health = player.GetComponent<Health>();
+		health.numberOfLives = 999;
+		Object.FindObjectOfType<EnemyDirector>().enabled = false;
+		support = Object.FindObjectOfType<SupportSpawnDirector>();
+	}
+
+	[UnityTest]
+	public IEnumerator FirstShieldFiveSecondsIntoLevel1() {
+		yield return Load("Level1");
+		float start = Time.time;
+		SupportPickup first = null;
+		while (first == null && Time.time - start < 8f) {
+			first = Object.FindObjectOfType<SupportPickup>();
+			yield return null;
+		}
+		Assert.IsNotNull(first);
+		Assert.AreEqual(SupportKind.Shield, first.kind);
+		Assert.That(Time.time - start, Is.InRange(5f, 5f + 0.85f + 0.6f), "5 s after the intro, after its marker and fall");
+	}
+
+	[UnityTest]
+	public IEnumerator SupportCapHolds() {
+		yield return Load("Level4");
+		support.intervalOverride = 0.2f;
+		int most = 0;
+		float end = Time.time + 4f;
+		while (Time.time < end) {
+			most = Mathf.Max(most, support.AliveCount);
+			Assert.LessOrEqual(support.AliveCount, 3);
+			yield return null;
+		}
+		Assert.AreEqual(3, most);
+	}
+
+	[UnityTest]
+	public IEnumerator LowHpBringsAHeal20() {
+		yield return Load("Level2");
+		yield return new WaitForSeconds(1.2f);
+		health.TakeDamage(70f, DamageKind.EnemyAttack);
+		support.intervalOverride = 0.2f;
+		SupportPickup first = null;
+		float end = Time.time + 3f;
+		while (first == null && Time.time < end) {
+			first = Object.FindObjectOfType<SupportPickup>();
+			yield return null;
+		}
+		Assert.IsNotNull(first);
+		Assert.AreEqual(SupportKind.Heal20, first.kind, "HP <= 40 and no heal nearby");
+	}
+
+	[UnityTest]
+	public IEnumerator ItemsExpireAfterTheirLifetime() {
+		yield return Load("Level2");
+		support.lifetimeOverride = 1f;
+		support.intervalOverride = 0.2f;
+		SupportPickup item = null;
+		while (item == null) {
+			item = Object.FindObjectOfType<SupportPickup>();
+			yield return null;
+		}
+		support.intervalOverride = 100f;
+		int gone = 0;
+		item.Gone += _ => gone++;
+		yield return new WaitForSeconds(1.3f);
+		Assert.IsTrue(item == null, "expired");
+		Assert.AreEqual(1, gone);
+	}
+
+	[UnityTest]
+	public IEnumerator ExpiryFreesTheSlotOnce() {
+		yield return Load("Level2");
+		support.intervalOverride = 0.2f;
+		SupportPickup item = null;
+		while (item == null) {
+			item = Object.FindObjectOfType<SupportPickup>();
+			yield return null;
+		}
+		support.intervalOverride = 100f;
+		yield return null;
+		int before = support.AliveCount, gone = 0;
+		item.Gone += _ => gone++;
+		item.Finish();
+		item.Finish();
+		yield return null;
+		Assert.AreEqual(1, gone);
+		Assert.AreEqual(before - 1, support.AliveCount);
+	}
+
+	[UnityTest]
+	public IEnumerator SupportNeverOnCores() {
+		yield return Load("Level4");
+		support.intervalOverride = 0.2f;
+		Object.FindObjectOfType<EnergySpawnDirector>().intervalOverride = 0.2f;
+		float end = Time.time + 4f;
+		while (Time.time < end) {
+			foreach (SupportPickup item in Object.FindObjectsOfType<SupportPickup>())
+				foreach (Treasure core in Object.FindObjectsOfType<Treasure>())
+					Assert.GreaterOrEqual(Vector3.Distance(item.transform.position, core.transform.position), 1.9f);
+			yield return null;
+		}
+	}
+
+	[UnityTest]
+	public IEnumerator OverdriveOnlyFromLevel2() {
+		yield return Load("Level1");
+		support.intervalOverride = 0.1f;
+		support.lifetimeOverride = 0.15f;   // keep slots free so many items roll
+		float end = Time.time + 4f;
+		while (Time.time < end) {
+			Assert.IsFalse(Object.FindObjectsOfType<SupportPickup>().Any(p => p.kind == SupportKind.Overdrive), "no Overdrive in Level1");
+			yield return null;
 		}
 	}
 }

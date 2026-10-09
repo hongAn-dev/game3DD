@@ -23,6 +23,11 @@ public static class LevelConfigBuilder {
 		Batch("Level2", 1, 2);
 		Batch("Level3", 2, 3);
 		Batch("Level4", 2, 4);
+		// Support items (spec §6.3).
+		Support("Level1", 1, 10f, 14f, new[] { 40f, 40f, 20f, 0f }, 5f);
+		Support("Level2", 2, 8f, 12f, new[] { 30f, 35f, 20f, 15f }, -1f);
+		Support("Level3", 3, 7f, 10f, new[] { 30f, 35f, 20f, 15f }, -1f);
+		Support("Level4", 3, 6f, 9f, new[] { 30f, 35f, 20f, 15f }, -1f);
 		// Enemies (spec §4.1-§4.3): caps (creep + boss), Normal speed/damage, creep timings, quiet time.
 		Enemies("Level1", new[] { 1, 1, 1 }, 0, 5.0f, 0f, 10, 0, 0.65f, 1.00f, 8f);
 		Enemies("Level2", new[] { 2, 3, 4 }, 0, 6.0f, 0f, 12, 0, 0.60f, 0.95f, 6f);
@@ -30,6 +35,16 @@ public static class LevelConfigBuilder {
 		Enemies("Level4", new[] { 6, 7, 8 }, 1, 7.5f, 7.2f, 18, 30, 0.50f, 0.85f, 5f);
 		AssetDatabase.SaveAssets();
 		Debug.Log("LevelConfigBuilder: done");
+	}
+
+	static void Support(string id, int cap, float min, float max, float[] weights, float firstShield) {
+		LevelConfig config = AssetDatabase.LoadAssetAtPath<LevelConfig>(Folder + "/" + id + ".asset");
+		config.supportCap = cap;
+		config.supportIntervalMin = min;
+		config.supportIntervalMax = max;
+		config.supportWeights = weights;
+		config.firstShieldAfter = firstShield;
+		EditorUtility.SetDirty(config);
 	}
 
 	static void Batch(string id, int min, int max) {

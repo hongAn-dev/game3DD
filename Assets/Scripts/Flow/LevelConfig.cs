@@ -35,6 +35,14 @@ public class LevelConfig : ScriptableObject {
 	[Tooltip("Gameplay seconds after the intro before the first enemy.")]
 	public float quietTime = 5f;
 
+	[Header("Support items (spec §6.3): budget alive + falling, interval, weights shield/heal10/heal20/overdrive")]
+	public int supportCap;
+	public float supportIntervalMin;
+	public float supportIntervalMax;
+	public float[] supportWeights = new float[4];
+	[Tooltip("Seconds into play for a first shield (Level1); < 0 = none.")]
+	public float firstShieldAfter = -1f;
+
 	[Header("Hazard")]
 	public string hazardDeathMessage;
 

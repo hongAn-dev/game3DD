@@ -44,7 +44,6 @@ public class EnergySpawnDirector : MonoBehaviour {
 	float timer, nextInterval, emptyTimer, staleTimer, killHeight = -50f;
 	int lastScore = -1;
 	Transform player;
-	OverdriveDirector boost;
 	Vector3 robotPoint;
 	bool robotPointValid;
 	static readonly RaycastHit[] GroundHits = new RaycastHit[16];
@@ -96,14 +95,17 @@ public class EnergySpawnDirector : MonoBehaviour {
 		foreach (Treasure t in alive)
 			if (t != null)
 				occupied.Add(t.transform.position);
-		if (boost != null && boost.Current != null)
-			occupied.Add(boost.Current.transform.position);
+		SupportSpawnDirector support = SupportSpawnDirector.Current;
+		if (support != null) {
+			occupied.AddRange(support.Pending);
+			foreach (SupportPickup item in support.Items)
+				occupied.Add(item.transform.position);
+		}
 		return occupied;
 	}
 
 	void Start() {
 		config = LevelCatalog.Get(SceneManager.GetActiveScene().name);
-		boost = GetComponent<OverdriveDirector>();
 		GameObject playerObject = GameObject.FindWithTag("Player");
 		player = playerObject != null ? playerObject.transform : null;
 		if (config == null) {
@@ -237,6 +239,12 @@ public class EnergySpawnDirector : MonoBehaviour {
 	/// </summary>
 	bool Pick(Vector2 band, bool near, out Vector3 point) {
 		return Pick(Candidates(), band, near, out point);
+	}
+
+	/// <summary>A safe point for a support item, from the same candidates (≥ 2 m from cores and items): near the robot
+	/// (6–18 m by path) or spread out.</summary>
+	public bool PickSupportPoint(bool near, out Vector3 point) {
+		return Pick(nearPath, near, out point);
 	}
 
 	// Removes candidates the new core makes too close, and lowers the isolation of the rest (one candidate scan per
