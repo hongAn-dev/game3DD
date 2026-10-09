@@ -17,6 +17,7 @@ public struct EnemyProfile {
 	public float speed;
 	public int damage;
 	public float windup, strike, recover;
+	public bool slam;   // guardian slam (all bosses)
 
 	public static EnemyProfile For(LevelConfig config, GameSettings.gameDifficulties difficulty, bool boss) {
 		int d = (int)difficulty;
@@ -27,6 +28,7 @@ public struct EnemyProfile {
 			p.windup = BossWindup;
 			p.strike = BossStrike;
 			p.recover = BossRecover;
+			p.slam = true;
 		} else {
 			p.windup = config.creepWindup + (difficulty == GameSettings.gameDifficulties.Easy ? EasyExtraWindup : 0f);
 			p.strike = CreepStrike;

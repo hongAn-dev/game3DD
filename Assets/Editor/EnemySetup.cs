@@ -172,7 +172,10 @@ public static class EnemySetup {
 			brain.idleClip = "Idle";
 			brain.runClip = "Run";
 			brain.attackClip = "Attack";
-			brain.telegraph = Telegraph(root, brain.attackRange, telegraph);
+			brain.canSlam = true;
+			brain.slamRadius = 2.4f;
+			brain.slamReach = 1.2f;
+			brain.telegraph = Telegraph(root, brain.slamRadius, telegraph);   // the slam circle at its real size
 			PrefabUtility.SaveAsPrefabAsset(root, BossPath);
 			Debug.Log("EnemySetup: boss " + b.size.ToString("F2") + " radius " + radius.ToString("F2") + " range " + brain.attackRange.ToString("F2"));
 		} finally {

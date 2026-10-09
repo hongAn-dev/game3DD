@@ -35,6 +35,11 @@ public class EnemyBrain : MonoBehaviour {
 	public string hitCause = "Robo bị quái vật đánh trúng";
 	public GameObject telegraph;
 
+	[Header("Guardian slam (spec §4.3): a drawn circle in front of the boss")]
+	public bool canSlam;
+	public float slamRadius = 2.4f;
+	public float slamReach = 1.2f;
+
 	[Header("Legacy animation clips (optional)")]
 	public string idleClip = "";
 	public string runClip = "";
@@ -45,6 +50,7 @@ public class EnemyBrain : MonoBehaviour {
 	public Vector3[] patrolPoints = new Vector3[0];
 
 	public EnemyState State { get; private set; }
+	public AttackKind CurrentAttack { get; private set; }
 
 	NavMeshAgent agent;
 	Animation anim;
@@ -53,6 +59,7 @@ public class EnemyBrain : MonoBehaviour {
 	Vector3 home, goal, lockedForward, lastCheckPosition, patrolPoint;
 	float stateTime, repathTimer, stuckCheckTimer, stuckTime;
 	bool hitDone;
+	Vector3 slamCentre;
 	string currentClip = "";
 	static readonly RaycastHit[] SightHits = new RaycastHit[16];
 
@@ -63,6 +70,7 @@ public class EnemyBrain : MonoBehaviour {
 		windup = profile.windup;
 		strike = profile.strike;
 		recover = profile.recover;
+		canSlam = profile.slam;
 		if (agent != null)
 			agent.speed = speed;
 	}
@@ -119,6 +127,14 @@ public class EnemyBrain : MonoBehaviour {
 		case EnemyState.Windup:
 			lockedForward = FlatTo(target.position);
 			hitDone = false;
+			if (CurrentAttack == AttackKind.Slam) {
+				// The circle is drawn at its real size where it will land, from the start of the windup.
+				slamCentre = BossAttacks.SlamCentre(transform.position, lockedForward, slamReach);
+				if (telegraph != null) {
+					telegraph.transform.position = slamCentre + Vector3.up * 0.04f;
+					telegraph.transform.localScale = Vector3.one;
+				}
+			}
 			PlayClip(attackClip);
 			break;
 		case EnemyState.Chase:
@@ -186,18 +202,31 @@ public class EnemyBrain : MonoBehaviour {
 			}
 			Repath(true);
 			CheckStuck();
-			if (distance <= attackRange * 0.85f && Vector3.Angle(transform.forward, FlatTo(target.position)) <= attackAngle && Clear())
+			if (canSlam) {
+				if (distance <= slamReach + slamRadius * 0.8f && Vector3.Angle(transform.forward, FlatTo(target.position)) <= 60f && Clear()) {
+					CurrentAttack = AttackKind.Slam;
+					Enter(EnemyState.Windup);
+				}
+			} else if (distance <= attackRange * 0.85f && Vector3.Angle(transform.forward, FlatTo(target.position)) <= attackAngle && Clear()) {
+				CurrentAttack = AttackKind.Strike;
 				Enter(EnemyState.Windup);
+			}
 			break;
 		case EnemyState.Windup:
 			transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(lockedForward), turnSpeed * Time.deltaTime);
-			if (telegraph != null)
+			if (telegraph != null && CurrentAttack == AttackKind.Strike)
 				telegraph.transform.localScale = Vector3.one * Mathf.Lerp(0.4f, 1f, stateTime / windup);
+			else if (telegraph != null)
+				telegraph.transform.position = slamCentre + Vector3.up * 0.04f;   // stays on the ground while the boss turns
 			if (stateTime >= windup)
 				Enter(EnemyState.Strike);
 			break;
 		case EnemyState.Strike:
-			if (!hitDone && distance <= attackRange && Vector3.Angle(lockedForward, FlatTo(target.position)) <= attackAngle
+			if (CurrentAttack == AttackKind.Slam) {
+				if (!hitDone && BossAttacks.InSlam(slamCentre, slamRadius, target.position)
+					&& BossAttacks.Clear(slamCentre + Vector3.up * 0.5f, target.position, SightHits))
+					Hit();
+			} else if (!hitDone && distance <= attackRange && Vector3.Angle(lockedForward, FlatTo(target.position)) <= attackAngle
 				&& Mathf.Abs(target.position.y - transform.position.y) < 2.5f && Clear())
 				Hit();
 			if (stateTime >= strike)

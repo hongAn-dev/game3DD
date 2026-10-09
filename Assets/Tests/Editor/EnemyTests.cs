@@ -136,6 +136,15 @@ public class EnemyTests {
 	}
 
 	[Test]
+	public void SlamGeometry() {
+		Vector3 centre = BossAttacks.SlamCentre(new Vector3(1f, 0f, 1f), Vector3.forward, 1.2f);
+		Assert.AreEqual(new Vector3(1f, 0f, 2.2f), centre);
+		Assert.IsTrue(BossAttacks.InSlam(centre, 2.4f, new Vector3(1f, 0.5f, 4.5f)));
+		Assert.IsFalse(BossAttacks.InSlam(centre, 2.4f, new Vector3(1f, 0.5f, 4.7f)));
+		Assert.IsFalse(BossAttacks.InSlam(centre, 2.4f, new Vector3(1f, 3f, 2.2f)), "another terrain level");
+	}
+
+	[Test]
 	public void EnemyAccelerationAndTurnInRange() {
 		EnemyBrain creep = Prefab("Enemy - Crater").GetComponent<EnemyBrain>();
 		EnemyBrain boss = Prefab("Enemy - Monster").GetComponent<EnemyBrain>();
