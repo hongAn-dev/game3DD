@@ -111,19 +111,6 @@ public class ThemeEditorTests {
 		}
 	}
 
-	[Test]
-	public void ExplosionPrefabsUseThemeSounds() {
-		var expected = new System.Collections.Generic.Dictionary<string, string> {
-			{ "ExplodeCoin Particle", "forceField_000" },
-			{ "ExplodeEnemy Particle", "explosionCrunch_000" },
-			{ "ExplodePlayer Particle", "lowFrequency_explosion_000" },
-		};
-		foreach (var pair in expected) {
-			GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/" + pair.Key + ".prefab");
-			Assert.AreEqual(pair.Value, prefab.GetComponentInChildren<AudioSource>().clip.name, pair.Key);
-		}
-	}
-
 	static IEnumerable<GameObject> UiRoots() {
 		foreach (string guid in AssetDatabase.FindAssets("t:Prefab", new[] { "Assets/Prefabs" }))
 			yield return AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(guid));

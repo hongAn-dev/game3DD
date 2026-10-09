@@ -37,10 +37,11 @@ public class GameManager : MonoBehaviour {
 	public GameObject beatLevelCanvas;
 
 	public AudioSource backgroundMusic;
-	public AudioClip gameOverSFX;
 
-	[Tooltip("Only need to set if canBeatLevel is set to true.")]
-	public AudioClip beatLevelSFX;
+	/// <summary>Seconds (real time) the music takes to fade out after a death or a win.</summary>
+	public const float MusicFade = 1f;
+	float fadeFrom;
+	float fadeStart;
 
 	[Tooltip("Only need to set if canBeatLevel is set to true.")]
 	public GameObject introBeatLevelCanvas;
@@ -143,18 +144,15 @@ public class GameManager : MonoBehaviour {
 				ResolvePlaying ();
 				break;
 			case gameStates.Death:
-				backgroundMusic.volume -= 0.01f;
-				if (backgroundMusic.volume<=0.0f) {
-					AudioSource.PlayClipAtPoint (gameOverSFX,gameObject.transform.position);
-					gameState = gameStates.GameOver;
-				}
-				break;
 			case gameStates.BeatLevel:
-				backgroundMusic.volume -= 0.01f;
-				if (backgroundMusic.volume<=0.0f) {
-					AudioSource.PlayClipAtPoint (beatLevelSFX,gameObject.transform.position);
+				// Fade by time, not per frame; the result cue already played once when the state began.
+				float left = 1f - (Time.unscaledTime - fadeStart) / MusicFade;
+				if (backgroundMusic != null)
+					backgroundMusic.volume = fadeFrom * Mathf.Max (0f, left);
+				if (left <= 0f) {
 					// If pass on current level should show set to true to show the intro message on the next level.
-					GameSettings.showIntroLevelMessage = true;
+					if (gameState == gameStates.BeatLevel)
+						GameSettings.showIntroLevelMessage = true;
 					gameState = gameStates.GameOver;
 				}
 				break;
@@ -175,6 +173,7 @@ public class GameManager : MonoBehaviour {
 		if (dead) {
 			GameFlow.Die ("MẤT KẾT NỐI");
 			gameState = gameStates.Death;
+			BeginResult (SfxEvent.Lose);
 			gameOverScoreDisplay.text = mainScoreDisplay.text;
 			Transform cause = gameOverCanvas.transform.Find ("Lost Title");
 			if (cause != null)
@@ -186,6 +185,7 @@ public class GameManager : MonoBehaviour {
 		}
 		if (canBeatLevel && score >= beatLevelScore && GameFlow.CompleteLevel ()) {
 			gameState = gameStates.BeatLevel;
+			BeginResult (config != null && config.IsFinal ? SfxEvent.CampaignWin : SfxEvent.LevelWin);
 			if (config != null)
 				CampaignProgress.CompleteLevel (config.levelId);
 			player.SetActive (false);
@@ -197,6 +197,12 @@ public class GameManager : MonoBehaviour {
 				SelectButton (isFinalLevel ? "Main Menu Button" : "Next Level Button");
 			}
 		}
+	}
+
+	void BeginResult (SfxEvent cue) {
+		Sfx.Play (cue);
+		fadeFrom = backgroundMusic != null ? backgroundMusic.volume : 0f;
+		fadeStart = Time.unscaledTime;
 	}
 
 	// Fades Level4 to black before the Ending (which fades in from black), spec §8 "Fade từ L4".

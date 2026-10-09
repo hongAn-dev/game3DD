@@ -45,6 +45,7 @@ public class ShieldEffect : MonoBehaviour {
 	public void Activate() {
 		Remaining = Duration;
 		Bubble.SetActive(true);
+		Sfx.Play(SfxEvent.ShieldOn);
 	}
 
 	void Update() {
@@ -53,8 +54,10 @@ public class ShieldEffect : MonoBehaviour {
 		Remaining = Mathf.Max(0f, Remaining - Time.deltaTime);
 		pulse = Mathf.Max(0f, pulse - Time.deltaTime);
 		bubble.transform.localScale = Vector3.one * bubbleScale * (pulse > 0f ? 1.1f : 1f);
-		if (!Active)
+		if (!Active) {
 			bubble.SetActive(false);
+			Sfx.Play(SfxEvent.ShieldOff);
+		}
 	}
 
 	void OnDisable() {

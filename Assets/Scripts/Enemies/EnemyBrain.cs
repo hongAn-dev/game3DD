@@ -127,6 +127,8 @@ public class EnemyBrain : MonoBehaviour {
 		ReleaseToken();
 	}
 
+	bool IsBoss { get { return canSlam || canDash; } }
+
 	void Enter(EnemyState next) {
 		State = next;
 		if (next == EnemyState.Idle || next == EnemyState.Patrol || next == EnemyState.Return || next == EnemyState.Disabled)
@@ -159,6 +161,11 @@ public class EnemyBrain : MonoBehaviour {
 				PinDashStrip();
 			}
 			PlayClip(attackClip);
+			if (IsBoss)
+				Sfx.Play(SfxEvent.BossWarn);
+			break;
+		case EnemyState.Strike:
+			Sfx.Play(IsBoss ? SfxEvent.BossStrike : SfxEvent.CreepAttack);
 			break;
 		case EnemyState.Chase:
 		case EnemyState.Patrol:
@@ -168,8 +175,7 @@ public class EnemyBrain : MonoBehaviour {
 			PlayClip(runClip);
 			break;
 		default:
-			if (next != EnemyState.Strike)
-				PlayClip(idleClip);
+			PlayClip(idleClip);
 			break;
 		}
 	}

@@ -15,15 +15,22 @@ public static class Sfx {
 
 	static SfxHost host;
 
+	/// <summary>Raised for each sound that actually started (tests count one cue per event).</summary>
+	public static event System.Action<SfxEvent> Played;
+
 	public static bool Play(SfxEvent e) {
-		if (!SoundSettings.SfxEnabled)
+		if (!SoundSettings.SfxEnabled || !Application.isPlaying)   // edit-mode tests and tools stay silent
 			return false;
 		if (host == null) {
 			GameObject go = new GameObject("Sfx Voices");
 			Object.DontDestroyOnLoad(go);
 			host = go.AddComponent<SfxHost>();
 		}
-		return host.Play(e);
+		if (!host.Play(e))
+			return false;
+		if (Played != null)
+			Played(e);
+		return true;
 	}
 
 	public static int ActiveVoices { get { return host != null ? host.Active : 0; } }

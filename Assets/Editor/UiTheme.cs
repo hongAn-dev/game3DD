@@ -73,8 +73,7 @@ public static class UiTheme {
 		Sprite icon = ImportSprite(SpriteFolder + "core_icon.png", Vector4.zero);
 		Sprite fill = ImportSprite(SpriteFolder + "hud_fill.png", new Vector4(24, 24, 24, 24));
 		Sprite brackets = ImportSprite(SpriteFolder + "hud_brackets.png", new Vector4(24, 24, 24, 24));
-		AudioClip click = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/ThirdParty/KenneyAudio/click_002.ogg");
-		var theme = new Theme { fonts = fonts, icon = icon, fill = fill, brackets = brackets, click = click };
+		var theme = new Theme { fonts = fonts, icon = icon, fill = fill, brackets = brackets };
 
 		foreach (string guid in AssetDatabase.FindAssets("t:Prefab", new[] { "Assets/Prefabs" })) {
 			string path = AssetDatabase.GUIDToAssetPath(guid);
@@ -107,7 +106,6 @@ public static class UiTheme {
 	class Theme {
 		public Fonts fonts;
 		public Sprite icon, fill, brackets;
-		public AudioClip click;
 	}
 
 	static Sprite ImportSprite(string path, Vector4 border) {
@@ -341,17 +339,20 @@ public static class UiTheme {
 		colors.fadeDuration = 0.12f;
 		button.colors = colors;
 
-		if (theme.click == null)
-			return;
-		AudioSource source = button.GetComponent<AudioSource>();
-		if (source == null) {
-			source = button.gameObject.AddComponent<AudioSource>();
-			source.playOnAwake = false;
-		}
+		// One soft tick from the SFX catalog (muted with SFX); the old per-button AudioSource and its listener go.
+		for (int i = button.onClick.GetPersistentEventCount() - 1; i >= 0; i--)
+			if (button.onClick.GetPersistentTarget(i) is AudioSource)
+				UnityEventTools.RemovePersistentListener(button.onClick, i);
+		AudioSource old = button.GetComponent<AudioSource>();
+		if (old != null)
+			Object.DestroyImmediate(old, true);
+		ClickSound click = button.GetComponent<ClickSound>();
+		if (click == null)
+			click = button.gameObject.AddComponent<ClickSound>();
 		for (int i = 0; i < button.onClick.GetPersistentEventCount(); i++)
-			if (button.onClick.GetPersistentTarget(i) == source)
+			if (button.onClick.GetPersistentTarget(i) == click)
 				return;
-		UnityEventTools.AddObjectPersistentListener<AudioClip>(button.onClick, source.PlayOneShot, theme.click);
+		UnityEventTools.AddVoidPersistentListener(button.onClick, click.Play);
 	}
 
 	// Main menu (1920x1080 reference): title, subtitle, and stacked buttons without the old GitHub gap.

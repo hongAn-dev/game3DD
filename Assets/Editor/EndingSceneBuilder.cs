@@ -149,9 +149,9 @@ public static class EndingSceneBuilder {
 			Object.Instantiate(glows[i - 1], spaceShip.transform, false).SetActive(true);
 
 		// ---------- audio ----------
-		AudioSource wind = Audio("Audio Weak Power", "computerNoise_000"), charge_ = Audio("Audio Charge", "forceField_000"),
-			full = Audio("Audio Fuel Full", "confirmation_004"), ignition = Audio("Audio Ignition", "lowFrequency_explosion_000"),
-			engine = Audio("Audio Engine", "spaceEngineLow_000");
+		// Soft charge, the level-win chime when full, short ignition, smooth engine (spec §8.2); the weak-power part is quiet.
+		AudioSource charge_ = Audio("Audio Charge", "ending_charge"), full = Audio("Audio Fuel Full", "level_win"),
+			ignition = Audio("Audio Ignition", "ending_ignition"), engine = Audio("Audio Engine", "ending_engine");
 
 		// ---------- UI ----------
 		Font bold = AssetDatabase.LoadAssetAtPath<Font>("Assets/Fonts/ChakraPetch/ChakraPetch-Bold.ttf");
@@ -279,10 +279,9 @@ public static class EndingSceneBuilder {
 		Activation(timeline, director, "Caption charging", charging, 8.5f, 3.5f);
 		Activation(timeline, director, "Caption fuel", fuel, 12f, 2f);
 		Activation(timeline, director, "Caption escaped", escaped, 23.5f, Duration - 23.5f);
-		Sound(timeline, director, wind, 0f, 8f);
 		Sound(timeline, director, charge_, 8f, 5f);
-		Sound(timeline, director, full, 12f, 1.5f);
-		Sound(timeline, director, ignition, 17f, 2f);
+		Sound(timeline, director, full, 12f, 0.8f);
+		Sound(timeline, director, ignition, 17f, 0.9f);
 		Sound(timeline, director, engine, 13.5f, 9.5f);
 
 		EditorUtility.SetDirty(timeline);
@@ -374,10 +373,13 @@ public static class EndingSceneBuilder {
 
 	static AudioSource Audio(string name, string clip) {
 		AudioSource source = new GameObject(name).AddComponent<AudioSource>();
-		source.clip = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/ThirdParty/KenneyAudio/" + clip + ".ogg");
+		source.clip = AudioSetup.Clip(clip);
 		source.playOnAwake = false;
 		source.spatialBlend = 0f;
 		source.volume = 0.6f;
+		SoundGroup group = source.gameObject.AddComponent<SoundGroup>();
+		group.group = SoundGroup.Group.Sfx;
+		group.baseVolume = 0.6f;
 		return source;
 	}
 
@@ -491,8 +493,11 @@ public static class EndingSceneBuilder {
 		AudioTrack track = timeline.CreateTrack<AudioTrack>(null, source.name);
 		TimelineClip clip = track.CreateDefaultClip();
 		((AudioPlayableAsset)clip.asset).clip = source.clip;
+		((AudioPlayableAsset)clip.asset).loop = duration > source.clip.length;   // the charge hum and engine fill their part
 		clip.start = start;
 		clip.duration = duration;
+		clip.easeInDuration = 0.3;
+		clip.easeOutDuration = 0.3;
 		director.SetGenericBinding(track, source);
 	}
 

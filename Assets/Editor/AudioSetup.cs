@@ -1,15 +1,18 @@
 using System.IO;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 
 /// <summary>
 /// Audio (spec §8): imports the synthesized clips (Tools/audio/make_sfx.py → Assets/ThirdParty/RoboLacLoi/Audio,
-/// decompressed on load), fills Resources/AudioCatalog and gives the Player prefab its RobotSounds. Re-runnable.
+/// decompressed on load), fills Resources/AudioCatalog, gives the Player prefab its RobotSounds, puts level/menu
+/// music in the Music group (≈ −10.5 dB under SFX) and sets each level's ambience bed (ZoneDresser). Re-runnable.
 /// </summary>
 public static class AudioSetup {
 
 	public const string Folder = "Assets/ThirdParty/RoboLacLoi/Audio/";
 	const string CatalogPath = "Assets/Resources/AudioCatalog.asset";
+	const float MusicVolume = 0.3f;
 
 	static readonly (SfxEvent e, string file, float volume)[] Map = {
 		(SfxEvent.UiClick, "ui_click", 0.6f), (SfxEvent.EnergyPickup, "energy_pickup", 0.8f), (SfxEvent.Heal, "heal", 0.8f),
@@ -57,7 +60,30 @@ public static class AudioSetup {
 			PrefabUtility.UnloadPrefabContents(contents);
 		}
 		AssetDatabase.SaveAssets();
+
+		foreach (ZoneDresser.Zone zone in ZoneDresser.Zones) {
+			var scene = EditorSceneManager.OpenScene("Assets/Scenes/" + zone.scene + ".unity", OpenSceneMode.Single);
+			ZoneDresser.AddAmbient(zone);
+			Music(Object.FindObjectOfType<GameManager>().backgroundMusic);
+			EditorSceneManager.MarkSceneDirty(scene);
+			EditorSceneManager.SaveScene(scene);
+		}
+		var menu = EditorSceneManager.OpenScene("Assets/Scenes/MainMenu.unity", OpenSceneMode.Single);
+		foreach (AudioSource source in Object.FindObjectsOfType<AudioSource>())
+			if (source.GetComponent<UnityEngine.UI.Button>() == null)   // old click sources are UiTheme's to remove
+				Music(source);
+		EditorSceneManager.MarkSceneDirty(menu);
+		EditorSceneManager.SaveScene(menu);
 		Debug.Log("AudioSetup: done");
+	}
+
+	static void Music(AudioSource source) {
+		SoundGroup group = source.GetComponent<SoundGroup>();
+		if (group == null)
+			group = source.gameObject.AddComponent<SoundGroup>();
+		group.group = SoundGroup.Group.Music;
+		group.baseVolume = MusicVolume;
+		source.volume = MusicVolume;
 	}
 
 	public static AudioClip Clip(string name) {
