@@ -84,6 +84,8 @@ public class EndingPlayTests {
 		Assert.AreEqual(1, controller.CompletionCount);
 		Assert.IsTrue(controller.completionPanel.activeSelf);
 		Assert.IsFalse(controller.skipButton.activeSelf);
+		Assert.IsTrue(controller.GetComponentsInChildren<UiTextRole>(true).Where(r => r.role == UiRole.EndingCaption).All(r => !r.gameObject.activeInHierarchy), "cinematic captions leave the completion screen");
+		Assert.Greater(Object.FindObjectOfType<MusicToggle>().GetComponentInParent<Canvas>().sortingOrder, controller.GetComponent<Canvas>().sortingOrder, "audio controls stay readable above completion");
 		Assert.AreEqual(director.duration, director.time, 0.05, "skip jumps to the last frame");
 		Assert.IsTrue(Find("Space Camera").activeSelf, "a camera still renders behind the completion panel");
 	}

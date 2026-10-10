@@ -16,7 +16,7 @@ public class AudioTests {
 		(SfxEvent.UiClick, 0.05f, 0.15f), (SfxEvent.EnergyPickup, 0.15f, 0.30f), (SfxEvent.Heal, 0.25f, 0.45f),
 		(SfxEvent.ShieldOn, 0.1f, 0.4f), (SfxEvent.ShieldBlock, 0.1f, 0.4f), (SfxEvent.ShieldOff, 0.1f, 0.4f),
 		(SfxEvent.RobotHit, 0.15f, 0.30f), (SfxEvent.CreepAttack, 0.15f, 0.35f), (SfxEvent.BossWarn, 0.2f, 0.6f),
-		(SfxEvent.BossStrike, 0.2f, 0.6f), (SfxEvent.Lose, 0.6f, 0.9f), (SfxEvent.LevelWin, 0.7f, 1.5f),
+		(SfxEvent.BossStrike, 0.2f, 0.6f), (SfxEvent.Trap, 0.12f, 0.35f), (SfxEvent.Lose, 0.6f, 0.9f), (SfxEvent.LevelWin, 0.7f, 1.5f),
 		(SfxEvent.CampaignWin, 0.7f, 1.5f), (SfxEvent.OverdriveOn, 0.2f, 0.4f), (SfxEvent.OverdriveOff, 0.2f, 0.4f),
 	};
 
@@ -43,6 +43,7 @@ public class AudioTests {
 	[Test]
 	public void SettingsPersistAndDefaultOn() {
 		bool savedSfx = SoundSettings.SfxEnabled;
+		bool savedMusicEnabled = SoundSettings.MusicEnabled;
 		float savedMusic = SoundSettings.MusicVolume;
 		PlayerPrefs.DeleteKey(SoundSettings.SfxKey);
 		SoundSettings.Reload();
@@ -57,9 +58,42 @@ public class AudioTests {
 		Assert.AreEqual(0.4f, SoundSettings.MusicVolume, 0.001f);
 		SoundSettings.MusicVolume = savedMusic;
 		SoundSettings.SfxEnabled = savedSfx;
+		SoundSettings.MusicEnabled = savedMusicEnabled;
 	}
 
 	// Spec §8.1: the harsh loop is gone (asset, scenes, prefabs, Timeline, builders) and no AudioClip reference dangles.
+	[Test]
+	public void MusicMuteIsIndependentAndPersists() {
+		bool savedMusic = SoundSettings.MusicEnabled;
+		bool savedSfx = SoundSettings.SfxEnabled;
+		float savedMusicVolume = SoundSettings.MusicVolume;
+		float savedSfxVolume = SoundSettings.SfxVolume;
+		try {
+			PlayerPrefs.DeleteKey(SoundSettings.MusicKey);
+			SoundSettings.Reload();
+			Assert.IsTrue(SoundSettings.MusicEnabled, "music defaults on");
+			SoundSettings.MusicVolume = 0.37f;
+			SoundSettings.SfxVolume = 0.62f;
+			SoundSettings.SfxEnabled = false;
+			Assert.AreEqual(0.37f, SoundSettings.MusicGain, 0.001f, "SFX mute leaves music gain alone");
+			Assert.AreEqual(0f, SoundSettings.SfxGain, 0.001f);
+			SoundSettings.MusicEnabled = false;
+			Assert.AreEqual(0f, SoundSettings.MusicGain, 0.001f);
+			Assert.AreEqual(0f, SoundSettings.SfxGain, 0.001f);
+			PlayerPrefs.Save();
+			SoundSettings.Reload();
+			Assert.IsFalse(SoundSettings.MusicEnabled, "music mute persisted");
+			SoundSettings.SfxEnabled = true;
+			Assert.AreEqual(0.62f, SoundSettings.SfxGain, 0.001f, "SFX volume restored");
+			Assert.AreEqual(0f, SoundSettings.MusicGain, 0.001f, "music remains muted independently");
+		} finally {
+			SoundSettings.MusicVolume = savedMusicVolume;
+			SoundSettings.SfxVolume = savedSfxVolume;
+			SoundSettings.SfxEnabled = savedSfx;
+			SoundSettings.MusicEnabled = savedMusic;
+		}
+	}
+
 	const string ForbiddenGuid = "850ad93d20b2c9b3a895d9de86c09f9c";
 	const string ForbiddenName = "computerNoise_000";
 

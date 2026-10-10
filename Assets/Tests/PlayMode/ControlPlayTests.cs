@@ -75,7 +75,7 @@ public class ControlPlayTests {
 			yield return new WaitForFixedUpdate();
 			ball.Move(Vector3.forward, false);
 		}
-		Assert.AreEqual(11f, ball.MaxSpeed, 0.01f);
+		Assert.AreEqual(8.8f, ball.MaxSpeed, 0.01f);
 		Assert.LessOrEqual(Time.time - start, 0.52f);
 	}
 
@@ -84,7 +84,7 @@ public class ControlPlayTests {
 	public IEnumerator StopsWithin2_3Metres() {
 		yield return FlatGround();
 		yield return Push(Vector3.forward, 2f);
-		Assert.Greater(Horizontal(), 10.8f);
+		Assert.Greater(Horizontal(), ball.MaxSpeed - .2f);
 		Vector3 from = body.position;
 		float start = Time.time;
 		while (Horizontal() > 0.05f && Time.time - start < 2f) {

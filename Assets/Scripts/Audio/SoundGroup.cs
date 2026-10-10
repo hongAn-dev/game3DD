@@ -35,13 +35,21 @@ public class SoundGroup : MonoBehaviour {
 
 	public float GroupVolume() {
 		switch (group) {
-		case Group.Music: return SoundSettings.MusicVolume;
-		case Group.Ambience: return SoundSettings.AmbienceVolume;
+		case Group.Music: return SoundSettings.MusicGain;
+		case Group.Ambience: return SoundSettings.SfxEnabled ? SoundSettings.AmbienceVolume : 0f;
 		default: return SoundSettings.SfxEnabled ? SoundSettings.SfxVolume : 0f;
 		}
 	}
 
+	// Timeline clip fades live in its audio playables. Reapply the authored source gain after
+	// track evaluation so Timeline cannot overwrite the user volume or group mute.
+	void LateUpdate() { Apply(); }
+	void ApplyMute() {
+		if (source != null) source.mute = group == Group.Music ? !SoundSettings.MusicEnabled : !SoundSettings.SfxEnabled;
+	}
+
 	public void Apply() {
+		ApplyMute();
 		if (source != null)
 			source.volume = baseVolume * GroupVolume() * fade;
 	}

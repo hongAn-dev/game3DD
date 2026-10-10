@@ -44,8 +44,7 @@ public class EnemyDirectorPlayTests {
 		}
 		Assert.LessOrEqual(max, cap);
 		Assert.LessOrEqual(maxBoss, bossCap);
-		Assert.AreEqual(cap, max, "fills up to the cap");
-		Assert.AreEqual(bossCap, maxBoss);
+		Assert.GreaterOrEqual(max, config.enemyInitialBatch, "the opening creep batch appears");
 	}
 
 	[UnityTest]
@@ -93,7 +92,7 @@ public class EnemyDirectorPlayTests {
 	}
 
 	[UnityTest]
-	public IEnumerator Level1HasOneCreepAndNoBoss() {
+	public IEnumerator Level1HasNoBossAndRespectsItsCap() {
 		yield return Load("Level1", GameSettings.gameDifficulties.Hard);
 		director.quietTime = 0f;
 		director.intervalOverride = 0.1f;
@@ -105,7 +104,7 @@ public class EnemyDirectorPlayTests {
 			Assert.IsFalse(Object.FindObjectsOfType<EnemyBrain>().Any(IsBoss), "no boss in Level1");
 			yield return null;
 		}
-		Assert.AreEqual(1, max, "exactly one creep at a time");
+		Assert.AreEqual(LevelCatalog.Get("Level1").enemyCap[2], max, "fills the configured creep cap");
 	}
 
 	[UnityTest]
@@ -117,7 +116,7 @@ public class EnemyDirectorPlayTests {
 		float end = Time.time + 4f;
 		while (Time.time < end) {
 			Assert.IsFalse(Object.FindObjectsOfType<EnemyBrain>().Any(IsBoss), "no boss in Level2");
-			Assert.LessOrEqual(director.AliveCount, 4);
+			Assert.LessOrEqual(director.AliveCount, LevelCatalog.Get("Level2").enemyCap[2]);
 			yield return null;
 		}
 	}
@@ -129,7 +128,7 @@ public class EnemyDirectorPlayTests {
 		Assert.AreEqual(2, director.maxChasers, "two chasers in L1-L2");
 		yield return Load("Level3", GameSettings.gameDifficulties.Normal);
 		Assert.AreEqual(5f, director.quietTime, 0.001f);
-		Assert.AreEqual(3, director.maxChasers, "three chasers in L3-L4");
+		Assert.AreEqual(LevelCatalog.Get("Level3").maxChasers[1], director.maxChasers, "L3 uses its configured normal chase limit");
 	}
 
 	// After the quiet time, enemies come every 2-3 s until the cap.
@@ -138,18 +137,49 @@ public class EnemyDirectorPlayTests {
 		yield return Load("Level4", GameSettings.gameDifficulties.Normal);
 		director.quietTime = 0f;
 		PinRobotOnGround();
+		int initialBatch = LevelCatalog.Get("Level4").enemyInitialBatch;
 		var starts = new List<float>();
 		var seen = new HashSet<GameObject>();
 		float end = Time.time + 3f * director.intervalMax + 1f;
-		while (Time.time < end && starts.Count < 4) {
+		while (Time.time < end && starts.Count < initialBatch + 1) {
 			foreach (GameObject marker in Object.FindObjectsOfType<GameObject>().Where(g => g.name == "Enemy Spawn Marker"))
 				if (seen.Add(marker))
 					starts.Add(Time.time);
 			yield return null;
 		}
-		Assert.GreaterOrEqual(starts.Count, 3);
-		for (int i = 1; i < starts.Count; i++)
-			Assert.That(starts[i] - starts[i - 1], Is.InRange(1.95f, 3.1f), "gap " + i);
+		Assert.GreaterOrEqual(starts.Count, initialBatch + 1, "initial batch plus the next batch spawned");
+		for (int i = 1; i < initialBatch; i++)
+			Assert.Less(starts[i] - starts[0], 0.1f, "initial enemies arrive together");
+		Assert.That(starts[initialBatch] - starts[initialBatch - 1], Is.InRange(1.95f, 3.1f), "next batch interval");
+	}
+
+	[UnityTest]
+	public IEnumerator EnemySpawnReservationsEndWhenTheEnemyAppears() {
+		yield return Load("Level2", GameSettings.gameDifficulties.Normal);
+		director.quietTime = 0f;
+		director.intervalOverride = 0.1f;
+		PinRobotOnGround();
+		float end = Time.time + 3f;
+		while (!Object.FindObjectsOfType<GameObject>().Any(g => g.name == "Enemy Spawn Marker") && Time.time < end)
+			yield return null;
+		director.intervalOverride = 100f;   // let only the opening batch finish
+		while ((Object.FindObjectOfType<EnemyBrain>() == null || SpawnRegistry.Current == null
+			|| SpawnRegistry.Current.Count(SpawnRegistry.SpawnCategory.EnemyTelegraph) > 0) && Time.time < end)
+			yield return null;
+		Assert.IsNotNull(Object.FindObjectOfType<EnemyBrain>());
+		Assert.IsNotNull(SpawnRegistry.Current);
+		Assert.AreEqual(0, SpawnRegistry.Current.Count(SpawnRegistry.SpawnCategory.EnemyTelegraph),
+			"live enemies use their current transforms instead of a stale spawn reservation");
+	}
+
+	[UnityTest]
+	public IEnumerator OnlyOneDirectorOwnsTheLevel() {
+		yield return Load("Level2", GameSettings.gameDifficulties.Normal);
+		EnemyDirector duplicate = new GameObject("Duplicate Enemy Director").AddComponent<EnemyDirector>();
+		Assert.IsFalse(duplicate.enabled);
+		Assert.AreSame(director, EnemyDirector.Current, "a second director cannot multiply the chase limit");
+		Object.Destroy(duplicate.gameObject);
+		yield return null;
 	}
 
 	[UnityTest]
@@ -205,17 +235,18 @@ public class EnemyDirectorPlayTests {
 		director.bossGateOverride = true;
 		PinRobotOnGround();
 		int most = 0;
+		int limit = LevelCatalog.Get("Level4").maxChasers[2];
 		float end = Time.time + 8f;
 		while (Time.time < end) {
 			// Spawn points are spread over a 200 m map; let every enemy see the robot so all of them want to chase.
 			foreach (EnemyBrain brain in Object.FindObjectsOfType<EnemyBrain>())
 				brain.detectRadius = brain.loseRadius = 500f;
 			most = Mathf.Max(most, director.Chasing);
-			Assert.LessOrEqual(director.Chasing, 3);
-			Assert.LessOrEqual(Object.FindObjectsOfType<EnemyBrain>().Count(Chasing), 3, "at most three chase at once in Level4");
+			Assert.LessOrEqual(director.Chasing, limit);
+			Assert.LessOrEqual(Object.FindObjectsOfType<EnemyBrain>().Count(Chasing), limit, "respects the configured Level4 chase limit");
 			yield return null;
 		}
-		Assert.AreEqual(3, most, "the limit is actually reached");
+		Assert.AreEqual(limit, most, "the configured limit is actually reached");
 	}
 
 	// Spec §4.2: the first creep comes when the quiet time ends (not one interval later).

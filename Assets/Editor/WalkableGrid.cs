@@ -15,9 +15,15 @@ public static class WalkableGrid {
 	const float Reach = 300f;   // flood fill stops this far from the start
 
 	static readonly Vector2Int[] Neighbours = { Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right };
+	static HazardVolume[] hazardSnapshot;
+
+	/// <summary>Use a scene-scoped hazard snapshot during bulk candidate authoring.</summary>
+	public static void BeginHazardSnapshot(HazardVolume[] hazards) { hazardSnapshot = hazards ?? new HazardVolume[0]; }
+	public static void EndHazardSnapshot() { hazardSnapshot = null; }
+	static HazardVolume[] Hazards { get { return hazardSnapshot ?? Object.FindObjectsOfType<HazardVolume>(); } }
 
 	public static bool InHazard(Vector3 point) {
-		foreach (HazardVolume hazard in Object.FindObjectsOfType<HazardVolume>())
+		foreach (HazardVolume hazard in Hazards)
 			if (hazard.GetComponent<Collider>().bounds.Contains(point))
 				return true;
 		return false;
@@ -94,6 +100,40 @@ public static class WalkableGrid {
 			cache[cell] = h;
 		}
 		return h;
+	}
+
+	/// <summary>Distance to the first missing, hazardous, or sharply lower surface around a pickup, sampled radially.</summary>
+	public static float EdgeClearance(Vector3 point, out Vector3 escapeDirection, float maxDistance = 4f) {
+		float nearest = maxDistance;
+		escapeDirection = Vector3.zero;
+		for (int i = 0; i < 32; i++) {
+			float angle = i * Mathf.PI * 2f / 32f;
+			Vector3 dir = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle));
+			for (float d = 0.25f; d < nearest && d <= maxDistance; d += 0.25f) {
+				RaycastHit hit;
+				if (!Ground(point.x + dir.x * d, point.z + dir.z * d, out hit)
+					|| Mathf.Abs(hit.point.y - point.y) > MaxClimb) {
+					if (d < nearest) { nearest = d; escapeDirection = -dir; }
+					break;
+				}
+			}
+		}
+		return nearest;
+	}
+
+	/// <summary>Ground must support the full circular footprint; returns false for hazards, gaps or steep edges.</summary>
+	public static bool FootprintGround(Vector3 center, float radius, int radialSamples = 12) {
+		RaycastHit baseHit;
+		if (!Ground(center.x, center.z, out baseHit)) return false;
+		if (radius <= 0f) return true;
+		for (int i = 0; i < radialSamples; i++) {
+			float angle = i * Mathf.PI * 2f / radialSamples;
+			float x = center.x + Mathf.Cos(angle) * radius;
+			float z = center.z + Mathf.Sin(angle) * radius;
+			RaycastHit hit;
+			if (!Ground(x, z, out hit) || Mathf.Abs(hit.point.y-baseHit.point.y)>MaxClimb) return false;
+		}
+		return true;
 	}
 
 	public static Vector3 PlayerStart() {

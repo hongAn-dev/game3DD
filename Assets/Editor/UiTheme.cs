@@ -17,10 +17,11 @@ public static class UiTheme {
 	static readonly Color PanelSelected = new Color32(22, 92, 98, 240);
 	static readonly Color Cyan = new Color32(46, 230, 230, 255);
 	static readonly Color OverdriveYellow = new Color32(255, 214, 40, 255);
-	static readonly Color TextColor = new Color32(240, 246, 250, 255);
+	static readonly Color TextColor = new Color32(244, 247, 250, 255);
 	// Light slate: readable over the bright menu terrain with a drop shadow.
 	static readonly Color Muted = new Color32(203, 213, 225, 255);
-	static readonly Color Warm = new Color32(255, 196, 77, 255);
+	static readonly Color Warm = new Color32(255, 209, 102, 255);
+	static readonly Color TitleInk = new Color32(20, 33, 43, 255);
 	// Danger red-orange, lightened to stay readable on the dark panel.
 	static readonly Color LostColor = new Color32(255, 120, 80, 255);
 
@@ -74,7 +75,7 @@ public static class UiTheme {
 		Sprite icon = ImportSprite(SpriteFolder + "core_icon.png", Vector4.zero);
 		Sprite fill = ImportSprite(SpriteFolder + "hud_fill.png", new Vector4(24, 24, 24, 24));
 		Sprite brackets = ImportSprite(SpriteFolder + "hud_brackets.png", new Vector4(24, 24, 24, 24));
-		var theme = new Theme { fonts = fonts, icon = icon, fill = fill, brackets = brackets };
+		var theme = new Theme { fonts = fonts, icon = icon, fill = fill, brackets = brackets, titleGradient = ImportSprite(SpriteFolder + "title_gradient.png", Vector4.zero) };
 
 		foreach (string guid in AssetDatabase.FindAssets("t:Prefab", new[] { "Assets/Prefabs" })) {
 			string path = AssetDatabase.GUIDToAssetPath(guid);
@@ -106,7 +107,7 @@ public static class UiTheme {
 
 	class Theme {
 		public Fonts fonts;
-		public Sprite icon, fill, brackets;
+		public Sprite icon, fill, brackets, titleGradient;
 	}
 
 	static Sprite ImportSprite(string path, Vector4 border) {
@@ -163,7 +164,7 @@ public static class UiTheme {
 			changed = true;
 		}
 
-		changed |= LayoutMainMenu(root, theme.fonts);
+		changed |= LayoutMainMenu(root, theme);
 		changed |= LayoutMessageBoxes(root);
 
 		foreach (Button button in root.GetComponentsInChildren<Button>(true)) {
@@ -244,6 +245,54 @@ public static class UiTheme {
 		return true;
 	}
 
+	/// <summary>Assigns a persistent semantic style role to a text element from editor builders.</summary>
+	public static void SetRole(Text text, UiRole role) {
+		if (text == null)
+			return;
+		UiTextRole marker = text.GetComponent<UiTextRole>();
+		if (marker == null)
+			marker = text.gameObject.AddComponent<UiTextRole>();
+		marker.role = role;
+		EditorUtility.SetDirty(marker);
+	}
+
+	static bool TryRole(Text text, out UiRole role) {
+		UiTextRole marker = text.GetComponent<UiTextRole>();
+		if (marker != null) {
+			role = marker.role;
+			return true;
+		}
+		if (text.name == "Game Title") { role = UiRole.GameTitle; return true; }
+		if (text.name == "Caption Ready" || text.name == "Caption Escaped") { role = UiRole.EndingCaption; return true; }
+		Transform parent = text.transform.parent;
+		if (text.name == "Title" && parent != null && parent.name == "Completion Panel") { role = UiRole.CompletionTitle; return true; }
+		if (text.name == "Subtitle" && parent != null && parent.name == "Completion Panel") { role = UiRole.CompletionBody; return true; }
+		if (text.name == "Zone Text") { role = UiRole.ZoneLabel; return true; }
+		role = default(UiRole);
+		return false;
+	}
+
+	static bool EnsureTitleBackdrop(Transform parent, Sprite sprite) {
+		Transform existing = parent.Find("Title Backdrop");
+		GameObject go;
+		if (existing == null) {
+			go = new GameObject("Title Backdrop", typeof(RectTransform), typeof(Image));
+			go.transform.SetParent(parent, false);
+			go.transform.SetSiblingIndex(0);
+		} else {
+			go = existing.gameObject;
+		}
+		RectTransform rect = (RectTransform)go.transform;
+		rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0.5f, 0.5f);
+		rect.sizeDelta = new Vector2(1600f, 490f);
+		rect.anchoredPosition = new Vector2(0f, 210f);
+		Image image = go.GetComponent<Image>();
+		image.sprite = sprite;
+		image.color = Color.white;
+		image.raycastTarget = false;
+		return true;
+	}
+
 	static void StyleText(Text text, Fonts fonts) {
 		foreach (KeyValuePair<string, string> pair in Strings) {
 			if (text.text.StartsWith(pair.Key)) {
@@ -252,20 +301,30 @@ public static class UiTheme {
 			}
 		}
 
-		bool heading = text.name == "Game Title" || text.name == "Congratulations Text" || text.name == "Lost Title"
+		bool hasRole = TryRole(text, out UiRole role);
+		bool semanticHeading = hasRole && (role == UiRole.GameTitle || role == UiRole.CompletionTitle);
+		bool heading = semanticHeading || text.name == "Congratulations Text" || text.name == "Lost Title"
 			|| text.name == "Score Text" || text.name == "Dialog Title";
-		text.font = heading ? fonts.bold : text.name == "Subtitle" ? fonts.medium : fonts.semiBold;
+		text.font = heading ? fonts.bold : hasRole && (role == UiRole.MenuSubtitle || role == UiRole.EndingCaption || role == UiRole.CompletionBody)
+			? fonts.medium : text.name == "Subtitle" ? fonts.medium : fonts.semiBold;
 
 		Color color = TextColor;
 		string difficulty = DifficultyOf(text.transform);
 		if (difficulty != null)
 			color = DifficultyColors[difficulty];
-		else if (text.name == "Zone Text" || text.name == "Dialog Title")
+		else if (hasRole) {
+			switch (role) {
+			case UiRole.GameTitle: color = Warm; break;
+			case UiRole.MenuSubtitle:
+			case UiRole.EndingCaption:
+			case UiRole.CompletionBody:
+			case UiRole.ZoneLabel: color = TextColor; break;
+			case UiRole.CompletionTitle: color = Warm; break;
+			}
+		} else if (text.name == "Dialog Title")
 			color = Cyan;
 		else if (text.transform.parent != null && text.transform.parent.parent != null && text.transform.parent.parent.name == "Overdrive Indicator")
 			color = OverdriveYellow;
-		else if (text.name == "Subtitle")
-			color = Muted;
 		else if (text.name == "Lost Title")
 			color = LostColor;
 		else if (text.text.StartsWith("ĐÃ VỀ"))
@@ -273,10 +332,10 @@ public static class UiTheme {
 		text.color = color;
 
 		Outline glow = text.GetComponent<Outline>();
-		if (text.name == "Game Title") {
+		if (hasRole && role == UiRole.GameTitle) {
 			if (glow == null)
 				glow = text.gameObject.AddComponent<Outline>();
-			glow.effectColor = new Color(Cyan.r, Cyan.g, Cyan.b, 0.45f);
+			glow.effectColor = TitleInk;
 			glow.effectDistance = new Vector2(3f, -3f);
 		} else if (glow != null) {
 			Object.DestroyImmediate(glow);
@@ -339,6 +398,7 @@ public static class UiTheme {
 
 		// Label fills the button with padding and shrinks until the longest line fits.
 		foreach (Text label in button.GetComponentsInChildren<Text>(true)) {
+			if (label.name == "Audio Label" || label.name == "Tooltip Text") continue;
 			RectTransform rect = label.rectTransform;
 			rect.anchorMin = Vector2.zero;
 			rect.anchorMax = Vector2.one;
@@ -377,16 +437,21 @@ public static class UiTheme {
 
 	// Main menu (1920x1080 reference): title, subtitle, and stacked buttons without the old GitHub gap.
 	// The difficulty choice reuses the same column.
-	static bool LayoutMainMenu(GameObject root, Fonts fonts) {
+	static bool LayoutMainMenu(GameObject root, Theme theme) {
+		Fonts fonts = theme.fonts;
 		bool changed = false;
 		Transform titleT = root.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == "Game Title");
 		if (titleT != null) {
 			Text title = titleT.GetComponent<Text>();
+			SetRole(title, UiRole.GameTitle);
+			EnsureTitleBackdrop(titleT.parent, theme.titleGradient);
 			title.fontSize = 170;
 			title.resizeTextForBestFit = false;
 			Transform subtitleT = titleT.parent.Find("Subtitle");
 			Text subtitle = subtitleT != null ? subtitleT.GetComponent<Text>()
 				: NewText("Subtitle", titleT.parent, fonts.medium, "HÀNH TRÌNH VỀ CĂN CỨ", 44, Muted);
+			SetRole(subtitle, UiRole.MenuSubtitle);
+			subtitle.color = TextColor;
 			RectTransform rect = subtitle.rectTransform;
 			rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
 			rect.sizeDelta = new Vector2(1200f, 60f);
@@ -478,6 +543,19 @@ public static class UiTheme {
 			zoneRect.anchoredPosition = new Vector2(0f, -6f);
 			zoneRect.sizeDelta = new Vector2(320f, 24f);
 			zoneT.GetComponent<Text>().alignment = TextAnchor.UpperCenter;
+			SetRole(zoneT.GetComponent<Text>(), UiRole.ZoneLabel);
+			zoneT.GetComponent<Text>().color = TextColor;
+			Transform back = panel.Find("Zone Backdrop");
+			if (back == null) {
+				GameObject go = new GameObject("Zone Backdrop", typeof(RectTransform), typeof(Image));
+				go.transform.SetParent(panel, false); back = go.transform;
+			}
+			RectTransform bg = (RectTransform)back;
+			bg.anchorMin = bg.anchorMax = zoneRect.anchorMin; bg.pivot = zoneRect.pivot;
+			bg.anchoredPosition = zoneRect.anchoredPosition + new Vector2(0f, 3f);
+			bg.sizeDelta = zoneRect.sizeDelta + new Vector2(16f, 8f);
+			back.GetComponent<Image>().color = Panel; back.GetComponent<Image>().raycastTarget = false;
+			back.SetSiblingIndex(zoneT.GetSiblingIndex());
 		}
 		// "Năng lượng: 18/18" fits the 250-wide panel right of the core icon.
 		score.fontSize = 22;

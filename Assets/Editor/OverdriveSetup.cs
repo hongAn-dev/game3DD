@@ -4,8 +4,8 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// Overdrive (spec §9, §6.3): builds Assets/Prefabs/Overdrive.prefab (SupportPickup kind Overdrive, 0.6 m bolt) and
-/// an "Overdrive Indicator" (bolt icon + seconds) in every level's energy panel. The SupportSpawnDirector drops it from
+/// Overdrive (spec §9, §6.3): builds Assets/Prefabs/Overdrive.prefab (SupportPickup kind Overdrive, 0.9 m bolt) and
+/// an "Overdrive Indicator" (bolt icon + seconds) in every level's energy panel. The SupportSpawnDirector spawns it on the ground from
 /// Level2 on. Re-runnable. Run UiTheme.Apply first (it creates the panel's "Zone Text") and again after.
 /// </summary>
 public static class OverdriveSetup {
@@ -13,7 +13,7 @@ public static class OverdriveSetup {
 	const string PrefabPath = "Assets/Prefabs/Overdrive.prefab";
 	const string ModelPath = "Assets/ThirdParty/RoboLacLoi/Models/Overdrive.fbx";
 	const string IconPath = "Assets/ThirdParty/RoboLacLoi/Sprites/overdrive_icon.png";
-	public const float BoltHeight = 0.6f;   // same size as the other pickups (spec §6.4)
+	public const float BoltHeight = 0.9f;   // same size as the other pickups (spec §6.4)
 
 	[MenuItem("Tools/Robo Lac Loi/Apply Overdrive Setup")]
 	public static void Apply() {

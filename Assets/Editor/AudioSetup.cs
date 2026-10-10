@@ -19,7 +19,7 @@ public static class AudioSetup {
 		(SfxEvent.ShieldOn, "shield_on", 0.7f), (SfxEvent.ShieldBlock, "shield_block", 0.8f), (SfxEvent.ShieldOff, "shield_off", 0.6f),
 		(SfxEvent.OverdriveOn, "overdrive_on", 0.7f), (SfxEvent.OverdriveOff, "overdrive_off", 0.6f),
 		(SfxEvent.RobotHit, "robot_hit", 0.9f), (SfxEvent.CreepAttack, "creep_attack", 0.6f),
-		(SfxEvent.BossWarn, "boss_warn", 0.8f), (SfxEvent.BossStrike, "boss_strike", 0.8f), (SfxEvent.Lose, "lose", 0.8f),
+		(SfxEvent.BossWarn, "boss_warn", 0.8f), (SfxEvent.BossStrike, "boss_strike", 0.8f), (SfxEvent.Trap, "trap_trigger", 0.8f), (SfxEvent.Lose, "lose", 0.8f),
 		(SfxEvent.LevelWin, "level_win", 0.8f), (SfxEvent.CampaignWin, "campaign_win", 0.8f),
 	};
 

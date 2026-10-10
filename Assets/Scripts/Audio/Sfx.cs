@@ -87,7 +87,7 @@ public class SfxHost : MonoBehaviour {
 	void Rescale() {
 		for (int i = 0; i < voices.Length; i++)
 			if (voices[i].isPlaying)
-				voices[i].volume = catalog.Volume(playing[i]) * SoundSettings.SfxVolume;
+				voices[i].volume = catalog.Volume(playing[i]) * SoundSettings.SfxGain;
 	}
 
 	public int Active {
@@ -124,7 +124,7 @@ public class SfxHost : MonoBehaviour {
 		AudioSource source = voices[voice];
 		source.Stop();
 		source.clip = clip;
-		source.volume = catalog.Volume(e) * SoundSettings.SfxVolume;
+		source.volume = catalog.Volume(e) * SoundSettings.SfxGain;
 		source.Play();
 		playing[voice] = e;
 		started[voice] = Time.unscaledTime;

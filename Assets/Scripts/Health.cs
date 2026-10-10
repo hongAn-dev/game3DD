@@ -3,7 +3,7 @@ using System.Collections;
 using UnityEngine.SceneManagement;
 
 /// <summary>What hurt the robot: enemy strikes respect invulnerability (and the shield); hazards always kill.</summary>
-public enum DamageKind { EnemyAttack, FatalHazard }
+public enum DamageKind { EnemyAttack, Trap, FatalHazard }
 
 /// <summary>
 /// A game object health handler. The single owner of HP (spec §6.1): damage goes through TakeDamage with its kind,

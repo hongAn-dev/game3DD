@@ -17,20 +17,29 @@ MonoBehaviour:
   displayName: "Thung l\u0169ng dung nham"
   nextScene: Level4
   energyTarget: 14
-  energyAtStart: 7
-  energyCap: 8
-  energyIntervalMin: 1.5
-  energyIntervalMax: 2.5
-  energyBatchMin: 2
-  energyBatchMax: 3
-  enemyCap: 040000000500000006000000
-  bossCap: 010000000100000001000000
-  creepSpeed: 6.8
-  bossSpeed: 6.5
-  creepDamage: 15
-  bossDamage: 25
-  creepWindup: 0.55
-  creepRecover: 0.9
+  energyAtStart: 12
+  energyCap: 18
+  energyIntervalMin: 0.8
+  energyIntervalMax: 1.2
+  energyBatchMin: 4
+  energyBatchMax: 6
+  energyPointMinimum: 64
+  energyRiskFraction: 0.45
+  enemyCap: 070000000a0000000c000000
+  bossCap: 010000000200000002000000
+  maxChasers: 030000000400000005000000
+  enemyInitialBatch: 3
+  enemyBatchMax: 2
+  bossSpacing: 8
+  creepSpeed: 8
+  bossSpeed: 7.8
+  creepDamage: 25
+  bossDamage: 35
+  creepWindup: 0.3
+  creepWindupMax: 0.4
+  bossWindup: 0.65
+  bossRecover: 1.1
+  creepRecover: 0.65
   quietTime: 5
   supportCap: 3
   supportIntervalMin: 7
@@ -41,4 +50,10 @@ MonoBehaviour:
   - 20
   - 15
   firstShieldAfter: -1
+  harmfulCap: 4
+  harmfulAtStart: 2
+  harmfulDamage: 20
+  harmfulIntervalMin: 6
+  harmfulIntervalMax: 9
+  harmfulLifetime: 20
   hazardDeathMessage: "Robo ch\u1EA1m dung nham"

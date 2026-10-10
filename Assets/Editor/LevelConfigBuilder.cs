@@ -14,27 +14,52 @@ public static class LevelConfigBuilder {
 			AssetDatabase.CreateFolder("Assets/Resources", "Levels");
 
 		// Zone names follow spec §7.2 (scene IDs unchanged); hazards follow the first spec §5.
-		Write("Level1", 1, "Đảo hoang", "Level2", 6, 3, 4, 2.5f, 3.5f, "Robo rơi xuống biển axit");
-		Write("Level2", 2, "Trạm khai thác bỏ hoang", "Level3", 10, 5, 6, 2f, 3f, "Robo rơi xuống biển axit");
-		Write("Level3", 3, "Thung lũng dung nham", "Level4", 14, 7, 8, 1.5f, 2.5f, "Robo chạm dung nham");
-		Write("Level4", 4, "Bãi phóng bỏ hoang", SceneRouter.EndingScene, 18, 8, 10, 1.5f, 2f, "Robo rơi xuống biển axit");
+		Write("Level1", 1, "Đảo hoang", "Level2", 6, 4, 6, 1.5f, 2f, "Robo rơi xuống biển axit");
+		Write("Level2", 2, "Trạm khai thác bỏ hoang", "Level3", 10, 8, 12, 1f, 1.5f, "Robo rơi xuống biển axit");
+		Write("Level3", 3, "Thung lũng dung nham", "Level4", 14, 12, 18, 0.8f, 1.2f, "Robo chạm dung nham");
+		Write("Level4", 4, "Bãi phóng bỏ hoang", SceneRouter.EndingScene, 18, 16, 24, 0.8f, 1f, "Robo rơi xuống biển axit");
 		// Energy batches (spec §5.1): cores per drop, upper bound included.
-		Batch("Level1", 1, 1);
-		Batch("Level2", 1, 2);
-		Batch("Level3", 2, 3);
-		Batch("Level4", 2, 4);
+		Batch("Level1", 2, 3);
+		Batch("Level2", 3, 4);
+		Batch("Level3", 4, 6);
+		Batch("Level4", 5, 7);
 		// Support items (spec §6.3).
 		Support("Level1", 1, 10f, 14f, new[] { 40f, 40f, 20f, 0f }, 5f);
 		Support("Level2", 2, 8f, 12f, new[] { 30f, 35f, 20f, 15f }, -1f);
 		Support("Level3", 3, 7f, 10f, new[] { 30f, 35f, 20f, 15f }, -1f);
 		Support("Level4", 3, 6f, 9f, new[] { 30f, 35f, 20f, 15f }, -1f);
 		// Enemies (spec §4.1-§4.3): caps (creep + boss), Normal speed/damage, creep timings, quiet time.
-		Enemies("Level1", new[] { 1, 1, 1 }, 0, 5.0f, 0f, 10, 0, 0.65f, 1.00f, 8f);
-		Enemies("Level2", new[] { 2, 3, 4 }, 0, 6.0f, 0f, 12, 0, 0.60f, 0.95f, 6f);
-		Enemies("Level3", new[] { 4, 5, 6 }, 1, 6.8f, 6.5f, 15, 25, 0.55f, 0.90f, 5f);
-		Enemies("Level4", new[] { 6, 7, 8 }, 1, 7.5f, 7.2f, 18, 30, 0.50f, 0.85f, 5f);
+		Enemies("Level1", new[] { 2, 2, 3 }, new[] { 0, 0, 0 }, 6.8f, 0f, 15, 0, 0.45f, 0.80f, 8f);
+		Enemies("Level2", new[] { 4, 5, 6 }, new[] { 0, 0, 0 }, 7.5f, 0f, 20, 0, 0.35f, 0.70f, 6f);
+		Enemies("Level3", new[] { 7, 10, 12 }, new[] { 1, 2, 2 }, 8.0f, 7.8f, 25, 35, 0.30f, 0.65f, 5f);
+		Enemies("Level4", new[] { 11, 15, 17 }, new[] { 2, 3, 3 }, 8.4f, 8.2f, 30, 40, 0.25f, 0.60f, 5f);
+		Challenge("Level1", new[] { 1, 2, 2 }, 1, 1, 20, 0.15f, 0, 0, 0, 8f, 12f);
+		Challenge("Level2", new[] { 2, 3, 3 }, 2, 1, 40, 0.30f, 2, 1, 15, 8f, 12f);
+		Challenge("Level3", new[] { 3, 4, 5 }, 3, 2, 64, 0.45f, 4, 2, 20, 6f, 9f);
+		Challenge("Level4", new[] { 4, 5, 6 }, 4, 3, 88, 0.55f, 6, 3, 25, 5f, 8f);
 		AssetDatabase.SaveAssets();
 		Debug.Log("LevelConfigBuilder: done");
+	}
+
+	static void Challenge(string id, int[] chasers, int initialBatch, int batchMax, int points, float risk,
+		int trapCap, int trapStart, int trapDamage, float trapMin, float trapMax) {
+		LevelConfig config = AssetDatabase.LoadAssetAtPath<LevelConfig>(Folder + "/" + id + ".asset");
+		config.maxChasers = chasers;
+		config.enemyInitialBatch = initialBatch;
+		config.enemyBatchMax = batchMax;
+		config.bossSpacing = 8f;
+		config.energyPointMinimum = points;
+		config.energyRiskFraction = risk;
+		config.creepWindupMax = config.creepWindup + 0.10f;
+		config.bossWindup = config.order == 4 ? 0.55f : 0.65f;
+		config.bossRecover = config.order == 4 ? 0.95f : 1.10f;
+		config.harmfulCap = trapCap;
+		config.harmfulAtStart = trapStart;
+		config.harmfulDamage = trapDamage;
+		config.harmfulIntervalMin = trapMin;
+		config.harmfulIntervalMax = trapMax;
+		config.harmfulLifetime = 20f;
+		EditorUtility.SetDirty(config);
 	}
 
 	static void Support(string id, int cap, float min, float max, float[] weights, float firstShield) {
@@ -54,11 +79,11 @@ public static class LevelConfigBuilder {
 		EditorUtility.SetDirty(config);
 	}
 
-	static void Enemies(string id, int[] cap, int boss, float creepSpeed, float bossSpeed, int creepDamage, int bossDamage,
+	static void Enemies(string id, int[] cap, int[] boss, float creepSpeed, float bossSpeed, int creepDamage, int bossDamage,
 		float creepWindup, float creepRecover, float quietTime) {
 		LevelConfig config = AssetDatabase.LoadAssetAtPath<LevelConfig>(Folder + "/" + id + ".asset");
 		config.enemyCap = cap;
-		config.bossCap = new[] { boss, boss, boss };
+		config.bossCap = boss;
 		config.creepSpeed = creepSpeed;
 		config.bossSpeed = bossSpeed;
 		config.creepDamage = creepDamage;

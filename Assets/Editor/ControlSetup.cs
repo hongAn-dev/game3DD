@@ -9,7 +9,7 @@ using UnityEngine.UI;
 /// Wires the spec §7 controls into Level1..4: orbit camera on the Main Camera (minimap keeps a fixed SmoothFollow),
 /// safe-area joystick + right-half look area on the mobile canvas, a two-button pause overlay canvas (the pause button
 /// itself is FlowUiSetup's top-right bar), the robot
-/// tuning (11 m/s, acceleration 24, brake 30, no torque; no per-scene overrides) with Rigidbody interpolation, and no
+/// tuning (8.8 m/s, acceleration 24, brake 30, no torque; no per-scene overrides) with Rigidbody interpolation, and no
 /// raycasts on decorative graphics (they would swallow camera swipes). Idempotent. Run UiTheme.Apply afterwards.
 /// </summary>
 public static class ControlSetup {
@@ -24,11 +24,12 @@ public static class ControlSetup {
 			health.maxHealth = health.healthPoints = health.respawnHealthPoints = 100f;
 			health.numberOfLives = 1;
 			var ball = new SerializedObject(contents.GetComponent<Ball>());
-			ball.FindProperty("m_MaxSpeed").floatValue = 11f;
+			ball.FindProperty("m_MaxSpeed").floatValue = 8.8f;
 			ball.FindProperty("m_AccelerationRate").floatValue = 24f;
 			ball.FindProperty("m_Brake").floatValue = 30f;
 			ball.FindProperty("m_UseTorque").boolValue = false;
 			ball.ApplyModifiedPropertiesWithoutUndo();
+			if (contents.GetComponent<SlowStatus>() == null) contents.AddComponent<SlowStatus>();
 			PrefabUtility.SaveAsPrefabAsset(contents, "Assets/Prefabs/Player.prefab");
 		} finally {
 			PrefabUtility.UnloadPrefabContents(contents);

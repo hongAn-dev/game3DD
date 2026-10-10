@@ -20,11 +20,13 @@ public class AudioPlayTests {
 
 	bool savedSfx;
 	float savedMusic, savedSfxVolume;
+	bool savedMusicEnabled;
 
 	[UnitySetUp]
 	public IEnumerator On() {
 		savedSfx = SoundSettings.SfxEnabled;
 		savedMusic = SoundSettings.MusicVolume;
+		savedMusicEnabled = SoundSettings.MusicEnabled;
 		savedSfxVolume = SoundSettings.SfxVolume;
 		played.Clear();
 		Sfx.Played += Record;
@@ -40,6 +42,7 @@ public class AudioPlayTests {
 		Sfx.StopAll();
 		SoundSettings.SfxEnabled = savedSfx;
 		SoundSettings.MusicVolume = savedMusic;
+		SoundSettings.MusicEnabled = savedMusicEnabled;
 		SoundSettings.SfxVolume = savedSfxVolume;
 	}
 
@@ -75,10 +78,11 @@ public class AudioPlayTests {
 		Assert.IsTrue(Sfx.Play(SfxEvent.CampaignWin));
 		Assert.AreEqual(1, Sfx.ActiveVoices);
 		SoundSettings.SfxEnabled = false;
-		Assert.AreEqual(0, Sfx.ActiveVoices, "silent at once");
+		foreach (AudioSource voice in Object.FindObjectOfType<SfxHost>().GetComponents<AudioSource>().Where(v => v.isPlaying))
+			Assert.AreEqual(0f, voice.volume, 0.0001f, "silent at once without restarting the source");
 		Assert.IsFalse(Sfx.Play(SfxEvent.Heal), "nothing new while muted");
 		SoundSettings.SfxEnabled = true;
-		Assert.AreEqual(0, Sfx.ActiveVoices, "no catch-up after unmuting");
+		Assert.AreEqual(1, Count(SfxEvent.CampaignWin), "unmuting does not replay or add a queued effect");
 		yield return null;
 	}
 
@@ -170,7 +174,7 @@ public class AudioPlayTests {
 		Assert.AreEqual(0f, GameManager.gm.backgroundMusic.volume, 0.001f);
 	}
 
-	// SFX mute silences the Ending's cinematic sources, never music or ambience.
+	// SFX mute covers ambience and cinematic sources while leaving music independent.
 	[UnityTest]
 	public IEnumerator MuteReachesEndingSourcesButNotMusic() {
 		yield return Level1();
@@ -178,14 +182,36 @@ public class AudioPlayTests {
 		float m = music.volume, a = ambience.volume;
 		SoundSettings.SfxEnabled = false;
 		Assert.AreEqual(m, music.volume, 0.0001f);
-		Assert.AreEqual(a, ambience.volume, 0.0001f);
+		Assert.AreEqual(0f, ambience.volume, 0.0001f);
+		yield return null; // a new evaluation/frame must retain the group mute
+		Assert.AreEqual(0f, ambience.volume, 0.0001f);
 		SoundSettings.SfxEnabled = true;
+		Assert.AreEqual(a, ambience.volume, 0.0001f);
+		float musicTime = music.time;
+		SoundSettings.MusicEnabled = false;
+		Assert.AreEqual(0f, music.volume, 0.0001f, "BGM toggle mutes music independently");
+		yield return null;
+		Assert.AreEqual(0f, music.volume, 0.0001f, "next frame keeps music muted");
+		SoundSettings.MusicEnabled = true;
+		Assert.AreEqual(m, music.volume, 0.0001f, "BGM volume restores the selected base gain");
+		Assert.GreaterOrEqual(music.time, musicTime, "BGM toggle does not restart the track");
 		SceneManager.LoadScene("Ending");
 		yield return null;
 		yield return null;
 		AudioSource engine = GameObject.Find("Audio Engine").GetComponent<AudioSource>();
 		Assert.Greater(engine.volume, 0f);
+		double startTime = GameObject.FindObjectOfType<EndingController>().director.time;
 		SoundSettings.SfxEnabled = false;
 		Assert.AreEqual(0f, engine.volume);
+		yield return null;
+		Assert.IsTrue(engine.mute, "Timeline evaluation cannot write over the group mute");
+		Assert.AreEqual(0f, engine.volume, .0001f);
+		SoundSettings.SfxVolume = .4f;
+		SoundSettings.SfxEnabled = true;
+		yield return null;
+		SoundGroup engineGroup = engine.GetComponent<SoundGroup>();
+		Assert.AreEqual(engineGroup.baseVolume * .4f * engineGroup.Fade, engine.volume, .0001f, "Timeline keeps the selected group gain on the next frame");
+		EndingController ending = GameObject.FindObjectOfType<EndingController>();
+		Assert.Greater(ending.director.time, startTime, "mute does not seek/restart the cinematic");
 	}
 }

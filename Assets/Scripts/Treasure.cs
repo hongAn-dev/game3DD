@@ -21,7 +21,7 @@ public class Treasure : MonoBehaviour {
 		collected = true;
 
 		if (GameManager.gm != null)
-			GameManager.gm.Collect (value);
+			GameManager.gm.QueueScoreDelta (this, value);
 		Sfx.Play (SfxEvent.EnergyPickup);   // the explosion effect is silent: one sound per pickup
 
 		if (explosionPrefab != null)

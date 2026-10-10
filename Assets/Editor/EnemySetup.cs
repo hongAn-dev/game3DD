@@ -196,9 +196,9 @@ public static class EnemySetup {
 			brain.telegraph = Telegraph(root, brain.slamRadius, telegraph);   // the slam circle at its real size
 			brain.dashLength = 5f;
 			brain.dashWidth = 1.5f;
-			brain.dashSpeed = 10.5f;
-			brain.dashWindup = 1.0f;
-			brain.dashRecover = 1.6f;
+			brain.dashSpeed = 11f;
+			brain.dashWindup = 0.65f;
+			brain.dashRecover = 1.2f;
 			brain.dashTelegraph = DashTelegraph(root, telegraph);
 			PrefabUtility.SaveAsPrefabAsset(root, BossPath);
 			Debug.Log("EnemySetup: boss " + b.size.ToString("F2") + " radius " + radius.ToString("F2") + " range " + brain.attackRange.ToString("F2"));

@@ -38,7 +38,7 @@ public class StoryPlayTests {
 		Assert.AreEqual("Robo lạc lối", dialog.title.text);
 		Assert.IsFalse(dialog.backButton.gameObject.activeSelf, "no Quay lại on page 1");
 		Assert.IsTrue(dialog.skipButton.gameObject.activeSelf);
-		for (int i = 0; i < 5; i++)
+		for (int i = 0; i < StoryText.Tutorial(LevelCatalog.First).Length - 1; i++)
 			dialog.Next();
 		Assert.AreEqual("Đảo hoang", dialog.title.text);
 		Assert.IsFalse(dialog.nextButton.gameObject.activeSelf);
@@ -98,10 +98,13 @@ public class StoryPlayTests {
 		yield return Open("Level2");
 		Assert.IsTrue(dialog.IsOpen);
 		Assert.AreEqual("Trạm khai thác bỏ hoang", dialog.title.text);
-		Assert.IsFalse(dialog.skipButton.gameObject.activeSelf);
+		Assert.IsTrue(dialog.skipButton.gameObject.activeSelf);
 		Assert.IsFalse(dialog.backButton.gameObject.activeSelf);
-		Assert.IsTrue(dialog.startButton.gameObject.activeSelf);
+		Assert.IsTrue(dialog.nextButton.gameObject.activeSelf);
 		StringAssert.Contains("Thu thập đủ 10 viên năng lượng để qua màn.", dialog.body.text);
+		dialog.Next();
+		StringAssert.Contains("Hóa chất độc hại", dialog.body.text);
+		Assert.IsTrue(dialog.startButton.gameObject.activeSelf);
 	}
 
 	[UnityTest]
@@ -313,7 +316,7 @@ public class StoryPlayTests {
 	[UnityTest]
 	public IEnumerator DoubleTapDoesNotSkipTheLastPage() {
 		yield return NewGame();
-		for (int i = 0; i < 4; i++)
+		for (int i = 0; i < StoryText.Tutorial(LevelCatalog.First).Length - 2; i++)
 			dialog.Next();
 		yield return new WaitForSecondsRealtime(DialogPanel.TapGuard + 0.05f);
 		dialog.nextButton.onClick.Invoke();

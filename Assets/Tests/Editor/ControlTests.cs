@@ -166,7 +166,7 @@ public class ControlTests {
 	[Test]
 	public void RobotTuningIs11_24_30() {
 		var ball = new SerializedObject(AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Player.prefab").GetComponent<Ball>());
-		Assert.AreEqual(11f, ball.FindProperty("m_MaxSpeed").floatValue);
+		Assert.AreEqual(8.8f, ball.FindProperty("m_MaxSpeed").floatValue);
 		Assert.AreEqual(24f, ball.FindProperty("m_AccelerationRate").floatValue);
 		Assert.AreEqual(30f, ball.FindProperty("m_Brake").floatValue);
 		Assert.IsFalse(ball.FindProperty("m_UseTorque").boolValue);

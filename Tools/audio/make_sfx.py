@@ -103,3 +103,6 @@ write('ambience_acid', loop(mix(noise(9.0, 350, 450, 0.001, 60.0),
                                 offsets=[0.0] + [rng.uniform(0.5, 8.0) for _ in range(10)]), 1.0))
 write('ambience_station', loop(mix(noise(9.0, 250, 320, 0.001, 60.0), [0.15 * v for v in tone(220, 9.0, 0.001, 60.0, 'warm', vibrato=0.002)]), 1.0))
 print('SFX_OK')
+
+# One shared harmful-item warning/impact cue. Keep it distinct from the positive pickup chime.
+write('trap_trigger', mix(tone(220, 0.22, 0.003, 0.08, bend=-0.35), tone(311.1, 0.18, 0.003, 0.06, bend=-0.2), noise(0.09, 2400, 700, 0.001, 0.025), offsets=[0, 0.035, 0.0]))

@@ -112,6 +112,60 @@ public class EnemyPlayTests {
 	}
 
 	[UnityTest]
+	public IEnumerator BossAttackTokenIsExclusiveAndReleasedWhenOwnerIsDisabled() {
+		yield return Arena();
+		EnemyDirector director = new GameObject("Director").AddComponent<EnemyDirector>();
+		EnemyBrain a = Spawn("Enemy - Monster", new Vector3(0f, 0f, 3f));
+		EnemyBrain b = Spawn("Enemy - Monster", new Vector3(0f, 0f, -3f));
+		float end = Time.time + 2f;
+		while (a.State != EnemyState.Windup && b.State != EnemyState.Windup && Time.time < end)
+			yield return null;
+		EnemyBrain owner = a.State == EnemyState.Windup ? a : b.State == EnemyState.Windup ? b : null;
+		Assert.IsNotNull(owner, "one nearby boss acquires the attack token");
+		EnemyBrain waiting = owner == a ? b : a;
+		Assert.IsFalse(director.RequestBossAttack(waiting), "a second boss cannot start an attack while the first telegraphs");
+		owner.enabled = false;
+
+		NavMeshAgent waitingAgent = waiting.GetComponent<NavMeshAgent>();
+		Vector3 inside = waiting.transform.position;
+		Assert.IsTrue(waitingAgent.Warp(new Vector3(0f, 0f, 20f)));
+		waitingAgent.isStopped = true;
+		float distanceDeadline = Time.time + 0.5f;
+		while (waiting.DistanceToTarget <= EnemyDirector.BossAttackTokenRange && Time.time < distanceDeadline)
+			yield return null;
+		Assert.Greater(waiting.DistanceToTarget, EnemyDirector.BossAttackTokenRange);
+		Assert.IsFalse(director.RequestBossAttack(waiting), "a boss outside the 15 m bubble cannot acquire the token");
+
+		Assert.IsTrue(waitingAgent.Warp(inside));
+		distanceDeadline = Time.time + 0.5f;
+		while (waiting.DistanceToTarget > EnemyDirector.BossAttackTokenRange && Time.time < distanceDeadline)
+			yield return null;
+		Assert.LessOrEqual(waiting.DistanceToTarget, EnemyDirector.BossAttackTokenRange);
+		Assert.IsTrue(director.RequestBossAttack(waiting), "disabling the owner releases its token for an in-range boss");
+	}
+
+	[UnityTest]
+	public IEnumerator BossAttackTokenReleasesWhenOwnerEntersRecover() {
+		yield return Arena();
+		EnemyDirector director = new GameObject("Director").AddComponent<EnemyDirector>();
+		EnemyBrain a = Spawn("Enemy - Monster", new Vector3(0f, 0f, 3f));
+		EnemyBrain b = Spawn("Enemy - Monster", new Vector3(0f, 0f, -3f));
+		float end = Time.time + 2f;
+		while (a.State != EnemyState.Windup && b.State != EnemyState.Windup && Time.time < end)
+			yield return null;
+		EnemyBrain owner = a.State == EnemyState.Windup ? a : b.State == EnemyState.Windup ? b : null;
+		Assert.IsNotNull(owner, "one nearby boss acquires the attack token");
+		EnemyBrain waiting = owner == a ? b : a;
+
+		yield return WaitFor(owner, EnemyState.Recover, 3f);
+		float retryDeadline = Time.time + 0.25f;
+		while (waiting.State != EnemyState.Windup && Time.time < retryDeadline)
+			yield return null;
+		Assert.AreEqual(EnemyState.Windup, waiting.State, "the next boss can telegraph as soon as its peer enters recovery");
+		Assert.AreEqual(EnemyState.Recover, owner.State, "recovery does not hold the attack token");
+	}
+
+	[UnityTest]
 	public IEnumerator EnemySpeedIgnoresRobotSpeed() {
 		yield return Arena();
 		player.GetComponent<Ball>().SpeedMultiplier = Overdrive.SpeedBoost;

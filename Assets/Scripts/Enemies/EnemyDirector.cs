@@ -7,11 +7,11 @@ using UnityEngine.SceneManagement;
 /// <summary>
 /// Sole owner of a level's enemy budget (spec §4.1/§4.2): alive + telegraphed enemies never exceed
 /// LevelConfig.enemyCap[difficulty], of which at most bossCap[difficulty] are bosses. Gameplay time only: nothing
-/// spawns during the level's quiet time, then one enemy every 2-3 s up to the cap; the boss (L3/L4) waits for
-/// BossGateOpen. Each spawn is telegraphed (creep 0.7 s, boss 1 s) on a NavMesh point at least minPlayerDistance from
-/// the robot, with a complete path to it and away from other enemies; if the robot reaches the marker the spawn is
-/// cancelled. It also hands out chase tokens (2 in L1-L2, 3 in L3-L4, boss included) and patrol points near the
-/// energy landing points. Development builds log the counts every 5 s.
+/// spawns during quiet time, then a configured opening creep batch and later batches up to the cap; bosses wait for
+/// BossGateOpen and the configured spacing. Each spawn is telegraphed (creep 0.7 s, boss 1 s) on a reachable NavMesh
+/// point at least minPlayerDistance from the robot; if the robot reaches the marker the spawn is cancelled. One
+/// active director owns the configured chase tokens and spreads L3/L4 patrols across authored energy regions.
+/// Development builds log the counts every 5 s.
 /// </summary>
 public class EnemyDirector : MonoBehaviour {
 
@@ -34,6 +34,7 @@ public class EnemyDirector : MonoBehaviour {
 	public float minEnemySpacing = 2f;
 	public float patrolRadius = 18f;
 	public int maxChasers = 3;
+	public const float ChaseReassignMargin = 4f;
 	[Tooltip("Tests: open the boss gate at once.")]
 	public bool bossGateOverride;
 
@@ -42,11 +43,16 @@ public class EnemyDirector : MonoBehaviour {
 	readonly List<EnemyBrain> bosses = new List<EnemyBrain>();
 	readonly List<EnemyBrain> creeps = new List<EnemyBrain>();
 	readonly List<GameObject> markers = new List<GameObject>();
+	readonly List<int> pendingReservations = new List<int>();
 	int pendingBosses, pendingCreeps;
 	int cap, bossCap;
 	LevelConfig config;
 	float elapsed, timer, nextInterval;
 	Transform player;
+	bool initialBatchPending = true;
+	float lastBossSpawnedAt = float.NegativeInfinity;
+	EnemyBrain bossAttackOwner;
+	public const float BossAttackTokenRange = 15f;
 
 	public int AliveCount { get { Prune(); return bosses.Count + creeps.Count + pendingBosses + pendingCreeps; } }
 	public int BossCount { get { Prune(); return bosses.Count + pendingBosses; } }
@@ -68,7 +74,8 @@ public class EnemyDirector : MonoBehaviour {
 	/// <summary>
 	/// Asks for one of the chase tokens; true if this enemy may chase. Already holding one counts. When all tokens
 	/// are taken, a requester closer to the robot takes the token of a chaser that has fallen behind (beyond its
-	/// detect radius); that chaser notices through HoldsChase and goes back to patrolling.
+	/// detect radius). Only a chaser currently in Chase can yield; an enemy in an attack keeps its slot until the attack
+	/// finishes. The former holder is returned to Patrol synchronously before the token is granted.
 	/// </summary>
 	public bool RequestChase(EnemyBrain brain) {
 		chasers.RemoveAll(b => b == null);
@@ -77,11 +84,12 @@ public class EnemyDirector : MonoBehaviour {
 		if (chasers.Count >= maxChasers) {
 			EnemyBrain trailing = null;
 			foreach (EnemyBrain c in chasers)
-				if (c.DistanceToTarget > c.detectRadius && (trailing == null || c.DistanceToTarget > trailing.DistanceToTarget))
+				if (c.CanYieldChaseToken && (trailing == null || c.DistanceToTarget > trailing.DistanceToTarget))
 					trailing = c;
-			if (trailing == null || trailing.DistanceToTarget <= brain.DistanceToTarget)
+			if (trailing == null || trailing.DistanceToTarget <= brain.DistanceToTarget + ChaseReassignMargin)
 				return false;
-			chasers.Remove(trailing);
+			if (!trailing.YieldChaseToken())
+				return false;
 		}
 		chasers.Add(brain);
 		return true;
@@ -91,12 +99,48 @@ public class EnemyDirector : MonoBehaviour {
 		return chasers.Contains(brain);
 	}
 
+	/// <summary>Only one boss inside the player bubble may begin/hold a slam or dash at once.</summary>
+	public bool RequestBossAttack(EnemyBrain brain) {
+		if (brain == null)
+			return false;
+		if (brain.DistanceToTarget > BossAttackTokenRange)
+			return false;
+		if (bossAttackOwner == null || bossAttackOwner.DistanceToTarget > BossAttackTokenRange) {
+			if (bossAttackOwner != null)
+				bossAttackOwner.ReleaseBossAttackToken();
+			bossAttackOwner = brain;
+			return true;
+		}
+		return bossAttackOwner == brain;
+	}
+
+	public void ReleaseBossAttack(EnemyBrain brain) {
+		if (bossAttackOwner == brain)
+			bossAttackOwner = null;
+	}
+
+	public void ForgetBossAttackOwner(EnemyBrain brain) {
+		if (bossAttackOwner == brain)
+			bossAttackOwner = null;
+	}
+
 	public void ReleaseChase(EnemyBrain brain) {
 		chasers.Remove(brain);
 	}
 
 	void Awake() {
+		if (Current != null && Current != this) {
+			enabled = false;
+			return;
+		}
 		Current = this;
+	}
+
+	void OnEnable() {
+		if (Current == null || Current == this)
+			Current = this;
+		else
+			enabled = false;
 	}
 
 	void OnDestroy() {
@@ -114,7 +158,8 @@ public class EnemyDirector : MonoBehaviour {
 		cap = config.enemyCap[d];
 		bossCap = Mathf.Min(config.bossCap[d], cap);
 		quietTime = config.quietTime;
-		maxChasers = config.order <= 2 ? 2 : 3;
+		maxChasers = config.maxChasers != null && d < config.maxChasers.Length
+			? config.maxChasers[d] : (config.order <= 2 ? 2 : 3);
 		GameObject p = GameObject.FindWithTag("Player");
 		player = p != null ? p.transform : null;
 		ScheduleNext();
@@ -146,12 +191,30 @@ public class EnemyDirector : MonoBehaviour {
 		ScheduleNext();
 		if (AliveCount >= cap)
 			return;
-		bool boss = BossCount < bossCap && BossAllowed() && bossPrefab != null;
-		if (!boss && (creepPrefab == null || creeps.Count + pendingCreeps >= cap - bossCap))
+		bool boss = bossPrefab != null && BossCount < bossCap && BossAllowed() && pendingBosses == 0
+			&& elapsed - lastBossSpawnedAt >= config.bossSpacing;
+		if (boss) {
+			Vector3 bossPoint;
+			if (PickPoint(out bossPoint))
+				BeginSpawn(true, bossPoint);
 			return;
-		Vector3 point;
-		if (PickPoint(out point))
-			StartCoroutine(Spawn(boss, point));
+		}
+		if (creepPrefab == null)
+			return;
+		int creepLimit = Mathf.Max(0, cap - bossCap);
+		int free = Mathf.Min(cap - AliveCount, creepLimit - creeps.Count - pendingCreeps);
+		int wanted = initialBatchPending ? config.enemyInitialBatch
+			: Random.Range(1, Mathf.Max(1, config.enemyBatchMax) + 1);
+		int count = Mathf.Min(free, wanted);
+		int spawned = 0;
+		for (int i = 0; i < count; i++) {
+			Vector3 point;
+			if (!PickPoint(out point) || !BeginSpawn(false, point))
+				break;
+			spawned++;
+		}
+		if (spawned > 0)
+			initialBatchPending = false;
 	}
 
 	bool RobotOnMesh(out Vector3 robot) {
@@ -180,9 +243,12 @@ public class EnemyDirector : MonoBehaviour {
 		Prune();
 		foreach (EnemyBrain brain in bosses) taken.Add(brain.transform.position);
 		foreach (EnemyBrain brain in creeps) taken.Add(brain.transform.position);
-		EnergySpawnDirector energy = GetComponent<EnergySpawnDirector>();
-		if (energy != null)
-			taken.AddRange(energy.Occupied());
+		if (SpawnRegistry.Current != null)
+			taken.AddRange(SpawnRegistry.Current.OccupiedPoints());
+		else {
+			EnergySpawnDirector energy = GetComponent<EnergySpawnDirector>();
+			if (energy != null) taken.AddRange(energy.Occupied());
+		}
 		return taken;
 	}
 
@@ -201,13 +267,41 @@ public class EnemyDirector : MonoBehaviour {
 		}
 		if (options.Count == 0)
 			return false;
+		if (config != null && config.order >= 3) {
+			int leastLoaded = int.MaxValue;
+			var balanced = new List<Vector3>();
+			foreach (Vector3 candidate in options) {
+				int load = RegionLoad(RegionAt(candidate));
+				if (load < leastLoaded) {
+					leastLoaded = load;
+					balanced.Clear();
+				}
+				if (load == leastLoaded)
+					balanced.Add(candidate);
+			}
+			options = balanced;
+		}
 		point = options[Random.Range(0, options.Count)];
 		return true;
 	}
 
-	IEnumerator Spawn(bool boss, Vector3 point) {
+	bool BeginSpawn(bool boss, Vector3 point) {
+		int reservation = 0;
+		SpawnRegistry registry = SpawnRegistry.Current;
+		GameObject prefab = boss ? bossPrefab : creepPrefab;
+		float radius = prefab != null && prefab.GetComponent<NavMeshAgent>() != null
+			? prefab.GetComponent<NavMeshAgent>().radius : 0.6f;
+		if (registry != null && !registry.TryReserve(SpawnRegistry.SpawnCategory.EnemyTelegraph, this,
+			point, radius, cap, out reservation))
+			return false;
 		if (boss) pendingBosses++; else pendingCreeps++;
 		pendingPoints.Add(point);
+		if (reservation != 0) pendingReservations.Add(reservation);
+		StartCoroutine(Spawn(boss, point, reservation));
+		return true;
+	}
+
+	IEnumerator Spawn(bool boss, Vector3 point, int reservation) {
 		GameObject marker = Marker(point);
 		markers.Add(marker);
 		float duration = boss ? bossTelegraphTime : telegraphTime;
@@ -228,24 +322,82 @@ public class EnemyDirector : MonoBehaviour {
 		Destroy(marker);
 		pendingPoints.Remove(point);
 		if (boss) pendingBosses--; else pendingCreeps--;
-		if (cancelled || !GameFlow.IsGameplayActive)
+		pendingReservations.Remove(reservation);
+		if (cancelled || !GameFlow.IsGameplayActive) {
+			if (SpawnRegistry.Current != null) SpawnRegistry.Current.Release(reservation);
 			yield break;
+		}
 		GameObject enemy = Instantiate(boss ? bossPrefab : creepPrefab, point, Quaternion.LookRotation(player != null ? Flat(player.position - point) : Vector3.forward));
 		EnemyBrain brain = enemy.GetComponent<EnemyBrain>();
 		brain.Configure(EnemyProfile.For(config, GameSettings.difficulty, boss));
-		brain.patrolPoints = PatrolPoints(point);
+		int region, cluster;
+		RegionAndCluster(point, out region, out cluster);
+		brain.SetPatrolRegion(region, PatrolPoints(point, region, cluster));
 		(boss ? bosses : creeps).Add(brain);
+		if (boss) lastBossSpawnedAt = elapsed;
+		// The shared registry reserves telegraph footprints only. Live enemies are represented by their moving
+		// transforms below, so committing them would leave a stale spawn-location footprint behind.
+		if (SpawnRegistry.Current != null && reservation != 0)
+			SpawnRegistry.Current.Release(reservation);
 	}
 
-	// Energy landing points near the spawn: patrols pass along the routes the robot takes to the cores.
-	Vector3[] PatrolPoints(Vector3 home) {
+	int GridRegion(Vector3 point) {
+		return Mathf.FloorToInt(point.x / 16f) * 10000 + Mathf.FloorToInt(point.z / 16f);
+	}
+
+	void RegionAndCluster(Vector3 point, out int region, out int cluster) {
+		region = cluster = GridRegion(point);
 		EnergySpawnDirector energy = GetComponent<EnergySpawnDirector>();
-		var points = new List<Vector3>();
-		if (energy != null)
-			foreach (Transform t in energy.landingPoints)
-				if (t != null && Vector3.Distance(t.position, home) <= patrolRadius)
-					points.Add(t.position);
-		return points.ToArray();
+		if (energy == null)
+			return;
+		float closest = float.PositiveInfinity;
+		foreach (Transform t in energy.landingPoints) {
+			if (t == null) continue;
+			SpawnPoint metadata = t.GetComponent<SpawnPoint>();
+			if (metadata == null) continue;
+			float distance = (t.position - point).sqrMagnitude;
+			if (distance >= closest) continue;
+			closest = distance;
+			region = metadata.regionId;
+			cluster = metadata.clusterId;
+		}
+	}
+
+	int RegionAt(Vector3 point) {
+		int region, cluster;
+		RegionAndCluster(point, out region, out cluster);
+		return region;
+	}
+
+	int RegionLoad(int region) {
+		int count = 0;
+		Prune();
+		foreach (EnemyBrain brain in bosses)
+			if (brain.PatrolRegionId == region) count++;
+		foreach (EnemyBrain brain in creeps)
+			if (brain.PatrolRegionId == region) count++;
+		foreach (Vector3 point in pendingPoints)
+			if (RegionAt(point) == region) count++;
+		return count;
+	}
+
+	// Enemies patrol the same authored energy cluster as their spawn region, spreading pressure around the map.
+	Vector3[] PatrolPoints(Vector3 home, int region, int cluster) {
+		EnergySpawnDirector energy = GetComponent<EnergySpawnDirector>();
+		var sameCluster = new List<Vector3>();
+		var nearby = new List<Vector3>();
+		if (energy != null) {
+			foreach (Transform t in energy.landingPoints) {
+				if (t == null) continue;
+				if (Vector3.Distance(t.position, home) <= patrolRadius)
+					nearby.Add(t.position);
+				SpawnPoint metadata = t.GetComponent<SpawnPoint>();
+				if (metadata != null && metadata.regionId == region && metadata.clusterId == cluster
+					&& Vector3.Distance(t.position, home) <= patrolRadius * 1.5f)
+					sameCluster.Add(t.position);
+			}
+		}
+		return sameCluster.Count > 0 ? sameCluster.ToArray() : nearby.ToArray();
 	}
 
 	static Vector3 Flat3(Vector3 v) {
@@ -302,6 +454,15 @@ public class EnemyDirector : MonoBehaviour {
 				Destroy(marker);
 		markers.Clear();
 		pendingPoints.Clear();
+		pendingReservations.Clear();
 		pendingBosses = pendingCreeps = 0;
+		if (bossAttackOwner != null)
+			bossAttackOwner.ReleaseBossAttackToken();
+		bossAttackOwner = null;
+		chasers.Clear();
+		if (Current == this && config != null)
+			Current = null;
+		if (SpawnRegistry.Current != null)
+			SpawnRegistry.Current.ReleaseOwner(this);
 	}
 }

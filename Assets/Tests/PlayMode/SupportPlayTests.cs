@@ -179,7 +179,7 @@ public class SupportPlayTests {
 		}
 		Assert.IsNotNull(first);
 		Assert.AreEqual(SupportKind.Shield, first.kind);
-		Assert.That(Time.time - start, Is.InRange(5f, 5f + 0.85f + 0.6f), "5 s after the intro, after its marker and fall");
+		Assert.That(Time.time - start, Is.InRange(4.95f, 5f + 0.85f + 0.6f), "5 s after the intro, allowing one frame of timer quantization");
 		while (support.Items.Count == 0 && Time.time - start < 9f)
 			yield return null;   // landed
 		Assert.AreEqual(1, support.Items.Count);
@@ -307,5 +307,24 @@ public class SupportPlayTests {
 			yield return null;
 		Assert.AreEqual(1, support.Items.Count(i => i.kind == SupportKind.Heal20), "one far shield became a +20");
 		Assert.LessOrEqual(support.AliveCount, 2, "within the budget");
+	}
+
+	[UnityTest]
+	public IEnumerator FirstShieldSpawnsOnGroundAndActivatesAfterScaleIn() {
+		yield return Load("Level1");
+		support.intervalOverride = 1000f;
+		float start = Time.time;
+		SupportPickup first = null;
+		while (first == null && Time.time - start < 8f) { first = Object.FindObjectOfType<SupportPickup>(); yield return null; }
+		Assert.IsNotNull(first);
+		Assert.AreEqual(SupportKind.Shield, first.kind);
+		RaycastHit hit;
+		Assert.IsTrue(Physics.Raycast(first.transform.position + Vector3.up, Vector3.down, out hit, 2f, ~0, QueryTriggerInteraction.Ignore));
+		Bounds bounds; Assert.IsTrue(GroundSpawn.TryBounds(first.transform, out bounds));
+		Assert.That(bounds.min.y - hit.point.y, Is.InRange(GroundSpawn.MinGap - 0.01f, GroundSpawn.MinGap + 0.03f));
+		Collider shieldCollider = first.GetComponent<Collider>();
+        float activationDeadline = Time.time + GroundSpawn.ScaleInDuration + 0.2f;
+        while (!shieldCollider.enabled && Time.time < activationDeadline) yield return null;
+        Assert.IsTrue(shieldCollider.enabled, "the shield trigger activates when scale-in completes");
 	}
 }

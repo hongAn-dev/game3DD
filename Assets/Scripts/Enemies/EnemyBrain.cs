@@ -29,6 +29,7 @@ public class EnemyBrain : MonoBehaviour {
 	public float attackRange = 1.6f;
 	public float attackAngle = 45f;
 	public float windup = 0.35f;
+	[HideInInspector] public float windupMax = 0.35f;
 	public float strike = 0.1f;
 	public float recover = 0.7f;
 	public int damage = 10;
@@ -44,9 +45,9 @@ public class EnemyBrain : MonoBehaviour {
 	public bool canDash;
 	public float dashLength = 5f;
 	public float dashWidth = 1.5f;
-	public float dashSpeed = 10.5f;
-	public float dashWindup = 1.0f;
-	public float dashRecover = 1.6f;
+	public float dashSpeed = 11f;
+	public float dashWindup = 0.65f;
+	public float dashRecover = 1.2f;
 	public GameObject dashTelegraph;
 
 	[Header("Legacy animation clips (optional)")]
@@ -62,6 +63,23 @@ public class EnemyBrain : MonoBehaviour {
 	public float DistanceToTarget { get; private set; }
 	public int HitAttempts { get; private set; }   // strikes that reached Hit (one per attack at most)
 	public AttackKind CurrentAttack { get; private set; }
+	public int PatrolRegionId { get; private set; }
+	public bool CanYieldChaseToken { get { return State == EnemyState.Chase; } }
+
+	/// <summary>Ends an ordinary chase immediately when the director transfers its token to a closer enemy.</summary>
+	public bool YieldChaseToken() {
+		if (!CanYieldChaseToken)
+			return false;
+		Enter(EnemyState.Patrol);
+		if (agent != null && agent.isOnNavMesh)
+			agent.SetDestination(home);
+		return true;
+	}
+
+	public void SetPatrolRegion(int regionId, Vector3[] points) {
+		PatrolRegionId = regionId;
+		patrolPoints = points ?? new Vector3[0];
+	}
 
 	NavMeshAgent agent;
 	Animation anim;
@@ -72,16 +90,21 @@ public class EnemyBrain : MonoBehaviour {
 	bool hitDone;
 	Vector3 slamCentre;
 	float dashTravel, dashDone;
-	bool nextIsDash;
+	float activeWindup;
+	int consecutiveDashes;
+	bool configured;
+	bool bossAttackToken;
 	Vector3 dashStart;
 	string currentClip = "";
 	static readonly RaycastHit[] SightHits = new RaycastHit[16];
 
 	/// <summary>Level/difficulty numbers (EnemyProfile). Call right after spawning; also works after Start.</summary>
 	public void Configure(EnemyProfile profile) {
+		configured = true;
 		speed = profile.speed;
 		damage = profile.damage;
 		windup = profile.windup;
+		windupMax = Mathf.Max(profile.windup, profile.windupMax);
 		strike = profile.strike;
 		recover = profile.recover;
 		canSlam = profile.slam;
@@ -102,6 +125,8 @@ public class EnemyBrain : MonoBehaviour {
 			targetHealth = target.GetComponent<Health>();
 			targetBody = target.GetComponent<Rigidbody>();
 		}
+		if (!configured)
+			windupMax = windup;
 		agent.speed = speed;
 		agent.acceleration = acceleration;
 		agent.angularSpeed = turnSpeed;
@@ -113,7 +138,7 @@ public class EnemyBrain : MonoBehaviour {
 		Enter(EnemyState.Idle);
 	}
 
-	// Chase token from the director (spec §4.2: at most 2 or 3 enemies chase at once); no director = no limit.
+	// Chase tokens are globally budgeted by the active director; no director means no limit.
 	bool MayChase() {
 		return EnemyDirector.Current == null || EnemyDirector.Current.RequestChase(this);
 	}
@@ -125,12 +150,33 @@ public class EnemyBrain : MonoBehaviour {
 
 	void OnDestroy() {
 		ReleaseToken();
+		ReleaseBossAttackToken();
+		if (SpawnRegistry.Current != null)
+			SpawnRegistry.Current.ReleaseAlive(gameObject);
+	}
+
+	void OnDisable() {
+		ReleaseToken();
+		ReleaseBossAttackToken();
+		if (SpawnRegistry.Current != null)
+			SpawnRegistry.Current.ReleaseAlive(gameObject);
+		State = EnemyState.Disabled;
+		if (agent != null && agent.isOnNavMesh)
+			agent.isStopped = true;
+		if (telegraph != null)
+			telegraph.SetActive(false);
+		if (dashTelegraph != null)
+			dashTelegraph.SetActive(false);
 	}
 
 	bool IsBoss { get { return canSlam || canDash; } }
 
 	void Enter(EnemyState next) {
 		State = next;
+		if (next == EnemyState.Recover)
+			ReleaseBossAttackToken();
+		if (next == EnemyState.Disabled)
+			ReleaseBossAttackToken();
 		if (next == EnemyState.Idle || next == EnemyState.Patrol || next == EnemyState.Return || next == EnemyState.Disabled)
 			ReleaseToken();
 		stateTime = 0f;
@@ -144,6 +190,7 @@ public class EnemyBrain : MonoBehaviour {
 			dashTelegraph.SetActive(next == EnemyState.Windup && CurrentAttack == AttackKind.Dash);
 		switch (next) {
 		case EnemyState.Windup:
+			activeWindup = Random.Range(windup, Mathf.Max(windup, windupMax));
 			lockedForward = FlatTo(target.position);
 			hitDone = false;
 			if (CurrentAttack == AttackKind.Slam) {
@@ -245,13 +292,16 @@ public class EnemyBrain : MonoBehaviour {
 				bool slamReady = distance <= slamReach + slamRadius * 0.8f && angle <= 60f && Clear();
 				bool dashReady = canDash && distance >= 2.5f && distance <= dashLength + 1f && angle <= 30f && Clear()
 					&& DashTravel(FlatTo(target.position)) >= 2f;
-				// L4 alternates: the other attack is preferred, but whichever is possible beats waiting.
-				if (dashReady && (nextIsDash || !slamReady)) {
-					CurrentAttack = AttackKind.Dash;
-					Enter(EnemyState.Windup);
-				} else if (slamReady) {
-					CurrentAttack = AttackKind.Slam;
-					Enter(EnemyState.Windup);
+				bool chooseDash = dashReady && consecutiveDashes < 2 && (!slamReady || Random.value < 0.40f);
+				if (!chooseDash && !slamReady && dashReady && consecutiveDashes < 2)
+					chooseDash = true;   // use a valid dash when a slam cannot reach
+				if (chooseDash || slamReady) {
+					EnemyDirector director = EnemyDirector.Current;
+					if (director == null || director.RequestBossAttack(this)) {
+						bossAttackToken = director != null;
+						CurrentAttack = chooseDash ? AttackKind.Dash : AttackKind.Slam;
+						Enter(EnemyState.Windup);
+					}
 				}
 			} else if (distance <= attackRange * 0.85f && Vector3.Angle(transform.forward, FlatTo(target.position)) <= attackAngle && Clear()) {
 				CurrentAttack = AttackKind.Strike;
@@ -261,12 +311,12 @@ public class EnemyBrain : MonoBehaviour {
 		case EnemyState.Windup:
 			transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(lockedForward), turnSpeed * Time.deltaTime);
 			if (telegraph != null && CurrentAttack == AttackKind.Strike)
-				telegraph.transform.localScale = Vector3.one * Mathf.Lerp(0.4f, 1f, stateTime / windup);
+				telegraph.transform.localScale = Vector3.one * Mathf.Lerp(0.4f, 1f, stateTime / Mathf.Max(0.01f, activeWindup));
 			else if (telegraph != null && CurrentAttack == AttackKind.Slam)
 				telegraph.transform.position = slamCentre + Vector3.up * 0.04f;   // stays on the ground while the boss turns
 			if (CurrentAttack == AttackKind.Dash)
 				PinDashStrip();   // the strip is a child of the turning boss: keep it on the locked line
-			if (stateTime >= (CurrentAttack == AttackKind.Dash ? dashWindup : windup))
+			if (stateTime >= (CurrentAttack == AttackKind.Dash ? dashWindup : activeWindup))
 				Enter(EnemyState.Strike);
 			break;
 		case EnemyState.Strike:
@@ -280,7 +330,7 @@ public class EnemyBrain : MonoBehaviour {
 				if (!hitDone && BossAttacks.TouchesDash(before, transform.position, target.position, dashWidth * 0.5f + 0.5f))
 					Hit();
 				if (dashDone >= dashTravel - 0.001f) {
-					nextIsDash = false;
+					consecutiveDashes++;
 					Enter(EnemyState.Recover);
 				}
 				break;
@@ -294,13 +344,14 @@ public class EnemyBrain : MonoBehaviour {
 				Hit();
 			if (stateTime >= strike) {
 				if (CurrentAttack == AttackKind.Slam)
-					nextIsDash = canDash;
+					consecutiveDashes = 0;
 				Enter(EnemyState.Recover);
 			}
 			break;
 		case EnemyState.Recover:
-			if (stateTime >= (CurrentAttack == AttackKind.Dash ? dashRecover : recover))
+			if (stateTime >= (CurrentAttack == AttackKind.Dash ? dashRecover : recover)) {
 				Enter(distance <= loseRadius ? EnemyState.Chase : EnemyState.Return);
+			}
 			break;
 		case EnemyState.Return:
 			Repath(false);
@@ -392,6 +443,14 @@ public class EnemyBrain : MonoBehaviour {
 			return false;
 		}
 		return true;
+	}
+
+	internal void ReleaseBossAttackToken() {
+		if (!bossAttackToken)
+			return;
+		bossAttackToken = false;
+		if (EnemyDirector.Current != null)
+			EnemyDirector.Current.ReleaseBossAttack(this);
 	}
 
 	void Hit() {

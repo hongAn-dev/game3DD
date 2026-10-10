@@ -17,10 +17,14 @@ public class PlayerHealthBar : MonoBehaviour {
 	public Text label;
 	public GameObject shieldGroup;   // shield icon + seconds beside the bar
 	public Text shieldSeconds;
+	public GameObject slowGroup;
+	public Text slowSeconds;
 	public float aboveTop = 0.32f;   // metres above the top of the ball
 
 	Health health;
 	ShieldEffect shield;
+	SlowStatus slow;
+	int shownSlow = -1;
 	int shownShield = -1;
 	Transform robot;
 	float radius = 0.5f;
@@ -41,6 +45,7 @@ public class PlayerHealthBar : MonoBehaviour {
 			robot = player.transform;
 			health = player.GetComponent<Health>();
 			shield = player.GetComponent<ShieldEffect>();
+			slow = player.GetComponent<SlowStatus>();
 			SphereCollider sphere = player.GetComponent<SphereCollider>();
 			if (sphere != null)
 				radius = sphere.radius * robot.lossyScale.y;
@@ -69,6 +74,12 @@ public class PlayerHealthBar : MonoBehaviour {
 			shieldGroup.SetActive(seconds > 0);
 			if (seconds > 0)
 				shieldSeconds.text = seconds.ToString();
+		}
+		int slowTime = slow != null && slow.Active ? Mathf.CeilToInt(slow.Remaining) : 0;
+		if (slowGroup != null && slowTime != shownSlow) {
+			shownSlow = slowTime;
+			slowGroup.SetActive(slowTime > 0);
+			if (slowTime > 0 && slowSeconds != null) slowSeconds.text = slowTime.ToString();
 		}
 		if (shownHp == health.healthPoints)
 			return;   // no new label string every frame
