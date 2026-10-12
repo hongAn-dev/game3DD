@@ -1,0 +1,8 @@
+Ultimate Space Kit by Quaternius
+https://quaternius.com/  (downloaded from https://poly.pizza/bundle/Ultimate-Space-Kit-YWh743lqGX)
+
+License: CC0 1.0 Universal (Public Domain)
+https://creativecommons.org/publicdomain/zero/1.0/
+
+Only the models the game uses are copied here (alien trees, rocks, plants, two robot enemies), FBX as shipped.
+Textures/Atlas.png is the colour atlas embedded in the pack's glTF files (the FBX files reference it but the FBX download does not ship it).

@@ -6,3 +6,6 @@ https://creativecommons.org/publicdomain/zero/1.0/
 
 BlueDemon.fbx was converted from the pack's glTF model (via https://poly.pizza/m/S7jYW6Amye)
 with Blender 4.2 so Unity 2020.3 can import it natively.
+
+GreenBlob, Mushnub, Goleling, Demon, GreenSpikyBlob and Alien are the pack's FBX files as shipped
+(downloaded from https://poly.pizza/bundle/Ultimate-Monsters-Bundle-5oyGWAmOB6).

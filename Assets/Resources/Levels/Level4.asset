@@ -17,20 +17,30 @@ MonoBehaviour:
   displayName: "B\xE3i ph\xF3ng b\u1ECF hoang"
   nextScene: Ending
   energyTarget: 18
-  energyAtStart: 8
-  energyCap: 10
-  energyIntervalMin: 1.5
-  energyIntervalMax: 2
-  energyBatchMin: 2
-  energyBatchMax: 4
-  enemyCap: 060000000700000008000000
-  bossCap: 010000000100000001000000
-  creepSpeed: 7.5
-  bossSpeed: 7.2
-  creepDamage: 18
-  bossDamage: 30
-  creepWindup: 0.5
-  creepRecover: 0.85
+  energyAtStart: 20
+  energySpare: 2
+  energyCap: 20
+  energyIntervalMin: 0.8
+  energyIntervalMax: 1
+  energyBatchMin: 5
+  energyBatchMax: 7
+  energyPointMinimum: 88
+  energyRiskFraction: 0.55
+  enemyCap: 0b0000000f00000011000000
+  bossCap: 020000000300000003000000
+  maxChasers: 040000000500000006000000
+  enemyInitialBatch: 4
+  enemyBatchMax: 3
+  bossSpacing: 8
+  creepSpeed: 8.4
+  bossSpeed: 8.2
+  creepDamage: 30
+  bossDamage: 40
+  creepWindup: 0.25
+  creepWindupMax: 0.35
+  bossWindup: 0.55
+  bossRecover: 0.95
+  creepRecover: 0.6
   quietTime: 5
   supportCap: 3
   supportIntervalMin: 6
@@ -41,4 +51,10 @@ MonoBehaviour:
   - 20
   - 15
   firstShieldAfter: -1
+  harmfulCap: 6
+  harmfulAtStart: 3
+  harmfulDamage: 25
+  harmfulIntervalMin: 5
+  harmfulIntervalMax: 8
+  harmfulLifetime: 20
   hazardDeathMessage: "Robo r\u01A1i xu\u1ED1ng bi\u1EC3n axit"

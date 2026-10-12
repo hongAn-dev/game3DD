@@ -75,7 +75,7 @@ def write(name, samples):
 
 # --- UI / pickups ---
 write('ui_click', mix(tone(1800, 0.06, 0.002, 0.012), noise(0.03, 6000, 3000, 0.001, 0.006)))
-write('energy_pickup', mix(tone(1318.5, 0.22, 0.003, 0.07, 'warm'), tone(2637, 0.16, 0.003, 0.04)))
+# energy pickup: the team's recording, Assets/ThirdParty/RoboLacLoi/Audio/nang_luong.mp3
 write('heal', mix(tone(659.3, 0.18, 0.005, 0.07, 'warm'), tone(987.8, 0.22, 0.005, 0.08, 'warm'), offsets=[0, 0.14]))
 write('shield_on', mix(tone(523.3, 0.32, 0.02, 0.12, 'warm', bend=0.5), tone(1046.5, 0.3, 0.03, 0.1, bend=0.5)))
 write('shield_block', mix(tone(1568, 0.14, 0.002, 0.04), tone(784, 0.12, 0.002, 0.04, 'warm')))
@@ -103,3 +103,6 @@ write('ambience_acid', loop(mix(noise(9.0, 350, 450, 0.001, 60.0),
                                 offsets=[0.0] + [rng.uniform(0.5, 8.0) for _ in range(10)]), 1.0))
 write('ambience_station', loop(mix(noise(9.0, 250, 320, 0.001, 60.0), [0.15 * v for v in tone(220, 9.0, 0.001, 60.0, 'warm', vibrato=0.002)]), 1.0))
 print('SFX_OK')
+
+# One shared harmful-item warning/impact cue. Keep it distinct from the positive pickup chime.
+write('trap_trigger', mix(tone(220, 0.22, 0.003, 0.08, bend=-0.35), tone(311.1, 0.18, 0.003, 0.06, bend=-0.2), noise(0.09, 2400, 700, 0.001, 0.025), offsets=[0, 0.035, 0.0]))

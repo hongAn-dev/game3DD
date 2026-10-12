@@ -64,7 +64,14 @@ public class EndingController : MonoBehaviour {
 		}
 		if (skipButton != null)
 			skipButton.SetActive(false);
+		foreach (UiTextRole caption in GetComponentsInChildren<UiTextRole>(true))
+			if (caption.role == UiRole.EndingCaption) caption.transform.parent.gameObject.SetActive(false);
 		completionPanel.SetActive(true);
+		// Keep the independent audio controls readable above the completion backing panel.
+		MusicToggle musicToggle = Object.FindObjectOfType<MusicToggle>(true);
+		Canvas endingCanvas = GetComponent<Canvas>();
+		Canvas audioCanvas = musicToggle != null ? musicToggle.GetComponentInParent<Canvas>() : null;
+		if (audioCanvas != null && endingCanvas != null) audioCanvas.sortingOrder = endingCanvas.sortingOrder + 1;
 		// Keyboard/gamepad players start on the first button (Play Again).
 		UnityEngine.UI.Button first = completionPanel.GetComponentInChildren<UnityEngine.UI.Button>();
 		if (first != null && UnityEngine.EventSystems.EventSystem.current != null)

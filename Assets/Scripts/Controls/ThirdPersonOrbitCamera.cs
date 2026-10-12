@@ -20,6 +20,8 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
 	public LayerMask obstacleMask = ~(1 << 2);   // everything except "Ignore Raycast"
 	public float mouseDegreesPerUnit = 3f;
 	public float zoomSpeed = 0.5f;
+	[Tooltip("Seconds the view takes to catch up with the look input; evens out touch events that arrive unevenly between frames.")]
+	public float lookSmoothing = 0.06f;
 
 	const string SensitivityKey = "camera_sensitivity";
 
@@ -38,6 +40,7 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
 	}
 
 	private Vector2 pendingLook;
+	private float shownYaw = float.NaN, shownPitch;
 	private float currentDistance = -1f;
 	private float distanceVelocity;
 	private readonly RaycastHit[] hits = new RaycastHit[16];
@@ -72,8 +75,17 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
 				TouchLookArea.Current.ConsumeDelta();
 		}
 
+		// yaw/pitch are the input targets; the view eases toward them (frame-rate independent).
+		if (float.IsNaN(shownYaw) || lookSmoothing <= 0f) {
+			shownYaw = yaw;
+			shownPitch = pitch;
+		} else {
+			float k = 1f - Mathf.Exp(-Time.unscaledDeltaTime / lookSmoothing);
+			shownYaw = Mathf.Repeat(shownYaw + Mathf.DeltaAngle(shownYaw, yaw) * k, 360f);
+			shownPitch = Mathf.Lerp(shownPitch, pitch, k);
+		}
 		Vector3 pivot = target.position + Vector3.up * pivotHeight;
-		Quaternion rotation = Quaternion.Euler(pitch, yaw, 0f);
+		Quaternion rotation = Quaternion.Euler(shownPitch, shownYaw, 0f);
 		Vector3 back = rotation * Vector3.back;
 		// Snap in front of obstacles at once, ease back out so the view does not pump.
 		float visible = VisibleDistance(pivot, back);

@@ -17,7 +17,7 @@ public class SupportTests {
 		}
 	}
 
-	// Spec §6.4: energy-core language, 0.9-1.1 x the 0.6 m core height, never energy.
+	// Spec §6.4: energy-core language, visual height from 0.8 to 1.0 m, never energy.
 	[Test]
 	public void SupportPrefabsLookRight() {
 		var kinds = new[] { ("Support Shield", SupportKind.Shield), ("Support Heal10", SupportKind.Heal10), ("Support Heal20", SupportKind.Heal20), ("Overdrive", SupportKind.Overdrive) };
@@ -29,8 +29,9 @@ public class SupportTests {
 			Assert.AreEqual(kind, pickup.kind, name);
 			Assert.IsNull(prefab.GetComponentInChildren<Treasure>(true), name + " is not energy");
 			Assert.IsTrue(prefab.GetComponent<SphereCollider>().isTrigger, name);
+            Assert.That(prefab.GetComponent<SphereCollider>().radius,Is.InRange(.35f,.55f),name+" trigger fits the visual");
 			Assert.IsNotNull(prefab.transform.Find("Model").GetComponent<EnergyBob>(), name);
-			Assert.That(Height(prefab), Is.InRange(0.54f, 0.66f), name + " height");
+			Assert.That(Height(prefab), Is.InRange(0.8f, 1.0f), name + " height");
 			Assert.AreEqual(25f, pickup.lifetime, name);
 		}
 	}

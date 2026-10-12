@@ -43,6 +43,16 @@ public class StoryTests {
 		StringAssert.Contains("Robo bắt đầu mỗi màn chơi với 100 HP.", pages[3].body);
 	}
 
+	[Test]
+	public void DangerousItemsAndL2AdviceStayComplete() {
+		StoryPage page = StoryText.Guide().Single(p => p.title == "Vật phẩm nguy hiểm");
+		StringAssert.Contains("Khiên chỉ chặn sát thương của hóa chất", page.body);
+		StoryPage[] cards = StoryText.LevelCards(LevelCatalog.Get("Level2"));
+		Assert.AreEqual(2, cards.Length);
+		StringAssert.Contains("Những cụm năng lượng gần quái vật hoặc mép đất", cards[1].body);
+		StringAssert.EndsWith("trước khi tiến tới.", cards[1].body);
+	}
+
 	static string[] AllTexts() {
 		var texts = StoryText.Tutorial(LevelCatalog.Get("Level1")).SelectMany(p => new[] { p.title, p.body }).ToList();
 		foreach (LevelConfig level in LevelCatalog.All) {
@@ -92,7 +102,7 @@ public class StoryTests {
 	public void EveryPageFitsAt16_9And20_9() {
 		var pages = StoryText.Tutorial(LevelCatalog.Get("Level1")).Concat(StoryText.Guide()).ToList();
 		foreach (LevelConfig level in LevelCatalog.All)
-			pages.Add(StoryText.LevelCard(level));
+			pages.AddRange(StoryText.LevelCards(level));
 		foreach (string scene in new[] { "Level1", "Level2", "Level3", "Level4", "MainMenu" }) {
 			EditorSceneManager.OpenScene("Assets/Scenes/" + scene + ".unity", OpenSceneMode.Single);
 			DialogPanel dialog = Object.FindObjectOfType<DialogPanel>(true);
@@ -123,6 +133,10 @@ public class StoryTests {
 		foreach (string scene in new[] { "Level1", "Level2", "Level3", "Level4", "MainMenu", "Ending" }) {
 			EditorSceneManager.OpenScene("Assets/Scenes/" + scene + ".unity", OpenSceneMode.Single);
 			SoundToggle sound = Object.FindObjectsOfType<SoundToggle>(true).Single();
+			MusicToggle music = Object.FindObjectsOfType<MusicToggle>(true).Single();
+			Assert.AreEqual(Rect(sound).parent, Rect(music).parent, scene);
+			Assert.GreaterOrEqual(Mathf.Min(Rect(music).sizeDelta.x, Rect(music).sizeDelta.y), 48f * Dp);
+			Assert.GreaterOrEqual((Rect(music).anchoredPosition.x - Rect(music).sizeDelta.x) - Rect(sound).anchoredPosition.x, 8f * Dp, scene + " SFX then BGM");
 			Assert.IsNotNull(sound.GetComponentsInParent<SafeAreaFitter>(true).FirstOrDefault(), scene + " sound inside the safe area");
 			Assert.AreEqual(Vector2.one, Rect(sound).anchorMin, scene);
 			Assert.GreaterOrEqual(Mathf.Min(Rect(sound).sizeDelta.x, Rect(sound).sizeDelta.y), 48f * Dp, scene + " touch area");
@@ -135,7 +149,7 @@ public class StoryTests {
 				Assert.Greater(Object.FindObjectOfType<DialogPanel>(true).GetComponentsInParent<Canvas>(true).Last().sortingOrder, order, scene + " dialog covers the bar");
 			PauseController pause = Object.FindObjectOfType<PauseController>(true);
 			if (scene.StartsWith("Level")) {
-				RectTransform p = Rect(pause.pauseButton.transform), q = Rect(sound);
+				RectTransform p = Rect(pause.pauseButton.transform), q = Rect(music);
 				Assert.AreEqual(q.parent, p.parent, scene);
 				Assert.AreEqual(Vector2.one, p.anchorMin, scene);
 				Assert.GreaterOrEqual(Mathf.Min(p.sizeDelta.x, p.sizeDelta.y), 48f * Dp, scene + " pause touch area");

@@ -155,9 +155,28 @@ public static class FlowUiSetup {
 		Stretch(safe);
 		safe.gameObject.AddComponent<SafeAreaFitter>();
 
+		Image musicIcon;
+		Button music = IconButton("Music Button", safe, -(Margin + (pause != null ? Touch + Gap : 0f)), Sprite("music_on"), out musicIcon);
+		MusicToggle musicToggle = music.gameObject.AddComponent<MusicToggle>();
+		musicToggle.icon = musicIcon;
+		musicToggle.musicOn = Sprite("music_on");
+		musicToggle.musicOff = Sprite("music_off");
+		RectTransform musicTip = Rect("Music Tooltip", music.transform, new Vector2(420f, 64f));
+		musicTip.anchorMin = musicTip.anchorMax = musicTip.pivot = Vector2.one;
+		musicTip.anchoredPosition = new Vector2(0f, -Touch - 8f);
+		Image musicBack = musicTip.gameObject.AddComponent<Image>();
+		musicBack.color = new Color32(14, 19, 26, 230);
+		musicBack.raycastTarget = false;
+		musicToggle.tooltip = musicTip.gameObject;
+		musicToggle.tooltipText = Label("Tooltip Text", musicTip, Vector2.zero, new Vector2(400f, 60f), "SemiBold", 30);
+		musicToggle.tooltipText.text = "Tắt nhạc nền";
+		musicTip.gameObject.SetActive(false);
+		UnityEventTools.AddPersistentListener(music.onClick, musicToggle.Toggle);
+		ButtonLabel(music, "BGM");
 		Image soundIcon;
-		Button sound = IconButton("Sound Button", safe, -(Margin + Touch + Gap), Sprite("sound_on"), out soundIcon);
+		Button sound = IconButton("Sound Button", safe, -(Margin + (pause != null ? 2f : 1f) * (Touch + Gap)), Sprite("sound_on"), out soundIcon);
 		SoundToggle toggle = sound.gameObject.AddComponent<SoundToggle>();
+		ButtonLabel(sound, "SFX");
 		toggle.icon = soundIcon;
 		toggle.soundOn = Sprite("sound_on");
 		toggle.soundOff = Sprite("sound_off");
@@ -193,6 +212,12 @@ public static class FlowUiSetup {
 				UnityEventTools.RemovePersistentListener(button.onClick, i);
 		UnityEventTools.AddPersistentListener(button.onClick, pause.Toggle);
 		pause.pauseButton = t.gameObject;
+	}
+
+	static void ButtonLabel(Button button, string label) {
+		Text text = Label("Audio Label", button.transform, new Vector2(-Touch / 2f, -Touch + 16f), new Vector2(Touch, 32f), "SemiBold", 24);
+		text.rectTransform.anchorMin = text.rectTransform.anchorMax = Vector2.one;
+		text.text = label;
 	}
 
 	static Button IconButton(string name, Transform parent, float x, Sprite sprite, out Image icon) {
@@ -234,7 +259,7 @@ public static class FlowUiSetup {
 
 	// Largest body size from 40 down to 32 at which every page (tutorial, guide, level cards) fits the body rect.
 	static int BodySize(Text body) {
-		var pages = StoryText.Tutorial(LevelCatalog.First).Concat(StoryText.Guide()).Concat(LevelCatalog.All.Select(StoryText.LevelCard));
+		var pages = StoryText.Tutorial(LevelCatalog.First).Concat(StoryText.Guide()).Concat(LevelCatalog.All.SelectMany(StoryText.LevelCards));
 		for (int size = 40; size > 32; size--) {
 			body.fontSize = size;
 			TextGenerationSettings settings = body.GetGenerationSettings(body.rectTransform.sizeDelta);

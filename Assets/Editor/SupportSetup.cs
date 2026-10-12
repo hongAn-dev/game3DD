@@ -11,7 +11,7 @@ public static class SupportSetup {
 
 	const string Models = "Assets/ThirdParty/RoboLacLoi/Models/";
 	const string BubblePath = "Assets/ThirdParty/RoboLacLoi/Materials/ShieldBubble.mat";
-	public const float ItemHeight = 0.6f;
+	public const float ItemHeight = 0.9f;
 
 	[MenuItem("Tools/Robo Lac Loi/Apply Support Setup")]
 	public static void Apply() {
@@ -39,7 +39,7 @@ public static class SupportSetup {
 		try {
 			SphereCollider trigger = root.AddComponent<SphereCollider>();
 			trigger.isTrigger = true;
-			trigger.radius = 0.6f;
+			trigger.radius = height * 0.45f;
 			SupportPickup pickup = root.AddComponent<SupportPickup>();
 			pickup.kind = kind;
 			pickup.lifetime = 25f;
@@ -59,7 +59,6 @@ public static class SupportSetup {
 
 	// One SupportSpawnDirector per level on the GameManager object; the old Overdrive spawner is removed.
 	static void Directors() {
-		Material marker = AssetDatabase.LoadAssetAtPath<Material>("Assets/ThirdParty/RoboLacLoi/Materials/CoreGlow.mat");
 		foreach (LevelConfig level in LevelCatalog.All) {
 			var scene = EditorSceneManager.OpenScene("Assets/Scenes/" + level.levelId + ".unity", OpenSceneMode.Single);
 			GameManager manager = Object.FindObjectOfType<GameManager>();
@@ -73,7 +72,6 @@ public static class SupportSetup {
 			director.heal10Prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Support Heal10.prefab");
 			director.heal20Prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Support Heal20.prefab");
 			director.overdrivePrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Overdrive.prefab");
-			director.markerMaterial = marker;
 			director.intervalOverride = -1f;
 			director.lifetimeOverride = -1f;
 			EditorSceneManager.MarkSceneDirty(scene);

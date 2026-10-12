@@ -13,6 +13,7 @@ public class FlowPlayTests {
 		SceneManager.LoadScene("Level1");
 		yield return null;
 		yield return null;
+		yield return new WaitForSeconds(GroundSpawn.ScaleInDuration + .08f);
 	}
 
 	[UnityTest]

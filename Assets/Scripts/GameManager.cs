@@ -2,6 +2,8 @@
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 using System.Collections;
+using System.Collections.Generic;
+using UnityEngine.LowLevel;
 
 /// <summary>
 /// Main Game Manager.
@@ -51,11 +53,65 @@ public class GameManager : MonoBehaviour {
 	private Health playerHealth;
 
 	private LevelConfig config;
+	private readonly Dictionary<int, int> pendingPickupDeltas = new Dictionary<int, int>();
+	private readonly HashSet<int> feedbackPickupIds = new HashSet<int>();
+	private int pendingAnonymousDelta;
+	public event System.Action<int, int> ScoreDeltaCommitted;
+	public event System.Action<int> ScoreFeedback;
+	static bool postPhysicsHookInstalled;
+	static bool postPhysicsHookAttempted;
+	struct ScoreCommitAfterPhysics { }
 
 	// The beat score level
 	private int beatLevelScore = 0;
 
 	public int BeatLevelScore { get { return beatLevelScore; } }
+	public static bool HasPostPhysicsScoreHook { get { return postPhysicsHookInstalled; } }
+
+	[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+	static void ResetPostPhysicsHookState() {
+		postPhysicsHookInstalled = false;
+		postPhysicsHookAttempted = false;
+	}
+
+	[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+	static void InstallPostPhysicsScoreHook() {
+		if (postPhysicsHookAttempted) return;
+		postPhysicsHookAttempted = true;
+		PlayerLoopSystem loop = PlayerLoop.GetCurrentPlayerLoop();
+		if (InsertAfterPhysics(ref loop)) {
+			PlayerLoop.SetPlayerLoop(loop);
+			postPhysicsHookInstalled = true;
+		} else {
+			Debug.LogError("GameManager: Unity PlayerLoop has no PhysicsFixedUpdate; score deltas will use the FixedUpdate fallback.");
+		}
+	}
+
+	static bool InsertAfterPhysics(ref PlayerLoopSystem parent) {
+		if (parent.subSystemList == null) return false;
+		if (parent.type == typeof(UnityEngine.PlayerLoop.FixedUpdate)) {
+			PlayerLoopSystem[] systems = parent.subSystemList;
+			for (int i = 0; i < systems.Length; i++) {
+				if (systems[i].type == typeof(ScoreCommitAfterPhysics)) return true;
+				if (systems[i].type != typeof(UnityEngine.PlayerLoop.FixedUpdate.PhysicsFixedUpdate)) continue;
+				var expanded = new PlayerLoopSystem[systems.Length + 1];
+				System.Array.Copy(systems, 0, expanded, 0, i + 1);
+				expanded[i + 1] = new PlayerLoopSystem { type = typeof(ScoreCommitAfterPhysics), updateDelegate = CommitAfterPhysics };
+				System.Array.Copy(systems, i + 1, expanded, i + 2, systems.Length - i - 1);
+				parent.subSystemList = expanded;
+				return true;
+			}
+		}
+		for (int i = 0; i < parent.subSystemList.Length; i++) {
+			PlayerLoopSystem child = parent.subSystemList[i];
+			if (InsertAfterPhysics(ref child)) { parent.subSystemList[i] = child; return true; }
+		}
+		return false;
+	}
+
+	static void CommitAfterPhysics() {
+		if (gm != null) gm.CommitPhysicsStep();
+	}
 
 	/// <summary>
 	/// Use this for initialization.
@@ -121,8 +177,10 @@ public class GameManager : MonoBehaviour {
 			return;
 		GameFlow.Enter (FlowState.Intro);
 		mainCanvas.SetActive (false);
-		StoryPage[] pages = tutorial ? StoryText.Tutorial (config) : new[] { StoryText.LevelCard (config) };
-		dialog.Show (pages, tutorial ? pages.Length - 1 : -1, "Bắt đầu", () => {
+		StoryPage[] pages = tutorial ? StoryText.Tutorial (config) : StoryText.LevelCards (config);
+		int finalPage = pages.Length - 1;
+		int skipTo = tutorial || pages.Length > 1 ? finalPage : -1;
+		dialog.Show (pages, skipTo, "Bắt đầu", () => {
 			CampaignProgress.MarkIntroSeen (config.levelId);
 			mainCanvas.SetActive (true);
 			if (GameFlow.State == FlowState.Intro)
@@ -134,9 +192,10 @@ public class GameManager : MonoBehaviour {
 	/// Update is called once per frame.
 	/// </summary>
 	void Update () {
-		switch (gameState)
+			switch (gameState)
 		{
 			case gameStates.Playing:
+				CommitPendingScoreDeltas ();
 				ResolvePlaying ();
 				break;
 			case gameStates.Death:
@@ -160,6 +219,21 @@ public class GameManager : MonoBehaviour {
 				break;
 		}
 
+	}
+
+	// Fallback if PlayerLoop injection is unavailable: FixedUpdate runs before simulation,
+	// so it commits the preceding physics step. Update drains the last step of each frame.
+	void FixedUpdate () {
+		if (!postPhysicsHookInstalled && gameState == gameStates.Playing) {
+			CommitPendingScoreDeltas ();
+			ResolvePlaying ();
+		}
+	}
+
+	void CommitPhysicsStep () {
+		if (gameState != gameStates.Playing) return;
+		CommitPendingScoreDeltas ();
+		ResolvePlaying ();
 	}
 
 	// Death and win are decided here only, death first (spec §3), independent of Health/GameManager Update order.
@@ -244,14 +318,63 @@ public class GameManager : MonoBehaviour {
 	/// Update the score text.
 	/// </summary>
 	public void Collect(int amount) {
-		if (amount != 0 && GameFlow.State != FlowState.Playing)
-			return;
-		score += amount;
-		if (canBeatLevel) {
-			mainScoreDisplay.text = StoryText.EnergyLabel (score, beatLevelScore);
-		} else {
-			mainScoreDisplay.text = score.ToString ();
-		}
+		if (amount == 0) { RefreshScoreDisplay (); return; }
+		QueueScoreDelta (amount);
+	}
 
+	/// <summary>Queues one pickup's score change for the current physics simulation step. A source contributes once.</summary>
+	public bool QueueScoreDelta (Object source, int delta) {
+		return QueueScoreDelta (source, delta, false);
+	}
+
+	public bool QueueScoreDelta (Object source, int delta, bool showFeedback) {
+		if (source == null || delta == 0 || GameFlow.State != FlowState.Playing) return false;
+		int id = source.GetInstanceID ();
+		if (pendingPickupDeltas.ContainsKey (id)) return false;
+		pendingPickupDeltas.Add (id, delta);
+		if (showFeedback) feedbackPickupIds.Add (id);
+		return true;
+	}
+
+	/// <summary>Queues a non-pickup change for the current physics step.</summary>
+	public bool QueueScoreDelta (int delta) {
+		if (delta == 0 || GameFlow.State != FlowState.Playing) return false;
+		pendingAnonymousDelta += delta;
+		return true;
+	}
+
+	void CommitPendingScoreDeltas () {
+		if (GameFlow.State != FlowState.Playing) { pendingPickupDeltas.Clear (); feedbackPickupIds.Clear (); pendingAnonymousDelta = 0; return; }
+		if (pendingPickupDeltas.Count == 0 && pendingAnonymousDelta == 0) return;
+		int delta = pendingAnonymousDelta;
+		pendingAnonymousDelta = 0;
+		int negativeFeedbacks = 0;
+		foreach (KeyValuePair<int, int> entry in pendingPickupDeltas) {
+			delta += entry.Value;
+			if (entry.Value < 0 && feedbackPickupIds.Contains (entry.Key))
+				negativeFeedbacks++;
+		}
+		pendingPickupDeltas.Clear ();
+		feedbackPickupIds.Clear ();
+		int before = score;
+		int upper = canBeatLevel && beatLevelScore > 0 ? beatLevelScore : int.MaxValue;
+		score = Mathf.Clamp (score + delta, 0, upper);
+		int applied = score - before;
+		RefreshScoreDisplay ();
+		if (ScoreDeltaCommitted != null) ScoreDeltaCommitted (applied, score);
+		int lossesToShow = Mathf.Min(before, negativeFeedbacks);
+		for (int i = 0; i < lossesToShow; i++)
+			if (ScoreFeedback != null) ScoreFeedback (-1);
+	}
+
+	void RefreshScoreDisplay () {
+		if (mainScoreDisplay == null) return;
+		int shown = Mathf.Max (0, score);
+		if (canBeatLevel) {
+			if (beatLevelScore > 0) shown = Mathf.Min (shown, beatLevelScore);
+			mainScoreDisplay.text = StoryText.EnergyLabel (shown, beatLevelScore);
+		} else {
+			mainScoreDisplay.text = shown.ToString ();
+		}
 	}
 }

@@ -53,12 +53,17 @@ public class EndingTests {
 		EndingController controller = Object.FindObjectOfType<EndingController>();
 		var texts = Object.FindObjectsOfType<UnityEngine.UI.Text>(true);
 		UnityEngine.UI.Text ready = texts.Single(t => t.name == "Caption Ready");
+		Assert.IsNotNull(ready.transform.parent.GetComponent<UnityEngine.UI.Image>(), "caption needs a dark backing panel");
+		Assert.IsNotNull(ready.GetComponentsInParent<SafeAreaFitter>(true).FirstOrDefault());
 		Assert.AreEqual(StoryText.ShipReady.title + "\n" + StoryText.ShipReady.body, ready.text);
 		TimelineAsset timeline = (TimelineAsset)controller.director.playableAsset;
 		TimelineClip clip = timeline.GetOutputTracks().Single(t => t.name == "Caption ready").GetClips().Single();
 		Assert.That(clip.start, Is.InRange(10.0, 13.0));
 		Assert.GreaterOrEqual(clip.duration, 5.0, "time to read");
 		Assert.IsFalse(texts.Any(t => t.text.Contains("…")), "no cut text");
+		Renderer planet = Object.FindObjectsOfType<Renderer>(true).Single(r => r.name == "Planet");
+		Assert.AreEqual("Assets/ThirdParty/RoboLacLoi/Materials/Planet.mat", AssetDatabase.GetAssetPath(planet.sharedMaterial));
+		Assert.AreNotEqual("Assets/ThirdParty/RoboLacLoi/Materials/Acid.mat", AssetDatabase.GetAssetPath(planet.sharedMaterial));
 		Transform panel = controller.completionPanel.transform;
 		Assert.AreEqual(StoryText.Finale.title, panel.Find("Title").GetComponent<UnityEngine.UI.Text>().text);
 		Assert.AreEqual(StoryText.Finale.body, panel.Find("Subtitle").GetComponent<UnityEngine.UI.Text>().text);

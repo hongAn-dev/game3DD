@@ -36,8 +36,9 @@ public static class StoryText {
 
 	// Extra pages for the main menu's "Hướng dẫn chơi" review.
 	static readonly StoryPage[] GuideExtras = {
+		new StoryPage("Vật phẩm nguy hiểm", "Hãy tránh ba loại vật phẩm gây hại trên đường đi. Hóa chất độc hại sẽ làm Robo mất máu. Phản năng lượng màu cam đỏ sẽ lấy đi 1 viên năng lượng bạn đã thu trong màn hiện tại. Từ trường nhiễu màu tím sẽ làm Robo chậm lại trong 3 giây. Khiên chỉ chặn sát thương của hóa chất, không ngăn được hai hiệu ứng còn lại."),
 		new StoryPage("Vật phẩm tăng tốc", "Từ màn thứ hai, bạn có thể gặp vật phẩm tăng tốc. Khi nhặt được, Robo sẽ di chuyển nhanh hơn trong 5 giây, giúp bạn thoát khỏi quái vật hoặc đến kịp những viên năng lượng ở xa."),
-		new StoryPage("Âm thanh và tạm dừng", "Nút loa ở góc trên bên phải giúp bật hoặc tắt hiệu ứng âm thanh. Nút tạm dừng ngay bên cạnh sẽ dừng trò chơi; khi đó bạn có thể chọn Tiếp tục hoặc Thoát về menu. Âm lượng nhạc nền, hiệu ứng và âm thanh môi trường có thể chỉnh trong phần Cài đặt ở menu chính."),
+		new StoryPage("Âm thanh và tạm dừng", "Nút SFX hình loa ở góc trên bên phải bật hoặc tắt hiệu ứng âm thanh và âm thanh môi trường. Nút BGM hình nốt nhạc bật hoặc tắt riêng nhạc nền. Nút tạm dừng ngay bên cạnh sẽ dừng trò chơi; khi đó bạn có thể chọn Tiếp tục hoặc Thoát về menu. Âm lượng nhạc nền, hiệu ứng và âm thanh môi trường có thể chỉnh trong phần Cài đặt ở menu chính."),
 	};
 
 	static readonly Dictionary<string, string> Leads = new Dictionary<string, string> {
@@ -79,6 +80,12 @@ public static class StoryText {
 	}
 
 	/// <summary>New Game tutorial: five pages, then the first level's card as page 6.</summary>
+	public static StoryPage[] LevelCards(LevelConfig level) {
+		if (level.levelId != "Level2")
+			return new[] { LevelCard(level) };
+		return new[] { LevelCard(level), new StoryPage("Cẩn thận với vật phẩm nguy hiểm", "Từ khu vực này, hãy cẩn thận với Hóa chất độc hại, Phản năng lượng và Từ trường nhiễu. Chúng có thể làm bạn mất máu, mất năng lượng đã thu hoặc di chuyển chậm lại. Những cụm năng lượng gần quái vật hoặc mép đất có thể giúp bạn thu thập nhanh hơn, nhưng hãy cân nhắc trước khi tiến tới.") };
+	}
+
 	public static StoryPage[] Tutorial(LevelConfig first) {
 		var pages = new List<StoryPage>(Basics);
 		pages.Add(LevelCard(first));
@@ -97,6 +104,6 @@ public static class StoryText {
 	}
 
 	public static string EnergyLabel(int collected, int target) {
-		return "Năng lượng: " + collected + "/" + target;
+		return "Năng lượng: " + System.Math.Max(0, System.Math.Min(collected, target)) + "/" + target;
 	}
 }

@@ -18,7 +18,7 @@ public class Ball : MonoBehaviour {
 	[SerializeField] private float m_JumpPower = 2;
 
 	// Horizontal speed cap (m/s); vertical speed is never clamped so falling and jumping stay physical.
-	[SerializeField] private float m_MaxSpeed = 9f;
+	[SerializeField] private float m_MaxSpeed = 8.8f;
 
 	// Rate (m/s²) at which the horizontal velocity moves towards stick × MaxSpeed when not using torque.
 	[SerializeField] private float m_AccelerationRate = 14f;
@@ -29,12 +29,12 @@ public class Ball : MonoBehaviour {
 	// Base top speed (enemy speeds are tuned against it; Overdrive does not change it).
 	public float MaxSpeed { get { return m_MaxSpeed; } }
 
-	// Temporary multipliers (Overdrive). They scale the base values each frame and are never written back into them,
-	// so they cannot compound.
+	// Independent status multipliers. The final cap composes both without either status writing over the other.
 	[System.NonSerialized] public float SpeedMultiplier = 1f;
+	[System.NonSerialized] public float SlowMultiplier = 1f;
 	[System.NonSerialized] public float AccelMultiplier = 1f;
 
-	public float CurrentMaxSpeed { get { return m_MaxSpeed * SpeedMultiplier; } }
+	public float CurrentMaxSpeed { get { return m_MaxSpeed * SpeedMultiplier * SlowMultiplier; } }
 
 	// The length of the ray to check if the ball is grounded.
 	private const float k_GroundRayLength = 1f;

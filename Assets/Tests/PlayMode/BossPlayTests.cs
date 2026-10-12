@@ -96,7 +96,7 @@ public class BossPlayTests {
 		yield return WaitFor(boss, EnemyState.Recover, 2f);
 		yield return null;
 		Assert.AreEqual(1, hits);
-		Assert.AreEqual(25f, lastDamage, 0.01f, "L3 Normal slam damage");
+		Assert.AreEqual(35f, lastDamage, 0.01f, "L3 Normal slam damage");
 	}
 
 	[UnityTest]
@@ -141,21 +141,25 @@ public class BossPlayTests {
 		Assert.AreEqual(EnemyState.Windup, boss.State);
 	}
 
-	// Both attacks possible (2.8 m: inside slam range, beyond the 2.5 m dash minimum): after a slam the dash wins.
+	// Both attacks are possible; choices stay fixed after warning and never allow three consecutive dashes.
 	[UnityTest]
-	public IEnumerator L4BossAlternatesSlamAndDash() {
+	public IEnumerator L4BossLocksChoicesAndLimitsConsecutiveDashes() {
 		yield return Arena();
+		health.maxHealth = 1000f;
+		health.healthPoints = 1000f;
 		EnemyBrain boss = Boss("Level4", new Vector3(0f, 0f, 2.8f));
-		var attacks = new System.Collections.Generic.List<AttackKind>();
-		EnemyState last = boss.State;
-		float end = Time.time + 8f;
-		while (Time.time < end && attacks.Count < 2) {
-			if (boss.State == EnemyState.Windup && last != EnemyState.Windup)
-				attacks.Add(boss.CurrentAttack);
-			last = boss.State;
-			yield return null;
+		int dashes = 0;
+		for (int i = 0; i < 6; i++) {
+			yield return WaitFor(boss, EnemyState.Windup, 5f);
+			AttackKind locked = boss.CurrentAttack;
+			if (locked == AttackKind.Dash) dashes++; else dashes = 0;
+			Assert.LessOrEqual(dashes, 2);
+			yield return new WaitForSeconds(0.1f);
+			Assert.AreEqual(locked, boss.CurrentAttack, "warning cannot change its promised attack");
+			yield return WaitFor(boss, EnemyState.Recover, 3f);
+			boss.GetComponent<NavMeshAgent>().Warp(new Vector3(0f, 0f, 2.8f));
+			boss.transform.rotation = Quaternion.LookRotation(Vector3.back);
 		}
-		CollectionAssert.AreEqual(new[] { AttackKind.Slam, AttackKind.Dash }, attacks, "slam first (preferred when both are ready), then the dash");
 	}
 
 	[UnityTest]
@@ -194,7 +198,7 @@ public class BossPlayTests {
 		yield return null;
 		Assert.AreEqual(1, boss.HitAttempts, "one dash checks one hit, even while overlapping for several frames");
 		Assert.AreEqual(1, hits, "one dash, one hit");
-		Assert.AreEqual(30f, lastDamage, 0.01f, "L4 Normal dash damage");
+		Assert.AreEqual(40f, lastDamage, 0.01f, "L4 Normal dash damage");
 	}
 
 	[UnityTest]

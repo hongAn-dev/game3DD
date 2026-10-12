@@ -138,7 +138,13 @@ public static class EndingSceneBuilder {
 		Object.DestroyImmediate(planet.GetComponent<Collider>());
 		planet.transform.position = SpaceOrigin + new Vector3(0f, -520f, 900f);
 		planet.transform.localScale = Vector3.one * 900f;
-		planet.GetComponent<Renderer>().sharedMaterial = AssetDatabase.LoadAssetAtPath<Material>(Materials + "Acid.mat");
+		planet.GetComponent<Renderer>().sharedMaterial = AssetDatabase.LoadAssetAtPath<Material>(Materials + "Planet.mat");
+		GameObject atmosphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+		atmosphere.name = "Planet Atmosphere";
+		Object.DestroyImmediate(atmosphere.GetComponent<Collider>());
+		atmosphere.transform.SetParent(planet.transform, false);
+		atmosphere.transform.localScale = Vector3.one * 1.02f;
+		atmosphere.GetComponent<Renderer>().sharedMaterial = AssetDatabase.LoadAssetAtPath<Material>(Materials + "PlanetAtmosphere.mat");
 		Stars(SpaceOrigin);
 		GameObject spaceShip = (GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(Models + "Spaceship.fbx"));
 		spaceShip.name = "Spaceship (space)";
@@ -167,19 +173,21 @@ public static class EndingSceneBuilder {
 		GameObject fade = Stretch(new GameObject("Fade", typeof(RectTransform), typeof(Image), typeof(CanvasGroup), typeof(Animator)), canvasGo.transform);
 		fade.GetComponent<Image>().color = Color.black;
 		fade.GetComponent<Image>().raycastTarget = false;
+		GameObject safeUi = Stretch(new GameObject("Safe UI", typeof(RectTransform), typeof(SafeAreaFitter)), canvasGo.transform);
 		// Spec §7.5: the "ship ready" caption once the fuel is full, long enough to read; no extra tap in the flow.
-		Text readyText = Label(canvasGo.transform, "Caption Ready", StoryText.ShipReady.title + "\n" + StoryText.ShipReady.body, medium, 44, -360f, new Vector2(1700f, 150f));
-		readyText.horizontalOverflow = HorizontalWrapMode.Wrap;
-		readyText.lineSpacing = 1.15f;
-		GameObject ready = readyText.gameObject;
-		GameObject escaped = Label(canvasGo.transform, "Caption Escaped", "Phi thuyền đã cất cánh, rời khỏi hành tinh xa lạ.", medium, 52, -380f, new Vector2(1700f, 80f)).gameObject;
+		GameObject ready = Caption(safeUi.transform, "Caption Ready", StoryText.ShipReady.title + "\n" + StoryText.ShipReady.body, medium, 44);
+		GameObject escaped = Caption(safeUi.transform, "Caption Escaped", "Phi thuyền đã cất cánh, rời khỏi hành tinh xa lạ.", medium, 52);
 		foreach (GameObject caption in new[] { ready, escaped })
 			caption.SetActive(false);
 
-		GameObject panel = Stretch(new GameObject("Completion Panel", typeof(RectTransform)), canvasGo.transform);
+		GameObject panel = Stretch(new GameObject("Completion Panel", typeof(RectTransform), typeof(Image)), safeUi.transform);
+		panel.GetComponent<Image>().color = new Color32(16, 24, 32, 225);
+		panel.GetComponent<Image>().raycastTarget = false;
 		panel.SetActive(false);
-		Label(panel.transform, "Title", StoryText.Finale.title, bold, 80, 300f, new Vector2(1700f, 110f));
+		Text completeTitle = Label(panel.transform, "Title", StoryText.Finale.title, bold, 80, 300f, new Vector2(1700f, 110f));
+		UiTheme.SetRole(completeTitle, UiRole.CompletionTitle);
 		Text finale = Label(panel.transform, "Subtitle", StoryText.Finale.body, medium, 42, 140f, new Vector2(1500f, 180f));
+		UiTheme.SetRole(finale, UiRole.CompletionBody);
 		finale.horizontalOverflow = HorizontalWrapMode.Wrap;
 		finale.lineSpacing = 1.15f;
 
@@ -187,7 +195,7 @@ public static class EndingSceneBuilder {
 		controller.completionPanel = panel;
 		UnityEventTools.AddPersistentListener(Button(panel.transform, "Play Again Button", "Chơi lại", bold, -60f).onClick, controller.PlayAgain);
 		UnityEventTools.AddPersistentListener(Button(panel.transform, "Main Menu Button", "Menu chính", bold, -200f).onClick, controller.BackToMenu);
-		Button skip = Button(canvasGo.transform, "Skip Button", "BỎ QUA", bold, 0f);
+		Button skip = Button(safeUi.transform, "Skip Button", "BỎ QUA", bold, 0f);
 		RectTransform skipRect = (RectTransform)skip.transform;
 		skipRect.anchorMin = skipRect.anchorMax = skipRect.pivot = new Vector2(1f, 0f);
 		skipRect.anchoredPosition = new Vector2(-60f, 60f);
@@ -516,6 +524,30 @@ public static class EndingSceneBuilder {
 		rect.anchorMax = Vector2.one;
 		rect.offsetMin = rect.offsetMax = Vector2.zero;
 		return go;
+	}
+
+	static GameObject Caption(Transform parent, string name, string content, Font font, int size) {
+		GameObject panel = new GameObject(name + " Panel", typeof(RectTransform), typeof(Image), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));
+		panel.transform.SetParent(parent, false);
+		RectTransform rect = (RectTransform)panel.transform;
+		rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0f);
+		rect.pivot = new Vector2(0.5f, 0f);
+		rect.anchoredPosition = new Vector2(-160f, 48f);
+		rect.sizeDelta = new Vector2(1300f, 180f);
+		panel.GetComponent<Image>().color = new Color32(16, 24, 32, 225);
+		panel.GetComponent<Image>().raycastTarget = false;
+		VerticalLayoutGroup layout = panel.GetComponent<VerticalLayoutGroup>();
+		layout.padding = new RectOffset(24, 24, 12, 12);
+		layout.childControlWidth = layout.childControlHeight = true;
+		layout.childForceExpandWidth = true;
+		layout.childForceExpandHeight = false;
+		panel.GetComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+		Text text = Label(panel.transform, name, content, font, size, 0f, new Vector2(1252f, 160f));
+		text.horizontalOverflow = HorizontalWrapMode.Wrap;
+		text.verticalOverflow = VerticalWrapMode.Overflow;
+		text.lineSpacing = 1.15f;
+		UiTheme.SetRole(text, UiRole.EndingCaption);
+		return panel;
 	}
 
 	static Text Label(Transform parent, string name, string value, Font font, int size, float y, Vector2 box) {

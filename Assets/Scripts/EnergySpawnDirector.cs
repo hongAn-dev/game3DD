@@ -1,494 +1,518 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.SceneManagement;
 
 /// <summary>
-/// Sole owner of a level's energy budget (spec §5). Starts with LevelConfig.energyAtStart cores (the first 4–10 m
-/// from the robot by path); every energyInterval it drops a random batch (energyBatchMin..Max, upper bound included)
-/// while cores alive + reserved (marked or falling) stay within min(energyCap, MaxAlive, target − score). Each core
-/// reserves its point before its marker, so later cores of the same batch see it; one core per batch is placed
-/// 6–18 m from the robot by path when possible, the others spread over the emptier areas. Candidates are landing
-/// points with a complete NavMesh path from the robot, ≥ minPlayerDistance from it and ≥ minSpacing from cores,
-/// reservations, items and enemies. Nothing alive or reserved for FallbackDelay → one core near the robot (retry each
-/// second). No pickup for staleDelay and nothing reachable nearby → one far core is recalled and replaced near.
-/// A win, a death or a transition cancels markers, falling cores and reservations; pause/intro only freeze.
+/// Owns the energy supply and selects safe/risk clusters from editor-authored ground candidates. Fixed supply
+/// (playtest): target + spare cores are placed at the start and nothing spawns on a timer; cores come back only
+/// when collected + on the map drops below the target (an anti-energy trap took one, a core was lost), so the
+/// level stays winnable. A far core nobody picks up for staleDelay seconds still moves closer.
 /// </summary>
 public class EnergySpawnDirector : MonoBehaviour {
+    public const int MaxAlive = 24;
+    public const float FallbackDelay = 3f;
+    public const float FallbackRetry = 1f;
+    public static EnergySpawnDirector Current { get; private set; }
 
-	public const int MaxAlive = 10;
-	public const float FallbackDelay = 3f;
-	public const float FallbackRetry = 1f;
+    public GameObject corePrefab;
+    public Transform[] landingPoints = new Transform[0];
+    public float intervalOverride = -1f;
+    public float staleDelay = 12f;
+    public float minPlayerDistance = 3f;
+    public float minSpacing = 1.5f;
+    public Vector2 nearPath = new Vector2(5f, 18f);
 
-	public GameObject corePrefab;
-	public Material markerMaterial;
-	public Transform[] landingPoints = new Transform[0];
+    LevelConfig config;
+    readonly List<Treasure> alive = new List<Treasure>();
+    readonly HashSet<int> pending = new HashSet<int>();
+    readonly List<GameObject> inFlight = new List<GameObject>();
+    float timer, nextInterval, emptyTimer, staleTimer;
+    int lastScore = -1;
+    Transform player;
+    Vector3 robotPoint;
+    bool robotPointValid;
+    SpawnRegistry registry;
+    static readonly RaycastHit[] GroundHits = new RaycastHit[16];
+    internal Vector3 FirstCorePoint { get; private set; }
+    internal int StartingNearSafeCandidateCount { get; private set; }
+    internal float[] StartingNearSafePaths { get; private set; } = new float[0];
+    public int AliveCount { get { return registry != null ? registry.Count(SpawnRegistry.SpawnCategory.Energy) : alive.Count + pending.Count; } }
+    public int ReservedCount { get { alive.RemoveAll(t => t == null); return registry != null ? Mathf.Max(0, registry.Count(SpawnRegistry.SpawnCategory.Energy) - alive.Count) : pending.Count; } }
 
-	[Tooltip("Seconds between batches; < 0 uses the LevelConfig interval (tests set it).")]
-	public float intervalOverride = -1f;
-	[Tooltip("Seconds without a pickup after which a far core is replaced near the robot.")]
-	public float staleDelay = 12f;
-	public float markerDuration = 0.35f;
-	public float dropHeight = 4f;
-	public float dropDuration = 0.5f;
-	public float minPlayerDistance = 3f;
-	public float minSpacing = 2f;
-	public Vector2 firstCorePath = new Vector2(4f, 10f);
-	public Vector2 nearPath = new Vector2(6f, 18f);
+    internal void ForceBatch() { timer = float.MaxValue; }
+    public static int AllowedAlive(int cap, int target, int score) {
+        return score >= target ? 0 : Mathf.Max(0, Mathf.Min(cap, MaxAlive));
+    }
+    public static int SpawnCount(int batch, int allowed, int aliveCount, int reservedCount) {
+        return Mathf.Max(0, Mathf.Min(batch, allowed - aliveCount - reservedCount));
+    }
+    public static int RandomBatch(int min, int max) { return Random.Range(min, max + 1); }
+    public static float PathLength(NavMeshPath path) {
+        float length = 0f; Vector3[] corners = path.corners;
+        for (int i = 1; i < corners.Length; i++) length += Vector3.Distance(corners[i - 1], corners[i]);
+        return length;
+    }
 
-	LevelConfig config;
-	readonly List<Treasure> alive = new List<Treasure>();
-	readonly List<Vector3> reserved = new List<Vector3>();
-	readonly List<GameObject> inFlight = new List<GameObject>();   // markers and falling cores
-	float timer, nextInterval, emptyTimer, staleTimer, killHeight = -50f;
-	int lastScore = -1;
-	Transform player;
-	Vector3 robotPoint;
-	bool robotPointValid;
-	static readonly RaycastHit[] GroundHits = new RaycastHit[16];
+    void Awake() {
+        if (Current != null && Current != this) { enabled = false; return; }
+        Current = this;
+        registry = SpawnRegistry.Current;
+        if (registry == null) registry = GetComponent<SpawnRegistry>();
+        if (registry == null) registry = gameObject.AddComponent<SpawnRegistry>();
+    }
+    void Start() {
+        config = LevelCatalog.Get(SceneManager.GetActiveScene().name);
+        GameObject p = GameObject.FindWithTag("Player");
+        player = p != null ? p.transform : null;
+        if (config == null) { enabled = false; return; }
+        GameFlow.Changed += OnFlowChanged;
+        StartingCores();
+        ScheduleNext();
+    }
+    void OnDestroy() {
+        GameFlow.Changed -= OnFlowChanged;
+        if (Current == this) Current = null;
+        if (registry != null) registry.ReleaseOwner(this);
+    }
+    void OnDisable() { CancelInFlight(); }
+    void OnFlowChanged(FlowState state) {
+        if (state == FlowState.Dead || state == FlowState.LevelComplete || state == FlowState.Transition) CancelInFlight();
+    }
+    void CancelInFlight() {
+        StopAllCoroutines();
+        foreach (int id in pending) registry.Release(id);
+        pending.Clear();
+        foreach (GameObject go in inFlight) if (go != null) Destroy(go);
+        inFlight.Clear();
+    }
 
-	/// <summary>Where the first starting core went (tests check its path distance).</summary>
-	internal Vector3 FirstCorePoint { get; private set; }
+    void StartingCores() {
+        foreach (Treasure old in FindObjectsOfType<Treasure>()) Destroy(old.gameObject);
+        alive.Clear();
+        int want = Mathf.Min(config.EnergySupply, AllowedAlive(config.energyCap, config.energyTarget, Score()));
+        Dictionary<SpawnPoint, float> paths;
+        var candidates = GetCandidates(true, true, out paths);
+        StartingNearSafePaths = candidates.Where(c => !c.IsRisk && CachedPath(c, paths) >= nearPath.x && CachedPath(c, paths) <= nearPath.y)
+            .Select(c => CachedPath(c, paths)).ToArray();
+        StartingNearSafeCandidateCount = StartingNearSafePaths.Length;
+        List<SpawnPoint> selected = SelectBatch(candidates, want, paths);
+        for (int i = 0; i < selected.Count; i++) {
+            if (i == 0) FirstCorePoint = selected[i].transform.position;
+            StartSpawn(selected[i].transform.position);
+        }
+    }
+    int Score() { return GameManager.gm != null ? GameManager.gm.score : 0; }
+    bool StartSpawn(Vector3 position) {
+        int id;
+        if (!registry.TryReserve(SpawnRegistry.SpawnCategory.Energy, this, position, GroundSpawn.FootprintRadius(corePrefab), config.energyCap, out id)) return false;
+        pending.Add(id); StartCoroutine(SpawnAt(position, id)); return true;
+    }
 
-	/// <summary>Tests: run a batch on the next Update.</summary>
-	internal void ForceBatch() {
-		timer = float.MaxValue;
-	}
+    void ScheduleNext() {
+        nextInterval = intervalOverride > 0f ? intervalOverride : Random.Range(config.energyIntervalMin, config.energyIntervalMax);
+        timer = 0f;
+    }
 
-	/// <summary>Cores on the map plus cores marked or falling.</summary>
-	public int AliveCount {
-		get {
-			alive.RemoveAll(t => t == null);
-			return alive.Count + reserved.Count;
-		}
-	}
+    void UpdateRobotPoint() {
+        if (player == null) return;
+        float ground = float.MinValue;
+        int count = Physics.RaycastNonAlloc(player.position + Vector3.up, Vector3.down, GroundHits, 60f, ~0, QueryTriggerInteraction.Ignore);
+        for (int i = 0; i < count; i++)
+            if (GroundHits[i].collider.attachedRigidbody == null) ground = Mathf.Max(ground, GroundHits[i].point.y);
+        NavMeshHit nav;
+        if (ground > float.MinValue && player.position.y - ground < 2f
+            && NavMesh.SamplePosition(new Vector3(player.position.x, ground, player.position.z), out nav, 3f, NavMesh.AllAreas)) {
+            robotPoint = nav.position; robotPointValid = true;
+        } else if (!robotPointValid && ground > float.MinValue
+            && NavMesh.SamplePosition(new Vector3(player.position.x, ground, player.position.z), out nav, 3f, NavMesh.AllAreas)) {
+            robotPoint = nav.position; robotPointValid = true;
+        }
+    }
 
-	public int ReservedCount { get { return reserved.Count; } }
+    public float PathFromRobot(Vector3 point) {
+        UpdateRobotPoint();
+        NavMeshHit nav; var path = new NavMeshPath();
+        if (!robotPointValid || !NavMesh.SamplePosition(point, out nav, 1.5f, NavMesh.AllAreas)
+            || !NavMesh.CalculatePath(robotPoint, nav.position, NavMesh.AllAreas, path) || path.status != NavMeshPathStatus.PathComplete)
+            return float.MaxValue;
+        return PathLength(path);
+    }
 
-	/// <summary>How many cores may exist at once: the level cap, never above MaxAlive nor the energy still needed.</summary>
-	public static int AllowedAlive(int cap, int target, int score) {
-		return Mathf.Max(0, Mathf.Min(Mathf.Min(cap, MaxAlive), target - score));
-	}
+    List<SpawnPoint> GetCandidates(bool includeRisk, bool includeDynamicRisk) {
+        Dictionary<SpawnPoint, float> ignored;
+        return GetCandidates(includeRisk, includeDynamicRisk, out ignored);
+    }
 
-	/// <summary>Cores to drop this turn: the random batch, cut to the free slots.</summary>
-	public static int SpawnCount(int batch, int allowed, int alive, int reservedCount) {
-		return Mathf.Max(0, Mathf.Min(batch, allowed - alive - reservedCount));
-	}
+    List<SpawnPoint> GetCandidates(bool includeRisk, bool includeDynamicRisk, out Dictionary<SpawnPoint, float> pathCache) {
+        UpdateRobotPoint();
+        var result = new List<SpawnPoint>();
+        pathCache = new Dictionary<SpawnPoint, float>();
+        if (!robotPointValid || player == null) return result;
+        EnemyBrain[] enemies = includeDynamicRisk ? FindObjectsOfType<EnemyBrain>() : new EnemyBrain[0];
+        HarmfulPickup[] traps = includeDynamicRisk ? FindObjectsOfType<HarmfulPickup>() : new HarmfulPickup[0];
+        HazardVolume[] hazards = FindObjectsOfType<HazardVolume>();
+        float footprint = GroundSpawn.FootprintRadius(corePrefab);
+        foreach (Transform t in landingPoints) {
+            if (t == null || Vector3.Distance(t.position, player.position) < Mathf.Max(minPlayerDistance, PlayerRadius() + footprint + 0.25f)) continue;
+            SpawnPoint metadata = t.GetComponent<SpawnPoint>();
+            if (metadata == null) metadata = t.gameObject.AddComponent<SpawnPoint>();
+            if (includeDynamicRisk && OverlapsEnemyStrike(t.position, footprint, enemies)) continue;
+            metadata.dynamicRiskFlags = includeDynamicRisk ? DynamicRiskAt(t.position, enemies, traps) : SpawnRisk.None;
+            if (!includeRisk && metadata.IsRisk) continue;
+            if (registry.IsOccupied(t.position, footprint)) continue;
+            RaycastHit ground;
+            if (!Physics.Raycast(t.position + Vector3.up * 2f, Vector3.down, out ground, 5f, ~0, QueryTriggerInteraction.Ignore)
+                || ground.normal.y < 0.7f || WalkableGround.InHazard(ground.point - Vector3.up * 0.1f, hazards)) continue;
+            if (!metadata.IsRisk && metadata.edgeClearance > 0f && metadata.edgeClearance < SafeEdgeClearance()) continue;
+            if (metadata.IsRisk && !ValidRiskFootprint(t.position, metadata, hazards)) continue;
+            if (registry.IsOccupied(t.position, footprint)) continue;
+            NavMeshHit nav; var path = new NavMeshPath();
+            if (!NavMesh.SamplePosition(ground.point, out nav, 1.5f, NavMesh.AllAreas)
+                || !NavMesh.CalculatePath(robotPoint, nav.position, NavMesh.AllAreas, path) || path.status != NavMeshPathStatus.PathComplete) continue;
+            result.Add(metadata);
+            pathCache[metadata] = PathLength(path);
+        }
+        return result;
+    }
 
-	/// <summary>Random batch size, both bounds included (Random.Range(int, int) excludes the upper one).</summary>
-	public static int RandomBatch(int min, int max) {
-		return Random.Range(min, max + 1);
-	}
+    float SafeEdgeClearance() { return 2.5f; }
+    float PlayerRadius() {
+        Collider c=player!=null?player.GetComponent<Collider>():null;
+        return c!=null?Mathf.Max(c.bounds.extents.x,c.bounds.extents.z):.5f;
+    }
+    internal bool ValidRiskFootprint(Vector3 center, SpawnPoint point, HazardVolume[] hazards) {
+        float playerRadius = PlayerRadius();
+        float footprint = GroundSpawn.FootprintRadius(corePrefab);
+        float minimum = playerRadius + footprint + 0.25f;
+        bool edgeRisk = (point.EffectiveRisk & SpawnRisk.Edge) != 0;
+        if (edgeRisk && (point.edgeClearance < Mathf.Max(1.2f, minimum) || point.edgeClearance > 1.8f)) return false;
 
-	public static float PathLength(NavMeshPath path) {
-		float length = 0f;
-		Vector3[] corners = path.corners;
-		for (int i = 1; i < corners.Length; i++)
-			length += Vector3.Distance(corners[i - 1], corners[i]);
-		return length;
-	}
+        RaycastHit ground;
+        if (!WalkableGround.Ground(center, out ground, hazards)) return false;
+        if (edgeRisk) {
+            Vector3 escape = point.escapeDirection;
+            if (escape.sqrMagnitude < 0.01f || !HasGroundedClearCorridor(center, escape, 1.5f, playerRadius, hazards)) return false;
+        }
 
-	/// <summary>Cores alive, reservations and items (Overdrive, support): nothing new goes on any of them.</summary>
-	public List<Vector3> Occupied() {
-		var occupied = new List<Vector3>(reserved);
-		foreach (Treasure t in alive)
-			if (t != null)
-				occupied.Add(t.transform.position);
-		SupportSpawnDirector support = SupportSpawnDirector.Current;
-		if (support != null) {
-			occupied.AddRange(support.Pending);
-			foreach (SupportPickup item in support.Items)
-				occupied.Add(item.transform.position);
-		}
-		return occupied;
-	}
+        // Risk should leave two non-opposing lanes around the pickup, so it cannot become
+        // the only route through a narrow passage. The edge escape lane counts as one.
+        Vector3[] directions = { Vector3.forward, Vector3.back, Vector3.left, Vector3.right };
+        var clear = new List<Vector3>();
+        foreach (Vector3 direction in directions) {
+            if (HasGroundedClearCorridor(center, direction, 1.5f, playerRadius, hazards))
+                clear.Add(direction);
+        }
+        if (edgeRisk) {
+            Vector3 escape = point.escapeDirection.normalized;
+            if (!clear.Any(d => Vector3.Dot(d, escape) > 0.9f)) clear.Add(escape);
+        }
+        for (int i = 0; i < clear.Count; i++) {
+            for (int j = i + 1; j < clear.Count; j++) {
+                float alignment = Vector3.Dot(clear[i], clear[j]);
+                if (alignment > -0.5f && alignment < 0.5f) return true;
+            }
+        }
+        return false;
+    }
 
-	void Start() {
-		config = LevelCatalog.Get(SceneManager.GetActiveScene().name);
-		GameObject playerObject = GameObject.FindWithTag("Player");
-		player = playerObject != null ? playerObject.transform : null;
-		if (config == null) {
-			enabled = false;
-			return;
-		}
-		float lowest = float.MaxValue;
-		foreach (Transform p in landingPoints)
-			if (p != null)
-				lowest = Mathf.Min(lowest, p.position.y);
-		if (lowest < float.MaxValue)
-			killHeight = lowest - 20f;
-		GameFlow.Changed += OnFlowChanged;
-		StartingCores();
-		ScheduleNext();
-	}
+    internal bool HasGroundedClearCorridor(Vector3 center, Vector3 direction, float length, float radius, HazardVolume[] hazards) {
+        direction.y = 0f;
+        if (direction.sqrMagnitude < 0.01f) return false;
+        direction.Normalize();
+        Vector3 side = Vector3.Cross(Vector3.up, direction).normalized;
+        float halfWidth = Mathf.Max(0.2f, radius);
+        float step = 0.25f;
+        int samples = Mathf.CeilToInt(length / step);
+        Vector3 previousBottom = Vector3.zero, previousTop = Vector3.zero;
+        bool havePrevious = false;
+        for (int i = 0; i <= samples; i++) {
+            float distance = length * i / samples;
+            Vector3 sample = center + direction * distance;
+            RaycastHit ground;
+            if (!WalkableGround.Ground(sample, out ground, hazards)) return false;
+            for (int sideIndex = -1; sideIndex <= 1; sideIndex++) {
+                Vector3 across = ground.point + side * (halfWidth * sideIndex);
+                RaycastHit acrossGround;
+                if (!WalkableGround.Ground(across, out acrossGround, hazards)
+                    || Mathf.Abs(acrossGround.point.y - ground.point.y) > 0.45f) return false;
+            }
 
-	void OnDestroy() {
-		GameFlow.Changed -= OnFlowChanged;
-	}
+            // Sweep an upright player-sized capsule just above the floor to reject walls,
+            // rocks and other solid obstructions along the full route.
+            float capsuleRadius = Mathf.Max(0.2f, radius);
+            float playerHeight = Mathf.Max(1.4f, player != null && player.GetComponent<Collider>() != null
+                ? player.GetComponent<Collider>().bounds.size.y : 1.8f);
+            Vector3 bottom = ground.point + Vector3.up * (capsuleRadius + 0.04f);
+            Vector3 top = ground.point + Vector3.up * (playerHeight - capsuleRadius);
+            if (top.y <= bottom.y) top = bottom + Vector3.up * 0.5f;
+            if (Physics.CheckCapsule(bottom, top, capsuleRadius, ~0, QueryTriggerInteraction.Ignore)) return false;
+            if (havePrevious) {
+                Vector3 delta = bottom - previousBottom;
+                float sweptDistance = delta.magnitude;
+                if (sweptDistance > 0.001f && Physics.CapsuleCast(previousBottom, previousTop, capsuleRadius,
+                    delta / sweptDistance, sweptDistance, ~0, QueryTriggerInteraction.Ignore)) return false;
+            }
+            previousBottom = bottom; previousTop = top; havePrevious = true;
+        }
+        return true;
+    }
+    SpawnRisk DynamicRiskAt(Vector3 p, EnemyBrain[] enemies, HarmfulPickup[] traps) {
+        SpawnRisk risk = SpawnRisk.None;
+        foreach (EnemyBrain e in enemies) {
+            if (e == null) continue;
+            float d = Vector3.Distance(p, e.transform.position);
+            bool boss = e.canSlam || e.canDash;
+            float riskNear = boss ? 4f : 3f;
+            if (d >= riskNear && d <= (boss ? 7f : 6f)) risk |= SpawnRisk.Enemy;
+        }
+        foreach (HarmfulPickup trap in traps) {
+            if (trap == null) continue;
+            float d = Vector3.Distance(p, trap.transform.position);
+            if (d >= 1.5f && d <= 2.5f) { risk |= SpawnRisk.Trap; break; }
+        }
+        return risk;
+    }
+    static bool OverlapsEnemyStrike(Vector3 p, float footprint, EnemyBrain[] enemies) {
+        foreach (EnemyBrain e in enemies) {
+            if (e == null) continue;
+            float d = Vector3.Distance(p, e.transform.position);
+            bool boss = e.canSlam || e.canDash;
+            float strikeRadius = boss ? Mathf.Max(e.slamReach + e.slamRadius, e.dashWidth * 0.5f) : e.attackRange;
+            if (d <= strikeRadius + footprint) return true;
+        }
+        return false;
+    }
 
-	void OnFlowChanged(FlowState state) {
-		if (state == FlowState.Dead || state == FlowState.LevelComplete || state == FlowState.Transition)
-			CancelInFlight();
-	}
+    public bool TryGetCandidate(bool allowRisk, bool near, float minPath, float maxPath, out SpawnPoint point, out float pathLength, bool visible = false) {
+        Dictionary<SpawnPoint, float> paths;
+        var candidates = GetCandidates(allowRisk, true, out paths);
+        if (visible) candidates.RemoveAll(c => !IsVisible(c.transform.position));
+        candidates.RemoveAll(p => { float d; return !paths.TryGetValue(p, out d) || d < minPath || d > maxPath; });
+        return TryPick(candidates, near, false, out point, out pathLength, paths);
+    }
+    bool IsVisible(Vector3 point) {
+        Camera cam=Camera.main; if(cam==null) return false;
+        Vector3 v=cam.WorldToViewportPoint(point+Vector3.up*.5f); if(v.z<=0f||v.x<.08f||v.x>.92f||v.y<.08f||v.y>.92f)return false;
+        Vector3 from=cam.transform.position,to=point+Vector3.up*.5f; RaycastHit hit;
+        return !Physics.Raycast(from,to-from,out hit,Vector3.Distance(from,to)-.3f,~0,QueryTriggerInteraction.Ignore)||hit.collider.attachedRigidbody!=null;
+    }
+    /// <summary>
+    /// A free walkable point 5–9 m straight ahead of the camera, on screen and reachable (first shield fallback
+    /// when the whole energy supply takes the visible landing points).
+    /// </summary>
+    public bool TryPointAhead(float radius, out Vector3 point) {
+        point = Vector3.zero;
+        Camera cam = Camera.main;
+        if (cam == null || player == null) return false;
+        Vector3 ahead = Vector3.ProjectOnPlane(cam.transform.forward, Vector3.up).normalized;
+        HazardVolume[] hazards = FindObjectsOfType<HazardVolume>();
+        foreach (float d in new[] { 6f, 5f, 7f, 8f, 9f }) {
+            RaycastHit ground;
+            Vector3 probe = player.position + ahead * d;
+            bool g = WalkableGround.Ground(probe, out ground, hazards);
+            if (!g || registry.IsOccupied(ground.point, radius)
+                || !IsVisible(ground.point) || PathFromRobot(ground.point) == float.MaxValue) continue;
+            point = ground.point;
+            return true;
+        }
+        return false;
+    }
+    public bool TryGetRiskCandidate(bool near, float minPath, float maxPath, out SpawnPoint point, out float pathLength) {
+        Dictionary<SpawnPoint, float> paths;
+        var candidates = GetCandidates(true, true, out paths);
+        candidates.RemoveAll(c => !c.IsRisk);
+        candidates.RemoveAll(c => { float d; return !paths.TryGetValue(c, out d) || d<minPath || d>maxPath; });
+        return TryPick(candidates, near, false, out point, out pathLength, paths);
+    }
+    public bool PickSupportPoint(bool near, bool visible, out Vector3 point) {
+        SpawnPoint candidate; float path;
+        if (TryGetCandidate(false, near, nearPath.x, nearPath.y, out candidate, out path, visible)) { point = candidate.transform.position; return true; }
+        point = Vector3.zero; return false;
+    }
 
-	void CancelInFlight() {
-		StopAllCoroutines();
-		foreach (GameObject go in inFlight)
-			if (go != null)
-				Destroy(go);
-		inFlight.Clear();
-		reserved.Clear();
-	}
+    bool TryPick(List<SpawnPoint> candidates, bool near, bool spread, out SpawnPoint point, out float pathLength, Dictionary<SpawnPoint, float> pathCache = null) {
+        point = null; pathLength = float.MaxValue;
+        if (candidates == null || candidates.Count == 0) return false;
+        var measured = new List<KeyValuePair<SpawnPoint, float>>();
+        foreach (SpawnPoint c in candidates) {
+            float distance;
+            if (pathCache == null) distance = PathFromRobot(c.transform.position);
+            else if (!pathCache.TryGetValue(c, out distance)) continue;
+            measured.Add(new KeyValuePair<SpawnPoint, float>(c, distance));
+        }
+        measured.RemoveAll(x => x.Value == float.MaxValue);
+        if (measured.Count == 0) return false;
+        if (near) measured.Sort((a,b) => Mathf.Abs(a.Value - Mid(nearPath)).CompareTo(Mathf.Abs(b.Value - Mid(nearPath))));
+        else if (spread) measured.Sort((a,b) => b.Value.CompareTo(a.Value));
+        else measured = measured.OrderBy(_ => Random.value).ToList();
+        int bound = near || spread ? 1 : Mathf.Min(4, measured.Count);
+        var chosen = measured[Random.Range(0, bound)];
+        point = chosen.Key; pathLength = chosen.Value; return true;
+    }
+    static float Mid(Vector2 v) { return (v.x + v.y) * .5f; }
 
-	void OnDisable() {
-		CancelInFlight();
-	}
+    void Update() {
+        if (!GameFlow.IsGameplayActive || config == null) return;
+        UpdateRobotPoint();
+        alive.RemoveAll(t => t == null);
+        int count = AliveCount, score = Score();
+        int allowed = AllowedAlive(config.energyCap, config.energyTarget, score);
+        if (score != lastScore) { lastScore = score; staleTimer = 0f; }
+        // Respawn only to keep the level winnable: collected + on the map must reach the target (+1 spare).
+        int missing = Missing(config.energyTarget, score, count);
+        if (allowed > 0 && missing > 0) {
+            emptyTimer += Time.deltaTime;
+            if (emptyTimer >= FallbackDelay) {
+                emptyTimer = 0f;
+                Dictionary<SpawnPoint, float> pathCache;
+                var candidates = GetCandidates(true, true, out pathCache);
+                List<SpawnPoint> selected = SelectBatch(candidates, missing, pathCache);
+                if (selected.Count == 0 && !TrySpawnNear()) emptyTimer = FallbackDelay - FallbackRetry;
+                foreach (SpawnPoint point in selected) StartSpawn(point.transform.position);
+                return;
+            }
+        } else emptyTimer = 0f;
+        ReplaceStaleCore();
+    }
 
-	// Starting cores appear at once (no fall): the first 4–10 m from the robot by path, the rest spread out.
-	void StartingCores() {
-		foreach (Treasure t in FindObjectsOfType<Treasure>())
-			Destroy(t.gameObject);   // guards scenes that still hold authored cores
-		int want = Mathf.Min(config.energyAtStart, AllowedAlive(config.energyCap, config.energyTarget, Score()));
-		List<Candidate> candidates = Candidates();
-		for (int n = 0; n < want; n++) {
-			Vector3 point;
-			if (!Pick(candidates, n == 0 ? firstCorePath : nearPath, n == 0, out point))
-				break;
-			if (n == 0)
-				FirstCorePoint = point;
-			alive.Add(Instantiate(corePrefab, point, Quaternion.identity).GetComponent<Treasure>());
-			Taken(candidates, point);
-		}
-	}
+    /// <summary>Cores to bring back so collected + on the map is the target plus one spare; 0 while enough remain.</summary>
+    public static int Missing(int target, int score, int onMap) {
+        return score + onMap >= target ? 0 : target + 1 - score - onMap;
+    }
 
-	int Score() {
-		return GameManager.gm != null ? GameManager.gm.score : 0;
-	}
+    static float CachedPath(SpawnPoint p, Dictionary<SpawnPoint, float> paths) { float d; return paths.TryGetValue(p, out d) ? d : float.MaxValue; }
 
-	void ScheduleNext() {
-		nextInterval = intervalOverride > 0f ? intervalOverride : Random.Range(config.energyIntervalMin, config.energyIntervalMax);
-		timer = 0f;
-	}
-
-	// The robot's NavMesh point under it; while airborne/off the mesh the last valid one is kept.
-	void UpdateRobotPoint() {
-		if (player == null)
-			return;
-		float ground = float.MinValue;
-		int count = Physics.RaycastNonAlloc(player.position + Vector3.up, Vector3.down, GroundHits, 60f, ~0, QueryTriggerInteraction.Ignore);
-		for (int i = 0; i < count; i++)
-			if (GroundHits[i].collider.attachedRigidbody == null)
-				ground = Mathf.Max(ground, GroundHits[i].point.y);
-		NavMeshHit nav;
-		if (ground > float.MinValue && player.position.y - ground < 2f
-			&& NavMesh.SamplePosition(new Vector3(player.position.x, ground, player.position.z), out nav, 3f, NavMesh.AllAreas)) {
-			robotPoint = nav.position;
-			robotPointValid = true;
-		} else if (!robotPointValid && ground > float.MinValue
-			&& NavMesh.SamplePosition(new Vector3(player.position.x, ground, player.position.z), out nav, 3f, NavMesh.AllAreas)) {
-			robotPoint = nav.position;   // start of the level: the robot is still dropping onto the ground
-			robotPointValid = true;
-		}
-	}
-
-	struct Candidate {
-		public Vector3 point;
-		public float path;
-		public float isolation;   // distance to the nearest core/reservation/item
-	}
-
-	List<Candidate> Candidates() {
-		var result = new List<Candidate>();
-		UpdateRobotPoint();
-		if (!robotPointValid)
-			return result;
-		List<Vector3> taken = Occupied();
-		var enemies = new List<Vector3>();
-		foreach (EnemyBrain e in FindObjectsOfType<EnemyBrain>())
-			enemies.Add(e.transform.position);
-		if (EnemyDirector.Current != null)
-			enemies.AddRange(EnemyDirector.Current.PendingSpawns);   // telegraphed enemy spawns too
-		var path = new NavMeshPath();
-		foreach (Transform t in landingPoints) {
-			if (t == null || Vector3.Distance(t.position, player.position) < minPlayerDistance)
-				continue;
-			float isolation = float.MaxValue;
-			foreach (Vector3 o in taken)
-				isolation = Mathf.Min(isolation, Vector3.Distance(o, t.position));
-			if (isolation < minSpacing)
-				continue;
-			bool nearEnemy = false;
-			foreach (Vector3 e in enemies)
-				nearEnemy |= Vector3.Distance(e, t.position) < minSpacing;
-			if (nearEnemy)
-				continue;
-			NavMeshHit nav;
-			if (!NavMesh.SamplePosition(t.position, out nav, 1.5f, NavMesh.AllAreas)
-				|| !NavMesh.CalculatePath(robotPoint, nav.position, NavMesh.AllAreas, path) || path.status != NavMeshPathStatus.PathComplete)
-				continue;
-			result.Add(new Candidate { point = t.position, path = PathLength(path), isolation = isolation });
-		}
-		return result;
-	}
-
-	/// <summary>
-	/// A point in the [band] path range (random among them); otherwise the closest to that range (strict for the
-	/// first core, which would rather be near than far). Spread picks (strict = false and no band match) favour the
-	/// most isolated candidates.
-	/// </summary>
-	bool Pick(Vector2 band, bool near, out Vector3 point) {
-		return Pick(Candidates(), band, near, out point);
-	}
-
-	/// <summary>
-	/// A safe point for a support item, from the same candidates (≥ 2 m from cores and items): near the robot (6–18 m
-	/// by path) or spread out. visible = prefer points on screen with a clear line from the camera (first shield).
-	/// </summary>
-	public bool PickSupportPoint(bool near, bool visible, out Vector3 point) {
-		List<Candidate> all = Candidates();
-		Camera cam = Camera.main;
-		if (visible && cam != null) {
-			List<Candidate> seen = all.FindAll(c => InView(cam, c.point));
-			if (seen.Count > 0)
-				return Pick(seen, nearPath, near, out point);
-			if (PointAhead(cam, out point))
-				return true;
-		}
-		return Pick(all, nearPath, near, out point);
-	}
-
-	// On screen (with a margin) and a clear line from the camera to the item's middle.
-	static bool InView(Camera cam, Vector3 ground) {
-		Vector3 to = ground + Vector3.up * 0.5f;
-		Vector3 v = cam.WorldToViewportPoint(to);
-		if (v.z <= 0f || v.x < 0.08f || v.x > 0.92f || v.y < 0.08f || v.y > 0.92f)
-			return false;
-		RaycastHit hit;
-		Vector3 from = cam.transform.position;
-		return !Physics.Raycast(from, to - from, out hit, Vector3.Distance(from, to) - 0.3f, ~0, QueryTriggerInteraction.Ignore)
-			|| hit.collider.attachedRigidbody != null;
-	}
-
-	// No landing point in view: a NavMesh point straight ahead of the camera (hazards are not walkable), ≥ 1 m from
-	// a NavMesh edge, free of cores/items/enemies and reachable from the robot.
-	bool PointAhead(Camera cam, out Vector3 point) {
-		point = Vector3.zero;
-		Vector3 ahead = Vector3.ProjectOnPlane(cam.transform.forward, Vector3.up).normalized;
-		List<Vector3> taken = Occupied();
-		if (EnemyDirector.Current != null)
-			taken.AddRange(EnemyDirector.Current.PendingSpawns);
-		foreach (EnemyBrain e in FindObjectsOfType<EnemyBrain>())
-			taken.Add(e.transform.position);
-		foreach (float d in new[] { 6f, 5f, 7f, 4f, 8f }) {
-			NavMeshHit nav, edge;
-			if (!NavMesh.SamplePosition(player.position + ahead * d, out nav, 2f, NavMesh.AllAreas)
-				|| !NavMesh.FindClosestEdge(nav.position, out edge, NavMesh.AllAreas) || edge.distance < 1f
-				|| Vector3.Distance(nav.position, player.position) < minPlayerDistance || !InView(cam, nav.position)
-				|| PathFromRobot(nav.position) == float.MaxValue || taken.Exists(o => Vector3.Distance(o, nav.position) < minSpacing))
-				continue;
-			point = nav.position;
-			return true;
-		}
-		return false;
-	}
-
-	/// <summary>NavMesh path length from the robot to a point, or float.MaxValue when there is no complete path.</summary>
-	public float PathFromRobot(Vector3 point) {
-		UpdateRobotPoint();
-		NavMeshHit nav;
-		var path = new NavMeshPath();
-		if (!robotPointValid || !NavMesh.SamplePosition(point, out nav, 1.5f, NavMesh.AllAreas)
-			|| !NavMesh.CalculatePath(robotPoint, nav.position, NavMesh.AllAreas, path) || path.status != NavMeshPathStatus.PathComplete)
-			return float.MaxValue;
-		return PathLength(path);
-	}
-
-	// Removes candidates the new core makes too close, and lowers the isolation of the rest (one candidate scan per
-	// batch instead of one per core).
-	void Taken(List<Candidate> candidates, Vector3 point) {
-		for (int i = candidates.Count - 1; i >= 0; i--) {
-			float d = Vector3.Distance(candidates[i].point, point);
-			if (d < minSpacing) {
-				candidates.RemoveAt(i);
-			} else {
-				Candidate c = candidates[i];
-				c.isolation = Mathf.Min(c.isolation, d);
-				candidates[i] = c;
-			}
-		}
-	}
-
-	bool Pick(List<Candidate> candidates, Vector2 band, bool near, out Vector3 point) {
-		point = Vector3.zero;
-		var all = new List<Candidate>(candidates);
-		if (all.Count == 0)
-			return false;
-		if (near) {
-			List<Candidate> inBand = all.FindAll(c => c.path >= band.x && c.path <= band.y);
-			if (inBand.Count > 0) {
-				point = inBand[Random.Range(0, inBand.Count)].point;
-				return true;
-			}
-			all.Sort((a, b) => Mathf.Abs(a.path - Mid(band)).CompareTo(Mathf.Abs(b.path - Mid(band))));
-			point = all[0].point;
-			return true;
-		}
-		// Spread: random among the three most isolated candidates (areas with fewer cores).
-		all.Sort((a, b) => b.isolation.CompareTo(a.isolation));
-		point = all[Random.Range(0, Mathf.Min(3, all.Count))].point;
-		return true;
-	}
-
-	static float Mid(Vector2 band) {
-		return (band.x + band.y) * 0.5f;
-	}
-
-	void Update() {
-		if (!GameFlow.IsGameplayActive)
-			return;
-		UpdateRobotPoint();
-
-		// Cores that fell out of the world free their slot.
-		foreach (Treasure t in alive)
-			if (t != null && t.transform.position.y < killHeight)
-				Destroy(t.gameObject);
-
-		int count = AliveCount;
-		int score = Score();
-		int allowed = AllowedAlive(config.energyCap, config.energyTarget, score);
-		if (score != lastScore) {
-			lastScore = score;
-			staleTimer = 0f;
-		}
-
-		// Nothing alive or falling while energy is still needed: one core near the robot, retried every second.
-		if (allowed > 0 && count == 0) {
-			emptyTimer += Time.deltaTime;
-			if (emptyTimer >= FallbackDelay) {
-				Vector3 point;
-				if (Pick(nearPath, true, out point)) {
-					Drop(point);
-					emptyTimer = 0f;
-					ScheduleNext();
-				} else {
-					emptyTimer = FallbackDelay - FallbackRetry;
-					if (Debug.isDebugBuild)
-						Debug.LogWarning("EnergySpawnDirector: no safe landing point near the robot, retrying in 1 s");
-				}
-				return;
-			}
-		} else {
-			emptyTimer = 0f;
-		}
-
-		ReplaceStaleCore(count);
-
-		timer += Time.deltaTime;
-		if (timer < (intervalOverride > 0f ? intervalOverride : nextInterval))
-			return;
-		ScheduleNext();
-		// One batch per interval; what does not fit is dropped (no backlog).
-		int n = SpawnCount(RandomBatch(config.energyBatchMin, config.energyBatchMax), allowed, alive.Count, reserved.Count);
-		List<Candidate> candidates = n > 0 ? Candidates() : null;
-		for (int i = 0; i < n; i++) {
-			Vector3 point;
-			if (!Pick(candidates, nearPath, i == 0, out point))
-				break;
-			Drop(point);   // reserves the point at once
-			Taken(candidates, point);   // and the next core of the batch sees it
-		}
-	}
-
-	// No pickup for staleDelay and nothing reachable within the near band: recall the farthest (by path, or
-	// unreachable) core that is not right next to the robot and drop one near it instead. One core per staleDelay.
-	void ReplaceStaleCore(int count) {
-		if (count == 0) {
-			staleTimer = 0f;
-			return;
-		}
-		staleTimer += Time.deltaTime;
-		if (staleTimer < staleDelay)
-			return;
-		staleTimer = 0f;
-		Treasure worst = null;
-		float worstPath = -1f;
-		bool nearExists = false;
-		var path = new NavMeshPath();
-		foreach (Treasure t in alive) {
-			if (t == null)
-				continue;
-			float length = float.MaxValue;
-			NavMeshHit nav;
-			if (robotPointValid && NavMesh.SamplePosition(t.transform.position, out nav, 1.5f, NavMesh.AllAreas)
-				&& NavMesh.CalculatePath(robotPoint, nav.position, NavMesh.AllAreas, path) && path.status == NavMeshPathStatus.PathComplete)
-				length = PathLength(path);
-			nearExists |= length <= nearPath.y;
-			if (Vector3.Distance(t.transform.position, player.position) >= 3f && length > worstPath) {
-				worstPath = length;
-				worst = t;
-			}
-		}
-		if (nearExists || worst == null)
-			return;
-		alive.Remove(worst);
-		Destroy(worst.gameObject);
-		Vector3 point;
-		if (Pick(nearPath, true, out point))
-			Drop(point);
-	}
-
-	void Drop(Vector3 point) {
-		reserved.Add(point);
-		StartCoroutine(DropRoutine(point));
-	}
-
-	IEnumerator DropRoutine(Vector3 point) {
-		GameObject marker = Marker(point);
-		inFlight.Add(marker);
-		float elapsed = 0f;
-		while (elapsed < markerDuration) {
-			elapsed += Time.deltaTime;   // frozen while paused
-			yield return null;
-		}
-
-		GameObject core = Instantiate(corePrefab, point + Vector3.up * dropHeight, Quaternion.identity);
-		inFlight.Add(core);
-		Collider trigger = core.GetComponent<Collider>();
-		if (trigger != null)
-			trigger.enabled = false;   // no pickup until it lands
-		elapsed = 0f;
-		while (elapsed < dropDuration && core != null) {
-			elapsed += Time.deltaTime;
-			float t = Mathf.Clamp01(elapsed / dropDuration);
-			core.transform.position = point + Vector3.up * dropHeight * (1f - t * t);
-			yield return null;
-		}
-
-		inFlight.Remove(marker);
-		inFlight.Remove(core);
-		if (marker != null)
-			Destroy(marker);
-		reserved.Remove(point);
-		if (core != null) {
-			core.transform.position = point;
-			if (trigger != null)
-				trigger.enabled = true;
-			alive.Add(core.GetComponent<Treasure>());
-		}
-	}
-
-	// Flat cyan disc on the ground under the landing point.
-	GameObject Marker(Vector3 point) {
-		GameObject marker = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-		marker.name = "Energy Landing Marker";
-		DestroyImmediate(marker.GetComponent<Collider>());   // never blocks the robot, not even for a frame
-		RaycastHit hit;
-		Vector3 ground = Physics.Raycast(point + Vector3.up, Vector3.down, out hit, 6f, ~0, QueryTriggerInteraction.Ignore) ? hit.point : point;
-		marker.transform.position = ground + Vector3.up * 0.02f;
-		marker.transform.localScale = new Vector3(0.9f, 0.01f, 0.9f);
-		if (markerMaterial != null)
-			marker.GetComponent<Renderer>().sharedMaterial = markerMaterial;
-		return marker;
-	}
+    List<SpawnPoint> SelectBatch(List<SpawnPoint> candidates, int count, Dictionary<SpawnPoint, float> paths) {
+        var selected = new List<SpawnPoint>();
+        if (count <= 0 || candidates.Count == 0) return selected;
+        var used = new List<Vector3>();
+        float minSeparation = Mathf.Max(1.5f, GroundSpawn.FootprintRadius(corePrefab) * 2f);
+        var usedRiskTypes = new Dictionary<int, SpawnRisk>();
+        bool hasNearSafe = candidates.Any(c => !c.IsRisk && CachedPath(c, paths) >= nearPath.x && CachedPath(c, paths) <= nearPath.y);
+        if (hasNearSafe) TakeClustered(candidates, selected, used, usedRiskTypes, false, 1, paths, minSeparation, nearPath.x, nearPath.y, int.MinValue);
+        int preferredSafeCluster = selected.Count > 0 ? selected[0].clusterId : int.MinValue;
+        int riskBudget = Mathf.Clamp(Mathf.RoundToInt(count * Mathf.Clamp01(config.energyRiskFraction)), 0, count);
+        int riskTarget = Mathf.Min(riskBudget, count - selected.Count);
+        int safeBudget = count - riskTarget - selected.Count;
+        TakeClustered(candidates, selected, used, usedRiskTypes, false, safeBudget, paths, minSeparation, float.MinValue, float.MaxValue, preferredSafeCluster);
+        int selectedRisk = selected.Count(p => p.IsRisk);
+        TakeClustered(candidates, selected, used, usedRiskTypes, true, riskTarget - selectedRisk, paths, minSeparation, float.MinValue, float.MaxValue, int.MinValue);
+        // Fill remaining slots with safe choices first. Risk picks may not exceed the configured budget.
+        if (selected.Count < count) TakeClustered(candidates, selected, used, usedRiskTypes, false, count - selected.Count, paths, minSeparation, float.MinValue, float.MaxValue, preferredSafeCluster);
+        int remainingRiskBudget = Mathf.Max(0, riskBudget - selected.Count(p => p.IsRisk));
+        if (selected.Count < count && remainingRiskBudget > 0)
+            TakeClustered(candidates, selected, used, usedRiskTypes, true,
+                Mathf.Min(count - selected.Count, remainingRiskBudget), paths, minSeparation,
+                float.MinValue, float.MaxValue, int.MinValue);
+        return selected;
+    }
+    void TakeClustered(List<SpawnPoint> candidates, List<SpawnPoint> selected, List<Vector3> used,
+        Dictionary<int, SpawnRisk> clusterRiskTypes, bool risk, int wanted, Dictionary<SpawnPoint, float> paths,
+        float minSeparation, float minPath, float maxPath, int preferredCluster) {
+        int picked = 0;
+        while (picked < wanted) {
+            var groups = candidates.Where(c => c.IsRisk == risk && CachedPath(c, paths) >= minPath && CachedPath(c, paths) <= maxPath)
+                .GroupBy(c => c.clusterId).Select(g => g.ToList())
+                .OrderBy(g => g[0].clusterId == preferredCluster ? 0 : 1)
+                .ThenByDescending(g => g.Count()).ThenBy(g => Random.value).ToList();
+            bool progressed = false;
+            foreach (List<SpawnPoint> group in groups) {
+                while (picked < wanted) {
+                    var pool = group.Where(c => used.All(u => Vector3.Distance(u, c.transform.position) >= minSeparation)
+                        && ClusterSelectionCanAccept(selected, c, risk)
+                        && (!risk || ClusterCanAccept(clusterRiskTypes, c.clusterId, c.EffectiveRisk))).ToList();
+                    if (pool.Count == 0) break;
+                    SpawnPoint point; float path;
+                    bool near = picked == 0 && minPath > float.MinValue;
+                    if (!TryPick(pool, near, !near, out point, out path, paths)) break;
+                    selected.Add(point);
+                    used.Add(point.transform.position);
+                    candidates.Remove(point);
+                    group.Remove(point);
+                    if (risk) AddRiskTypes(clusterRiskTypes, point.clusterId, point.EffectiveRisk);
+                    picked++;
+                    progressed = true;
+                }
+                if (picked >= wanted) break;
+            }
+            if (!progressed) break;
+        }
+    }
+    static bool ClusterSelectionCanAccept(List<SpawnPoint> selected, SpawnPoint candidate, bool risk) {
+        List<SpawnPoint> inCluster = selected.Where(p => p.clusterId == candidate.clusterId).ToList();
+        if (inCluster.Count >= (risk ? 4 : 3)) return false;
+        return inCluster.Count == 0 || inCluster.Any(p => Vector3.Distance(p.transform.position, candidate.transform.position) <= 2.5f);
+    }
+    static bool ClusterCanAccept(Dictionary<int, SpawnRisk> byCluster, int clusterId, SpawnRisk candidate) {
+        SpawnRisk used;
+        if (!byCluster.TryGetValue(clusterId, out used)) used = SpawnRisk.None;
+        return RiskTypeCount(used | candidate) <= 2;
+    }
+    static int RiskTypeCount(SpawnRisk flags) {
+        int count=0; foreach(SpawnRisk flag in new[] { SpawnRisk.Edge, SpawnRisk.Enemy, SpawnRisk.Trap }) if((flags&flag)!=0)count++;
+        return count;
+    }
+    static void AddRiskTypes(Dictionary<int, SpawnRisk> byCluster, int clusterId, SpawnRisk flags) {
+        SpawnRisk used;
+        if (!byCluster.TryGetValue(clusterId, out used)) used = SpawnRisk.None;
+        byCluster[clusterId] = used | flags;
+    }
+    bool TrySpawnNear() {
+        SpawnPoint point; float path;
+        if (!TryGetCandidate(false, true, nearPath.x, nearPath.y, out point, out path)) return false;
+        int id;
+        if (!registry.TryReserve(SpawnRegistry.SpawnCategory.Energy, this, point.transform.position, GroundSpawn.FootprintRadius(corePrefab), config.energyCap, out id)) return false;
+        pending.Add(id); StartCoroutine(SpawnAt(point.transform.position, id)); return true;
+    }
+    IEnumerator SpawnAt(Vector3 point, int reservation) {
+        GameObject core = Instantiate(corePrefab, point, Quaternion.identity);
+        pending.Remove(reservation);
+        inFlight.Add(core);
+        Collider trigger = core.GetComponent<Collider>();
+        RaycastHit ground;
+        if (!GroundSpawn.PlaceAtGround(core.transform, point, trigger, out ground) || !registry.CommitAlive(reservation, core)) {
+            Destroy(core); registry.Release(reservation); inFlight.Remove(core); yield break;
+        }
+        SpawnLease lease = core.GetComponent<SpawnLease>();
+        if (lease == null) lease = core.AddComponent<SpawnLease>();
+        lease.Bind(registry, reservation);
+        Treasure treasure = core.GetComponent<Treasure>();
+        if (treasure != null) alive.Add(treasure);
+        yield return GroundSpawn.ScaleIn(core.transform, trigger, GroundSpawn.ScaleInDuration);
+        if (core != null) registry.UpdatePosition(core, core.transform.position);
+        inFlight.Remove(core);
+    }
+    void ReplaceStaleCore() {
+        if (AliveCount == 0) { staleTimer = 0f; return; }
+        staleTimer += Time.deltaTime;
+        if (staleTimer < staleDelay) return;
+        staleTimer = 0f;
+        bool nearExists = false; Treasure far = null; float farPath = -1f;
+        foreach (Treasure t in FindObjectsOfType<Treasure>()) {
+            float path = PathFromRobot(t.transform.position);
+            nearExists |= path <= nearPath.y;
+            if (path > farPath && Vector3.Distance(t.transform.position, player.position) >= 3f && !Visible(t.transform.position)) { far = t; farPath = path; }
+        }
+        if (nearExists || far == null) return;
+        SpawnPoint point; float d;
+        if (!TryGetCandidate(false, true, nearPath.x, nearPath.y, out point, out d)) return;
+        // Same-frame replacement: release the stale slot, then reserve the selected near point atomically.
+        registry.ReleaseAlive(far.gameObject);
+        alive.Remove(far.GetComponent<Treasure>());
+        Destroy(far.gameObject);
+        int id;
+        if (registry.TryReserve(SpawnRegistry.SpawnCategory.Energy, this, point.transform.position, GroundSpawn.FootprintRadius(corePrefab), config.energyCap, out id)) {
+            pending.Add(id); StartCoroutine(SpawnAt(point.transform.position, id));
+        }
+    }
+    bool Visible(Vector3 p) {
+        Camera cam = Camera.main;
+        if (cam == null) return false;
+        Vector3 v = cam.WorldToViewportPoint(p);
+        return v.z > 0f && v.x >= .05f && v.x <= .95f && v.y >= .05f && v.y <= .95f;
+    }
+    public List<Vector3> Occupied() { return registry != null ? registry.OccupiedPoints() : new List<Vector3>(); }
 }

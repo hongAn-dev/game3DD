@@ -35,7 +35,7 @@ public class EnergyTests {
 			Assert.IsNotNull(model.GetComponent<EnergyBob>(), core.name);
 			Assert.AreEqual("EnergyCore", model.GetComponentInChildren<MeshFilter>().sharedMesh.name, core.name);
 			float height = MeshHeight(model);
-			Assert.That(height, Is.InRange(0.5f, 0.7f), core.name);
+			Assert.That(height, Is.InRange(0.85f, 0.95f), core.name);
 		}
 	}
 
@@ -57,12 +57,13 @@ public class EnergyTests {
 	// Spec §5.1, same on every difficulty.
 	[Test]
 	public void EnergyConfigFollowsTheTable() {
-		int[] target = { 6, 10, 14, 18 }, atStart = { 3, 5, 7, 8 }, cap = { 4, 6, 8, 10 }, batchMin = { 1, 1, 2, 2 }, batchMax = { 1, 2, 3, 4 };
-		float[] intervalMin = { 2.5f, 2.0f, 1.5f, 1.5f }, intervalMax = { 3.5f, 3.0f, 2.5f, 2.0f };
+		int[] target = { 6, 10, 14, 18 }, atStart = { 8, 12, 16, 20 }, cap = { 8, 12, 16, 20 }, batchMin = { 2, 3, 4, 5 }, batchMax = { 3, 4, 6, 7 };
+		float[] intervalMin = { 1.5f, 1f, .8f, .8f }, intervalMax = { 2f, 1.5f, 1.2f, 1f };
 		for (int i = 0; i < 4; i++) {
 			LevelConfig c = LevelCatalog.All[i];
 			Assert.AreEqual(target[i], c.energyTarget, c.levelId);
 			Assert.AreEqual(atStart[i], c.energyAtStart, c.levelId);
+			Assert.AreEqual(target[i] + 2, c.EnergySupply, c.levelId + " fixed supply: target + 2");
 			Assert.AreEqual(cap[i], c.energyCap, c.levelId);
 			Assert.AreEqual(intervalMin[i], c.energyIntervalMin, 0.001f, c.levelId);
 			Assert.AreEqual(intervalMax[i], c.energyIntervalMax, 0.001f, c.levelId);
@@ -72,14 +73,13 @@ public class EnergyTests {
 	}
 
 	[Test]
-	public void AllowedAliveCapsAtTenAndRemaining() {
-		Assert.AreEqual(4, EnergySpawnDirector.AllowedAlive(4, 6, 0));
-		Assert.AreEqual(10, EnergySpawnDirector.AllowedAlive(12, 18, 0), "never more than 10");
-		Assert.AreEqual(1, EnergySpawnDirector.AllowedAlive(10, 18, 17));
-		Assert.AreEqual(0, EnergySpawnDirector.AllowedAlive(10, 18, 18));
-		Assert.AreEqual(0, EnergySpawnDirector.AllowedAlive(10, 18, 20));
+	public void AllowedAliveUsesLevelCapAndDoesNotClampToRemainingScore() {
+		Assert.AreEqual(6, EnergySpawnDirector.AllowedAlive(6, 6, 0));
+		Assert.AreEqual(24, EnergySpawnDirector.AllowedAlive(30, 18, 0), "technical maximum is 24");
+		Assert.AreEqual(24, EnergySpawnDirector.AllowedAlive(30, 18, 17));
+		Assert.AreEqual(0, EnergySpawnDirector.AllowedAlive(30, 18, 18));
+		Assert.AreEqual(0, EnergySpawnDirector.AllowedAlive(30, 18, 20));
 	}
-
 	[Test]
 	public void SpawnCountUsesFreeSlots() {
 		Assert.AreEqual(1, EnergySpawnDirector.SpawnCount(4, 10, 7, 2), "only the free slot");
@@ -108,7 +108,7 @@ public class EnergyTests {
 			EnergySpawnDirector director = Object.FindObjectOfType<EnergySpawnDirector>();
 			Assert.IsNotNull(director, level.levelId);
 			Assert.IsNotNull(director.corePrefab, level.levelId);
-			Assert.GreaterOrEqual(director.landingPoints.Length, level.energyCap + 2, level.levelId);
+			Assert.GreaterOrEqual(director.landingPoints.Length, level.energyPointMinimum, level.levelId);
 			foreach (Transform point in director.landingPoints) {
 				RaycastHit hit;
 				Assert.IsTrue(Physics.Raycast(point.position + Vector3.up, Vector3.down, out hit, 4f, ~0, QueryTriggerInteraction.Ignore),
@@ -119,38 +119,41 @@ public class EnergyTests {
 	}
 
 	[Test]
-	public void LandingPointsAreValidatedAndSpread() {
+	public void LandingPointsHaveRiskAndOrdinaryValidation() {
 		foreach (LevelConfig level in LevelCatalog.All) {
 			EditorSceneManager.OpenScene("Assets/Scenes/" + level.levelId + ".unity", OpenSceneMode.Single);
 			EnergySpawnDirector director = Object.FindObjectOfType<EnergySpawnDirector>();
-			Assert.LessOrEqual(director.landingPoints.Length, EnergySetup.PointTarget(level.order) + 2, level.levelId);
+			Assert.GreaterOrEqual(director.landingPoints.Length, level.energyPointMinimum, level.levelId);
 			foreach (Transform point in director.landingPoints) {
-				RaycastHit hit;
-				Assert.IsTrue(Physics.Raycast(point.position + Vector3.up, Vector3.down, out hit, 4f, ~0, QueryTriggerInteraction.Ignore), point.name);
-				foreach (Vector3 side in new[] { Vector3.forward, Vector3.back, Vector3.left, Vector3.right }) {
-					RaycastHit near;
-					Vector3 p = point.position + side * 2.5f;
-					Assert.IsTrue(WalkableGrid.Ground(p.x, p.z, out near) && Mathf.Abs(near.point.y - hit.point.y) <= 1.5f,
-						level.levelId + " " + point.name + " sits on a ledge/prop top");
+				SpawnPoint metadata=point.GetComponent<SpawnPoint>();
+				Assert.IsNotNull(metadata,point.name);
+				Assert.IsTrue(WalkableGrid.Ground(point.position.x,point.position.z,out _),point.name+" has ground");
+				if((metadata.riskFlags&SpawnRisk.Edge)!=0) {
+					Assert.That(metadata.edgeClearance,Is.InRange(1.15f,1.81f),point.name+" edge clearance");
+					Assert.Greater(metadata.escapeDirection.sqrMagnitude,.5f,point.name+" escape route");
+				} else {
+					Assert.GreaterOrEqual(metadata.edgeClearance,2.5f,point.name+" ordinary clearance");
+					Assert.IsTrue(WalkableGrid.FootprintGround(point.position,.9f),point.name+" supports pickup footprint");
 				}
 			}
 		}
 	}
-
-	// Spec §5.2: at least 12 / 20 / 28 / 36 landing points.
 	[Test]
 	public void DirectorTimingsAreWrittenIntoEveryScene() {
 		foreach (LevelConfig level in LevelCatalog.All) {
 			EditorSceneManager.OpenScene("Assets/Scenes/" + level.levelId + ".unity", OpenSceneMode.Single);
 			EnergySpawnDirector d = Object.FindObjectOfType<EnergySpawnDirector>();
-			Assert.AreEqual(new[] { 0.35f, 0.5f, 12f, 3f, 2f }, new[] { d.markerDuration, d.dropDuration, d.staleDelay, d.minPlayerDistance, d.minSpacing }, level.levelId);
+			Assert.AreEqual(12f,d.staleDelay,level.levelId);
+            Assert.AreEqual(3f,d.minPlayerDistance,level.levelId);
+            Assert.AreEqual(1.5f,d.minSpacing,level.levelId);
+            Assert.AreEqual(24,EnergySpawnDirector.MaxAlive,level.levelId);
 			Assert.AreEqual(-1f, d.intervalOverride, level.levelId);
 		}
 	}
 
 	[Test]
 	public void LandingPointCountsMeetTheTarget() {
-		int[] target = { 12, 20, 28, 36 };
+		int[] target = { 20, 40, 64, 88 };
 		for (int i = 0; i < 4; i++) {
 			LevelConfig level = LevelCatalog.All[i];
 			EditorSceneManager.OpenScene("Assets/Scenes/" + level.levelId + ".unity", OpenSceneMode.Single);
@@ -188,5 +191,14 @@ public class EnergyTests {
 			EditorSceneManager.OpenScene("Assets/Scenes/" + level.levelId + ".unity", OpenSceneMode.Single);
 			Assert.AreEqual(0, Object.FindObjectsOfType<Treasure>(true).Length, level.levelId + ": cores come from the director only");
 		}
+	}
+
+	// Playtest: respawn only keeps the level winnable (collected + on the map back to target + 1).
+	[Test]
+	public void RespawnOnlyWhenTheLevelWouldBeLost() {
+		Assert.AreEqual(0, EnergySpawnDirector.Missing(18, 0, 20));
+		Assert.AreEqual(0, EnergySpawnDirector.Missing(18, 10, 8), "exactly enough left");
+		Assert.AreEqual(2, EnergySpawnDirector.Missing(18, 9, 8), "an anti-energy trap took one");
+		Assert.AreEqual(0, EnergySpawnDirector.Missing(6, 6, 0), "won");
 	}
 }
