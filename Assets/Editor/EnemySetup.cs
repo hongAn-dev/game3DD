@@ -26,6 +26,8 @@ public static class EnemySetup {
 		Material telegraph = TelegraphMaterial();
 		BuildBoss(telegraph);
 		BuildCreep(telegraph);
+		foreach (var variant in Variants)
+			BuildCreepVariant(variant.model, variant.idle, variant.run, variant.attack);
 		foreach (LevelConfig level in LevelCatalog.All) {
 			var scene = EditorSceneManager.OpenScene("Assets/Scenes/" + level.levelId + ".unity", OpenSceneMode.Single);
 			RemoveOldEnemies();
@@ -40,6 +42,7 @@ public static class EnemySetup {
 				director = manager.gameObject.AddComponent<EnemyDirector>();
 			director.bossPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(BossPath);
 			director.creepPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(CreepPath);
+			director.creepVariants = LevelVariants[level.levelId].Select(n => AssetDatabase.LoadAssetAtPath<GameObject>(VariantPath(n))).ToArray();
 			director.telegraphMaterial = telegraph;
 			director.intervalMin = 2f;
 			director.intervalMax = 3f;
@@ -248,6 +251,61 @@ public static class EnemySetup {
 			brain.telegraph = Telegraph(root, brain.attackRange, telegraph);
 			PrefabUtility.SaveAsPrefabAsset(root, CreepPath);
 			Debug.Log("EnemySetup: creep " + b.size.ToString("F2") + " range " + brain.attackRange.ToString("F2"));
+		} finally {
+			PrefabUtility.UnloadPrefabContents(root);
+		}
+	}
+
+	// Creep looks (Quaternius CC0 monsters, animated): same behaviour as the BugRobot creep, a themed pair per level.
+	const string Monsters = "Assets/ThirdParty/QuaterniusUltimateMonsters/", SpaceKit = "Assets/ThirdParty/QuaterniusSpaceKit/";
+	public const float VariantHeight = 1.05f;
+	static readonly (string model, string idle, string run, string attack)[] Variants = {
+		(Monsters + "GreenBlob.fbx", "Idle", "Walk", "Bite_Front"),
+		(Monsters + "Mushnub.fbx", "Idle", "Walk", "Bite_Front"),
+		(SpaceKit + "EnemySmall.fbx", "Flying_Idle", "Fast_Flying", "Headbutt"),
+		(Monsters + "Goleling.fbx", "Flying_Idle", "Fast_Flying", "Headbutt"),
+		(Monsters + "Demon.fbx", "Flying_Idle", "Fast_Flying", "Headbutt"),
+		(Monsters + "GreenSpikyBlob.fbx", "Idle", "Walk", "Bite_Front"),
+		(Monsters + "Alien.fbx", "Idle", "Walk", "Bite_Front"),
+		(SpaceKit + "EnemyFlying.fbx", "Flying_Idle", "Fast_Flying", "Headbutt"),
+	};
+	static readonly System.Collections.Generic.Dictionary<string, string[]> LevelVariants = new System.Collections.Generic.Dictionary<string, string[]> {
+		{ "Level1", new[] { "GreenBlob", "Mushnub" } },          // acid island: slimes and mushrooms
+		{ "Level2", new[] { "EnemySmall", "Goleling" } },        // mining station: a drone and a rock golem
+		{ "Level3", new[] { "Demon", "GreenSpikyBlob" } },       // lava valley
+		{ "Level4", new[] { "Alien", "EnemyFlying" } },          // launch pad
+	};
+
+	public static string VariantPath(string name) {
+		return "Assets/Prefabs/Enemies/Creep " + name + ".prefab";
+	}
+
+	static void BuildCreepVariant(string modelPath, string idle, string run, string attack) {
+		string name = System.IO.Path.GetFileNameWithoutExtension(modelPath);
+		if (!AssetDatabase.IsValidFolder("Assets/Prefabs/Enemies"))
+			AssetDatabase.CreateFolder("Assets/Prefabs", "Enemies");
+		GameObject root = PrefabUtility.LoadPrefabContents(CreepPath);
+		try {
+			root.name = "Creep " + name;
+			Object.DestroyImmediate(root.transform.Find("Model").gameObject);
+			GameObject model = (GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(modelPath), root.transform);
+			model.name = "Model";
+			Bounds b = MeshBounds(root);
+			model.transform.localScale *= VariantHeight / b.size.y;
+			b = MeshBounds(root);
+			model.transform.localPosition += new Vector3(-b.center.x, -b.min.y, -b.center.z);
+			Animation anim = model.GetComponent<Animation>();
+			anim.playAutomatically = true;
+			anim.clip = anim.GetClip(idle);
+			EnemyBrain brain = root.GetComponent<EnemyBrain>();
+			brain.idleClip = idle;
+			brain.runClip = run;
+			brain.attackClip = attack;
+			CapsuleCollider capsule = root.GetComponent<CapsuleCollider>();
+			capsule.height = VariantHeight;
+			capsule.center = new Vector3(0f, VariantHeight / 2f, 0f);
+			root.GetComponent<NavMeshAgent>().height = VariantHeight;
+			PrefabUtility.SaveAsPrefabAsset(root, VariantPath(name));
 		} finally {
 			PrefabUtility.UnloadPrefabContents(root);
 		}

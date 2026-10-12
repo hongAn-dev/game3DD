@@ -19,6 +19,8 @@ public class EnemyDirector : MonoBehaviour {
 
 	public GameObject bossPrefab;
 	public GameObject creepPrefab;
+	[Tooltip("Other creep looks for this level (same behaviour, set by EnemySetup); each spawn picks one at random, creepPrefab included.")]
+	public GameObject[] creepVariants = new GameObject[0];
 	public Material telegraphMaterial;
 	public Transform[] spawnPoints = new Transform[0];
 
@@ -327,7 +329,7 @@ public class EnemyDirector : MonoBehaviour {
 			if (SpawnRegistry.Current != null) SpawnRegistry.Current.Release(reservation);
 			yield break;
 		}
-		GameObject enemy = Instantiate(boss ? bossPrefab : creepPrefab, point, Quaternion.LookRotation(player != null ? Flat(player.position - point) : Vector3.forward));
+		GameObject enemy = Instantiate(boss ? bossPrefab : PickCreep(), point, Quaternion.LookRotation(player != null ? Flat(player.position - point) : Vector3.forward));
 		EnemyBrain brain = enemy.GetComponent<EnemyBrain>();
 		brain.Configure(EnemyProfile.For(config, GameSettings.difficulty, boss));
 		int region, cluster;
@@ -339,6 +341,20 @@ public class EnemyDirector : MonoBehaviour {
 		// transforms below, so committing them would leave a stale spawn-location footprint behind.
 		if (SpawnRegistry.Current != null && reservation != 0)
 			SpawnRegistry.Current.Release(reservation);
+	}
+
+	GameObject PickCreep() {
+		int n = 1;
+		foreach (GameObject v in creepVariants)
+			if (v != null)
+				n++;
+		int pick = Random.Range(0, n);
+		if (pick == 0)
+			return creepPrefab;
+		foreach (GameObject v in creepVariants)
+			if (v != null && --pick == 0)
+				return v;
+		return creepPrefab;
 	}
 
 	int GridRegion(Vector3 point) {

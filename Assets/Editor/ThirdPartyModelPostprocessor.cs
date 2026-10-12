@@ -11,10 +11,12 @@ public class ThirdPartyModelPostprocessor : AssetPostprocessor {
 		"Assets/ThirdParty/KenneyCityKitIndustrial/",
 		"Assets/ThirdParty/KenneySurvivalKit/",
 		"Assets/ThirdParty/KenneySpaceStationKit/",
+		"Assets/ThirdParty/QuaterniusSpaceKit/",
 	};
 	static readonly string[] CharacterFolders = {
 		"Assets/ThirdParty/QuaterniusUltimateMonsters/",
 		"Assets/ThirdParty/QuaterniusRobotEnemy/",
+		"Assets/ThirdParty/QuaterniusSpaceKit/Enemy",
 	};
 
 	static bool In(string path, string[] folders) {
@@ -27,15 +29,15 @@ public class ThirdPartyModelPostprocessor : AssetPostprocessor {
 	void OnPreprocessModel() {
 		ModelImporter importer = (ModelImporter)assetImporter;
 
-		if (In(assetPath, PropFolders)) {
+		if (In(assetPath, CharacterFolders)) {
+			// The game drives monsters with the legacy Animation component (see EnemyBrain).
+			importer.animationType = ModelImporterAnimationType.Legacy;
+			importer.importAnimation = true;
+		} else if (In(assetPath, PropFolders)) {
 			// Static props: readable meshes so they can be used by mesh colliders.
 			importer.isReadable = true;
 			importer.animationType = ModelImporterAnimationType.None;
 			importer.importAnimation = false;
-		} else if (In(assetPath, CharacterFolders)) {
-			// The game drives monsters with the legacy Animation component (see EnemyBrain).
-			importer.animationType = ModelImporterAnimationType.Legacy;
-			importer.importAnimation = true;
 		}
 	}
 

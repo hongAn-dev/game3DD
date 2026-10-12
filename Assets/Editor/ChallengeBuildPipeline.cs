@@ -12,6 +12,7 @@ public static class ChallengeBuildPipeline {
         LevelConfigBuilder.WriteDefaults();
         ChallengeAssetSetup.Apply();
         ControlSetup.Apply();
+        DecorSetup.Apply();   // trees/rocks before the NavMesh bake and the landing points
         EnemySetup.Apply();
         EnergySetup.Apply();
         SupportSetup.Apply();
