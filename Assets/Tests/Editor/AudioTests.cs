@@ -13,14 +13,15 @@ using UnityEngine.UI;
 public class AudioTests {
 
 	static readonly (SfxEvent e, float min, float max)[] Lengths = {
-		(SfxEvent.UiClick, 0.05f, 0.15f), (SfxEvent.EnergyPickup, 0.15f, 0.30f), (SfxEvent.Heal, 0.25f, 0.45f),
+		(SfxEvent.UiClick, 0.05f, 0.15f), (SfxEvent.Heal, 0.25f, 0.45f),
 		(SfxEvent.ShieldOn, 0.1f, 0.4f), (SfxEvent.ShieldBlock, 0.1f, 0.4f), (SfxEvent.ShieldOff, 0.1f, 0.4f),
 		(SfxEvent.RobotHit, 0.15f, 0.30f), (SfxEvent.CreepAttack, 0.15f, 0.35f), (SfxEvent.BossWarn, 0.2f, 0.6f),
 		(SfxEvent.BossStrike, 0.2f, 0.6f), (SfxEvent.Trap, 0.12f, 0.35f), (SfxEvent.Lose, 0.6f, 0.9f), (SfxEvent.LevelWin, 0.7f, 1.5f),
 		(SfxEvent.CampaignWin, 0.7f, 1.5f), (SfxEvent.OverdriveOn, 0.2f, 0.4f), (SfxEvent.OverdriveOff, 0.2f, 0.4f),
 	};
 
-	// Spec §8.2: one clip per event, lengths from the table, no clipping (peak <= -1 dBFS).
+	// Spec §8.2: one clip per event, lengths from the table, no clipping (peak <= -1 dBFS). The energy pickup is the
+	// team's own recording (nang_luong.mp3, ~1.9 s), so it is outside the synthesized-length table.
 	[Test]
 	public void CatalogCoversEveryEvent() {
 		AudioCatalog catalog = Resources.Load<AudioCatalog>("AudioCatalog");

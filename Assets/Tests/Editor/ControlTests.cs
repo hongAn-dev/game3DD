@@ -78,12 +78,12 @@ public class ControlTests {
 		look.OnPointerDown(Pointer(3, Vector2.zero, Vector2.zero));
 		look.OnDrag(Pointer(4, Vector2.zero, new Vector2(50f, 0f)));
 		Assert.AreEqual(Vector2.zero, look.ConsumeDelta());
-		look.OnDrag(Pointer(3, Vector2.zero, new Vector2(20f, -5f)));
-		look.OnDrag(Pointer(3, Vector2.zero, new Vector2(10f, 0f)));
+		look.OnDrag(Pointer(3, new Vector2(20f, -5f), new Vector2(20f, -5f)));
+		look.OnDrag(Pointer(3, new Vector2(30f, -5f), new Vector2(10f, 0f)));
 		Assert.AreEqual(new Vector2(30f, -5f), look.ConsumeDelta());
 		Assert.AreEqual(Vector2.zero, look.ConsumeDelta());
 		look.OnPointerUp(Pointer(3, Vector2.zero, Vector2.zero));
-		look.OnDrag(Pointer(3, Vector2.zero, new Vector2(10f, 0f)));
+		look.OnDrag(Pointer(3, new Vector2(40f, -5f), new Vector2(10f, 0f)));
 		Assert.AreEqual(Vector2.zero, look.ConsumeDelta());
 		Object.DestroyImmediate(look.gameObject);
 	}
@@ -150,9 +150,9 @@ public class ControlTests {
 		look.OnPointerDown(Pointer(-1, Vector2.zero, Vector2.zero));
 		Assert.IsTrue(look.Owned);
 		look.OnPointerDown(Pointer(5, Vector2.zero, Vector2.zero));
-		look.OnDrag(Pointer(5, Vector2.zero, new Vector2(40f, 0f)));
+		look.OnDrag(Pointer(5, new Vector2(40f, 0f), new Vector2(40f, 0f)));
 		Assert.AreEqual(Vector2.zero, look.ConsumeDelta(), "the other finger does not turn the camera");
-		look.OnDrag(Pointer(-1, Vector2.zero, new Vector2(12f, 3f)));
+		look.OnDrag(Pointer(-1, new Vector2(12f, 3f), new Vector2(12f, 3f)));
 		Assert.AreEqual(new Vector2(12f, 3f), look.ConsumeDelta());
 		look.OnPointerUp(Pointer(5, Vector2.zero, Vector2.zero));
 		Assert.IsTrue(look.Owned);
@@ -268,6 +268,26 @@ public class ControlTests {
 			ScreenShareSizer sizer = joystick.GetComponent<ScreenShareSizer>();
 			Assert.IsNotNull(sizer, level);
 			Assert.That(sizer.heightShare, Is.InRange(0.20f, 0.25f), level);
+			Assert.AreEqual(sizer.heightShare * 2f, sizer.mobileShare, 0.001f, level + " twice as big on phones");
 		}
+	}
+
+	// Playtest: swipes started with a dead zone. The movement made before uGUI's drag threshold counts too.
+	[Test]
+	public void LookDragKeepsTheMovementBeforeTheThreshold() {
+		GameFlow.ResetForScene();
+		var go = new GameObject("look");
+		TouchLookArea look = go.AddComponent<TouchLookArea>();
+		var events = new UnityEngine.EventSystems.PointerEventData(null) { pointerId = 3, button = UnityEngine.EventSystems.PointerEventData.InputButton.Left };
+		events.position = new Vector2(100f, 100f);
+		look.OnPointerDown(events);
+		events.position = new Vector2(112f, 104f);
+		events.delta = new Vector2(2f, 0f);   // what uGUI reports on the first drag event, after the threshold
+		look.OnDrag(events);
+		Assert.AreEqual(new Vector2(12f, 4f), look.ConsumeDelta());
+		events.position = new Vector2(120f, 104f);
+		look.OnDrag(events);
+		Assert.AreEqual(new Vector2(8f, 0f), look.ConsumeDelta());
+		Object.DestroyImmediate(go);
 	}
 }

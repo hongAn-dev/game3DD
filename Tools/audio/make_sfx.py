@@ -75,7 +75,7 @@ def write(name, samples):
 
 # --- UI / pickups ---
 write('ui_click', mix(tone(1800, 0.06, 0.002, 0.012), noise(0.03, 6000, 3000, 0.001, 0.006)))
-write('energy_pickup', mix(tone(1318.5, 0.22, 0.003, 0.07, 'warm'), tone(2637, 0.16, 0.003, 0.04)))
+# energy pickup: the team's recording, Assets/ThirdParty/RoboLacLoi/Audio/nang_luong.mp3
 write('heal', mix(tone(659.3, 0.18, 0.005, 0.07, 'warm'), tone(987.8, 0.22, 0.005, 0.08, 'warm'), offsets=[0, 0.14]))
 write('shield_on', mix(tone(523.3, 0.32, 0.02, 0.12, 'warm', bend=0.5), tone(1046.5, 0.3, 0.03, 0.1, bend=0.5)))
 write('shield_block', mix(tone(1568, 0.14, 0.002, 0.04), tone(784, 0.12, 0.002, 0.04, 'warm')))

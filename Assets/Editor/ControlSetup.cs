@@ -169,7 +169,9 @@ public static class ControlSetup {
 		stick.sizeDelta = new Vector2(132f, 132f);
 		stick.anchoredPosition = new Vector2(96f, 96f);
 		// Sized at runtime to ~22 % of the real canvas height (it varies with the aspect ratio); the handle follows.
-		GetOrAdd<ScreenShareSizer>(stick.gameObject).heightShare = 0.22f;
+		ScreenShareSizer sizer = GetOrAdd<ScreenShareSizer>(stick.gameObject);
+		sizer.heightShare = 0.22f;
+		sizer.mobileShare = 0.44f;   // twice as big on phones (playtest)
 		joystick.handle.anchorMin = new Vector2(0.29f, 0.29f);
 		joystick.handle.anchorMax = new Vector2(0.71f, 0.71f);
 		joystick.handle.sizeDelta = Vector2.zero;

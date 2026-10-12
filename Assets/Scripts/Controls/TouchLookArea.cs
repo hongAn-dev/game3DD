@@ -14,6 +14,7 @@ public class TouchLookArea : MonoBehaviour, IPointerDownHandler, IDragHandler, I
 	private bool owned;
 	private int activePointer;
 	private Vector2 delta;
+	private Vector2 lastPosition;
 
 	public bool Owned { get { return owned; } }
 
@@ -38,12 +39,16 @@ public class TouchLookArea : MonoBehaviour, IPointerDownHandler, IDragHandler, I
 			return;
 		owned = true;
 		activePointer = eventData.pointerId;
+		lastPosition = eventData.position;
 	}
 
 	public void OnDrag(PointerEventData eventData) {
-		// eventData.delta is already the distance moved this frame; no deltaTime scaling.
-		if (owned && eventData.pointerId == activePointer)
-			delta += eventData.delta;
+		// Measured from the last position seen, not eventData.delta: the movement made before the EventSystem's
+		// drag threshold was crossed is kept, so a swipe does not start with a dead zone and then jump.
+		if (owned && eventData.pointerId == activePointer) {
+			delta += eventData.position - lastPosition;
+			lastPosition = eventData.position;
+		}
 	}
 
 	public void OnPointerUp(PointerEventData eventData) {
