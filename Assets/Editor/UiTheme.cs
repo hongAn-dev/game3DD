@@ -447,6 +447,7 @@ public static class UiTheme {
 			EnsureTitleBackdrop(titleT.parent, theme.titleGradient);
 			title.fontSize = 170;
 			title.resizeTextForBestFit = false;
+			MenuLogo(title);
 			Transform subtitleT = titleT.parent.Find("Subtitle");
 			Text subtitle = subtitleT != null ? subtitleT.GetComponent<Text>()
 				: NewText("Subtitle", titleT.parent, fonts.medium, "HÀNH TRÌNH VỀ CĂN CỨ", 44, Muted);
@@ -471,6 +472,38 @@ public static class UiTheme {
 		changed |= Place(root, "Normal Button", 0f, new Vector2(440f, 110f), "DifficultCanvas");
 		changed |= Place(root, "Hard Button", -140f, new Vector2(440f, 110f), "DifficultCanvas");
 		return changed;
+	}
+
+	// The app logo (Tools/ui/make_app_icon.py) left of the title; logo + gap + title are centred together.
+	const float LogoSize = 210f, LogoGap = 36f;
+	static void MenuLogo(Text title) {
+		string path = "Assets/ThirdParty/RoboLacLoi/Icons/menu_logo.png";
+		TextureImporter importer = (TextureImporter)AssetImporter.GetAtPath(path);
+		if (importer.textureType != TextureImporterType.Sprite) {
+			importer.textureType = TextureImporterType.Sprite;
+			importer.alphaIsTransparency = true;
+			importer.mipmapEnabled = false;
+			importer.SaveAndReimport();
+		}
+		RectTransform titleRect = title.rectTransform;
+		Transform parent = titleRect.parent;
+		Transform existing = parent.Find("Game Logo");
+		GameObject go = existing != null ? existing.gameObject : new GameObject("Game Logo", typeof(RectTransform), typeof(Image));
+		go.transform.SetParent(parent, false);
+		Image image = go.GetComponent<Image>();
+		image.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+		image.preserveAspect = true;
+		image.raycastTarget = false;
+		float width = title.preferredWidth;
+		float shift = (LogoSize + LogoGap) / 2f;
+		Vector2 centre = new Vector2(0f, titleRect.anchoredPosition.y);
+		titleRect.anchoredPosition = centre + new Vector2(shift, 0f);
+		RectTransform rect = (RectTransform)go.transform;
+		// The title stretches over the canvas (centred text), so its centre is its offset from the canvas centre.
+		rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0.5f, 0.5f);
+		rect.sizeDelta = new Vector2(LogoSize, LogoSize);
+		rect.anchoredPosition = new Vector2(titleRect.anchoredPosition.x - width / 2f - LogoGap - LogoSize / 2f, titleRect.anchoredPosition.y);
+		go.transform.SetSiblingIndex(titleRect.GetSiblingIndex());
 	}
 
 	static bool Place(GameObject root, string name, float y, Vector2 size, string parentName = null) {
