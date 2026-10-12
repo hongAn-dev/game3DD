@@ -299,6 +299,27 @@ public class EnergySpawnDirector : MonoBehaviour {
         Vector3 from=cam.transform.position,to=point+Vector3.up*.5f; RaycastHit hit;
         return !Physics.Raycast(from,to-from,out hit,Vector3.Distance(from,to)-.3f,~0,QueryTriggerInteraction.Ignore)||hit.collider.attachedRigidbody!=null;
     }
+    /// <summary>
+    /// A free walkable point 5–9 m straight ahead of the camera, on screen and reachable (first shield fallback
+    /// when the whole energy supply takes the visible landing points).
+    /// </summary>
+    public bool TryPointAhead(float radius, out Vector3 point) {
+        point = Vector3.zero;
+        Camera cam = Camera.main;
+        if (cam == null || player == null) return false;
+        Vector3 ahead = Vector3.ProjectOnPlane(cam.transform.forward, Vector3.up).normalized;
+        HazardVolume[] hazards = FindObjectsOfType<HazardVolume>();
+        foreach (float d in new[] { 6f, 5f, 7f, 8f, 9f }) {
+            RaycastHit ground;
+            Vector3 probe = player.position + ahead * d;
+            bool g = WalkableGround.Ground(probe, out ground, hazards);
+            if (!g || registry.IsOccupied(ground.point, radius)
+                || !IsVisible(ground.point) || PathFromRobot(ground.point) == float.MaxValue) continue;
+            point = ground.point;
+            return true;
+        }
+        return false;
+    }
     public bool TryGetRiskCandidate(bool near, float minPath, float maxPath, out SpawnPoint point, out float pathLength) {
         Dictionary<SpawnPoint, float> paths;
         var candidates = GetCandidates(true, true, out paths);

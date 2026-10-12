@@ -100,7 +100,7 @@ public static class UiTheme {
 			if (changed)
 				EditorSceneManager.SaveScene(scene);
 		}
-		PlayerSettings.productName = "Robo Lac Loi";
+		PlayerSettings.productName = AppIconSetup.ProductName;
 		AssetDatabase.SaveAssets();
 		Debug.Log("UiTheme: done");
 	}
@@ -553,9 +553,12 @@ public static class UiTheme {
 			RectTransform bg = (RectTransform)back;
 			bg.anchorMin = bg.anchorMax = zoneRect.anchorMin; bg.pivot = zoneRect.pivot;
 			bg.anchoredPosition = zoneRect.anchoredPosition + new Vector2(0f, 3f);
-			bg.sizeDelta = zoneRect.sizeDelta + new Vector2(16f, 8f);
+			// As wide as the name itself, and drawn under it (it used to cover the label with a 336-wide dark bar).
+			Text zoneText = zoneT.GetComponent<Text>();
+			bg.sizeDelta = new Vector2(zoneText.preferredWidth + 20f, zoneRect.sizeDelta.y + 6f);
 			back.GetComponent<Image>().color = Panel; back.GetComponent<Image>().raycastTarget = false;
 			back.SetSiblingIndex(zoneT.GetSiblingIndex());
+			zoneT.SetSiblingIndex(back.GetSiblingIndex() + 1);
 		}
 		// "Năng lượng: 18/18" fits the 250-wide panel right of the core icon.
 		score.fontSize = 22;

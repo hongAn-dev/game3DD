@@ -30,6 +30,9 @@ public class ScreenShareSizer : MonoBehaviour {
 		float size = Size(height, Share);
 		RectTransform rect = (RectTransform)transform;
 		rect.sizeDelta = new Vector2(size, size);
-		rect.anchoredPosition = new Vector2(size * 0.75f, size * 0.75f);
+		// Centre half a stick plus a small margin from the bottom-left corner (it used to sit 0.75 sizes up,
+		// which put the twice-as-big phone stick a third of the way up the screen).
+		float margin = height * 0.05f;
+		rect.anchoredPosition = new Vector2(size * 0.5f + margin, size * 0.5f + margin);
 	}
 }

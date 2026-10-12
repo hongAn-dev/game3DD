@@ -24,6 +24,7 @@ public static class ChallengeBuildPipeline {
         HarmfulSetup.Apply();
         AudioSetup.Apply();
         UiTheme.Apply();
+        AppIconSetup.Apply();
         AssetDatabase.SaveAssets();
         Validate();
         Debug.Log("CHALLENGE_INTEGRATION_COMPLETE");
