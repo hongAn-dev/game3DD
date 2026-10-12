@@ -21,6 +21,8 @@ public class EnemyBrain : MonoBehaviour {
 	[Header("Senses")]
 	public float detectRadius = 26f;
 	public float loseRadius = 38f;
+	[Tooltip("Spawned enemies acquire a chase token immediately, even when the player is outside detectRadius.")]
+	public bool chaseFromSpawn = true;
 	public float repathInterval = 0.2f;
 	public float stuckRepath = 1.5f;
 	public float stuckReturn = 3f;
@@ -43,6 +45,7 @@ public class EnemyBrain : MonoBehaviour {
 
 	[Header("L4 guardian dash (spec §4.3): straight, locked, telegraphed strip; alternates with the slam")]
 	public bool canDash;
+	[HideInInspector] public bool finalBoss;
 	public float dashLength = 5f;
 	public float dashWidth = 1.5f;
 	public float dashSpeed = 11f;
@@ -109,6 +112,7 @@ public class EnemyBrain : MonoBehaviour {
 		recover = profile.recover;
 		canSlam = profile.slam;
 		canDash = profile.dash;
+		finalBoss = profile.finalBoss;
 		if (agent != null)
 			agent.speed = speed;
 	}
@@ -252,16 +256,22 @@ public class EnemyBrain : MonoBehaviour {
 		UpdateRunSpeed();
 		float distance = FlatDistance(target.position);
 		DistanceToTarget = distance;
+		// The final guardian is a lethal contact hazard. It does not need to
+		// complete a slam windup: touching the player ends the run immediately.
+		if (finalBoss && distance <= ContactDistance()) {
+			FinalContact();
+			return;
+		}
 
 		switch (State) {
 		case EnemyState.Idle:
-			if (distance <= detectRadius && MayChase())
+			if (ShouldChase(distance) && MayChase())
 				Enter(EnemyState.Chase);
 			else if (stateTime > 2f)
 				Enter(EnemyState.Patrol);
 			break;
 		case EnemyState.Patrol:
-			if (distance <= detectRadius && MayChase()) {
+			if (ShouldChase(distance) && MayChase()) {
 				Enter(EnemyState.Chase);
 			} else if (stateTime > 6f || (!agent.pathPending && agent.remainingDistance < 1f)) {
 				NavMeshHit hit;
@@ -273,7 +283,7 @@ public class EnemyBrain : MonoBehaviour {
 			}
 			break;
 		case EnemyState.Chase:
-			if (distance > loseRadius) {
+			if (!chaseFromSpawn && distance > loseRadius) {
 				Enter(EnemyState.Return);
 				break;
 			}
@@ -356,7 +366,7 @@ public class EnemyBrain : MonoBehaviour {
 		case EnemyState.Return:
 			Repath(false);
 			// Back home, or at least 3 s of retreat, before chasing again (no chase/retreat flapping when stuck).
-			if (distance <= detectRadius && stateTime > 3f && MayChase())
+			if (ShouldChase(distance) && stateTime > 3f && MayChase())
 				Enter(EnemyState.Chase);
 			else if (!agent.pathPending && agent.remainingDistance < 1f)
 				Enter(EnemyState.Idle);
@@ -460,6 +470,30 @@ public class EnemyBrain : MonoBehaviour {
 			return;
 		if (targetHealth.TakeDamage(damage, DamageKind.EnemyAttack) && targetHealth.healthPoints <= 0f)
 			GameFlow.ReportDeathCause(hitCause);   // only the strike that ends the run names the cause
+	}
+
+	bool ShouldChase(float distance) {
+		return chaseFromSpawn || distance <= detectRadius;
+	}
+
+	float ContactDistance() {
+		float targetRadius = 0.5f;
+		if (target != null) {
+			Collider c = target.GetComponent<Collider>();
+			if (c != null) targetRadius = Mathf.Max(c.bounds.extents.x, c.bounds.extents.z);
+		}
+		return Mathf.Max(0.55f, agent != null ? agent.radius : 0.6f) + targetRadius;
+	}
+
+	void FinalContact() {
+		if (hitDone || targetHealth == null || targetHealth.healthPoints <= 0f)
+			return;
+		hitDone = true;
+		HitAttempts++;
+		// Force a true run-ending contact even in scenes/tests that grant extra lives.
+		targetHealth.numberOfLives = 1;
+		if (targetHealth.TakeDamage(float.MaxValue, DamageKind.FatalHazard))
+			GameFlow.ReportDeathCause("Robo bị boss chạm trúng");
 	}
 
 	Vector3 FlatTo(Vector3 point) {

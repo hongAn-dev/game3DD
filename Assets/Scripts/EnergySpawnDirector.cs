@@ -6,8 +6,8 @@ using UnityEngine.AI;
 using UnityEngine.SceneManagement;
 
 /// <summary>
-/// Owns the energy supply and selects safe/risk clusters from editor-authored ground candidates. Fixed supply
-/// (playtest): target + spare cores are placed at the start and nothing spawns on a timer; cores come back only
+/// Owns the energy supply and selects safe/risk clusters from editor-authored ground candidates. A randomized
+/// target + 2..5 spare cores are placed at the start and nothing spawns on a timer; cores come back only
 /// when collected + on the map drops below the target (an anti-energy trap took one, a core was lost), so the
 /// level stays winnable. A far core nobody picks up for staleDelay seconds still moves closer.
 /// </summary>
@@ -31,6 +31,7 @@ public class EnergySpawnDirector : MonoBehaviour {
     readonly List<GameObject> inFlight = new List<GameObject>();
     float timer, nextInterval, emptyTimer, staleTimer;
     int lastScore = -1;
+    int startingSupply;
     Transform player;
     Vector3 robotPoint;
     bool robotPointValid;
@@ -40,6 +41,10 @@ public class EnergySpawnDirector : MonoBehaviour {
     internal int StartingNearSafeCandidateCount { get; private set; }
     internal float[] StartingNearSafePaths { get; private set; } = new float[0];
     public int AliveCount { get { return registry != null ? registry.Count(SpawnRegistry.SpawnCategory.Energy) : alive.Count + pending.Count; } }
+    /// <summary>Number of cores selected for this run (target + 2..5); useful for HUD/debug and QA.</summary>
+    public int StartingSupply { get { return startingSupply; } }
+    /// <summary>Runtime cap includes the largest configured random supply.</summary>
+    public int Capacity { get { return config == null ? 0 : EnergyCapacity(); } }
     public int ReservedCount { get { alive.RemoveAll(t => t == null); return registry != null ? Mathf.Max(0, registry.Count(SpawnRegistry.SpawnCategory.Energy) - alive.Count) : pending.Count; } }
 
     internal void ForceBatch() { timer = float.MaxValue; }
@@ -50,6 +55,11 @@ public class EnergySpawnDirector : MonoBehaviour {
         return Mathf.Max(0, Mathf.Min(batch, allowed - aliveCount - reservedCount));
     }
     public static int RandomBatch(int min, int max) { return Random.Range(min, max + 1); }
+    /// <summary>Returns a valid starting supply with 2–5 spare cores (inclusive by default).</summary>
+    public static int RandomSupply(int target, int minSpare, int maxSpare) {
+        int lo = Mathf.Max(0, minSpare), hi = Mathf.Max(lo, maxSpare);
+        return Mathf.Max(0, target) + Random.Range(lo, hi + 1);
+    }
     public static float PathLength(NavMeshPath path) {
         float length = 0f; Vector3[] corners = path.corners;
         for (int i = 1; i < corners.Length; i++) length += Vector3.Distance(corners[i - 1], corners[i]);
@@ -92,7 +102,8 @@ public class EnergySpawnDirector : MonoBehaviour {
     void StartingCores() {
         foreach (Treasure old in FindObjectsOfType<Treasure>()) Destroy(old.gameObject);
         alive.Clear();
-        int want = Mathf.Min(config.EnergySupply, AllowedAlive(config.energyCap, config.energyTarget, Score()));
+        startingSupply = RandomSupply(config.energyTarget, config.energySpare, config.energySpareMax);
+        int want = Mathf.Min(startingSupply, AllowedAlive(EnergyCapacity(), config.energyTarget, Score()));
         Dictionary<SpawnPoint, float> paths;
         var candidates = GetCandidates(true, true, out paths);
         StartingNearSafePaths = candidates.Where(c => !c.IsRisk && CachedPath(c, paths) >= nearPath.x && CachedPath(c, paths) <= nearPath.y)
@@ -105,9 +116,12 @@ public class EnergySpawnDirector : MonoBehaviour {
         }
     }
     int Score() { return GameManager.gm != null ? GameManager.gm.score : 0; }
+    int EnergyCapacity() {
+        return Mathf.Min(MaxAlive, Mathf.Max(config.energyCap, config.EnergySupplyMax));
+    }
     bool StartSpawn(Vector3 position) {
         int id;
-        if (!registry.TryReserve(SpawnRegistry.SpawnCategory.Energy, this, position, GroundSpawn.FootprintRadius(corePrefab), config.energyCap, out id)) return false;
+        if (!registry.TryReserve(SpawnRegistry.SpawnCategory.Energy, this, position, GroundSpawn.FootprintRadius(corePrefab), EnergyCapacity(), out id)) return false;
         pending.Add(id); StartCoroutine(SpawnAt(position, id)); return true;
     }
 
@@ -153,6 +167,7 @@ public class EnergySpawnDirector : MonoBehaviour {
         if (!robotPointValid || player == null) return result;
         EnemyBrain[] enemies = includeDynamicRisk ? FindObjectsOfType<EnemyBrain>() : new EnemyBrain[0];
         HarmfulPickup[] traps = includeDynamicRisk ? FindObjectsOfType<HarmfulPickup>() : new HarmfulPickup[0];
+        Treasure[] cores = includeDynamicRisk ? FindObjectsOfType<Treasure>() : new Treasure[0];
         HazardVolume[] hazards = FindObjectsOfType<HazardVolume>();
         float footprint = GroundSpawn.FootprintRadius(corePrefab);
         foreach (Transform t in landingPoints) {
@@ -160,7 +175,7 @@ public class EnergySpawnDirector : MonoBehaviour {
             SpawnPoint metadata = t.GetComponent<SpawnPoint>();
             if (metadata == null) metadata = t.gameObject.AddComponent<SpawnPoint>();
             if (includeDynamicRisk && OverlapsEnemyStrike(t.position, footprint, enemies)) continue;
-            metadata.dynamicRiskFlags = includeDynamicRisk ? DynamicRiskAt(t.position, enemies, traps) : SpawnRisk.None;
+            metadata.dynamicRiskFlags = includeDynamicRisk ? DynamicRiskAt(t.position, enemies, traps, cores) : SpawnRisk.None;
             if (!includeRisk && metadata.IsRisk) continue;
             if (registry.IsOccupied(t.position, footprint)) continue;
             RaycastHit ground;
@@ -259,7 +274,7 @@ public class EnergySpawnDirector : MonoBehaviour {
         }
         return true;
     }
-    SpawnRisk DynamicRiskAt(Vector3 p, EnemyBrain[] enemies, HarmfulPickup[] traps) {
+    SpawnRisk DynamicRiskAt(Vector3 p, EnemyBrain[] enemies, HarmfulPickup[] traps, Treasure[] cores = null) {
         SpawnRisk risk = SpawnRisk.None;
         foreach (EnemyBrain e in enemies) {
             if (e == null) continue;
@@ -272,6 +287,13 @@ public class EnergySpawnDirector : MonoBehaviour {
             if (trap == null) continue;
             float d = Vector3.Distance(p, trap.transform.position);
             if (d >= 1.5f && d <= 2.5f) { risk |= SpawnRisk.Trap; break; }
+        }
+        // Keep harmful pickups close to some energy drops. This also marks an energy
+        // point as a deliberate risk candidate without creating an unreachable trap.
+        if (cores != null) foreach (Treasure core in cores) {
+            if (core == null) continue;
+            float d = Vector3.Distance(p, core.transform.position);
+            if (d >= 1.8f && d <= 4.5f) { risk |= SpawnRisk.Trap; break; }
         }
         return risk;
     }
@@ -359,7 +381,7 @@ public class EnergySpawnDirector : MonoBehaviour {
         UpdateRobotPoint();
         alive.RemoveAll(t => t == null);
         int count = AliveCount, score = Score();
-        int allowed = AllowedAlive(config.energyCap, config.energyTarget, score);
+        int allowed = AllowedAlive(EnergyCapacity(), config.energyTarget, score);
         if (score != lastScore) { lastScore = score; staleTimer = 0f; }
         // Respawn only to keep the level winnable: collected + on the map must reach the target (+1 spare).
         int missing = Missing(config.energyTarget, score, count);
@@ -464,7 +486,7 @@ public class EnergySpawnDirector : MonoBehaviour {
         SpawnPoint point; float path;
         if (!TryGetCandidate(false, true, nearPath.x, nearPath.y, out point, out path)) return false;
         int id;
-        if (!registry.TryReserve(SpawnRegistry.SpawnCategory.Energy, this, point.transform.position, GroundSpawn.FootprintRadius(corePrefab), config.energyCap, out id)) return false;
+        if (!registry.TryReserve(SpawnRegistry.SpawnCategory.Energy, this, point.transform.position, GroundSpawn.FootprintRadius(corePrefab), EnergyCapacity(), out id)) return false;
         pending.Add(id); StartCoroutine(SpawnAt(point.transform.position, id)); return true;
     }
     IEnumerator SpawnAt(Vector3 point, int reservation) {
@@ -504,7 +526,7 @@ public class EnergySpawnDirector : MonoBehaviour {
         alive.Remove(far.GetComponent<Treasure>());
         Destroy(far.gameObject);
         int id;
-        if (registry.TryReserve(SpawnRegistry.SpawnCategory.Energy, this, point.transform.position, GroundSpawn.FootprintRadius(corePrefab), config.energyCap, out id)) {
+        if (registry.TryReserve(SpawnRegistry.SpawnCategory.Energy, this, point.transform.position, GroundSpawn.FootprintRadius(corePrefab), EnergyCapacity(), out id)) {
             pending.Add(id); StartCoroutine(SpawnAt(point.transform.position, id));
         }
     }

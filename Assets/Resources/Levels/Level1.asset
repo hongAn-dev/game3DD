@@ -19,7 +19,8 @@ MonoBehaviour:
   energyTarget: 6
   energyAtStart: 8
   energySpare: 2
-  energyCap: 8
+  energySpareMax: 5
+  energyCap: 11
   energyIntervalMin: 1.5
   energyIntervalMax: 2
   energyBatchMin: 2

@@ -52,6 +52,8 @@ public class ControlTests {
 
 		joystick.OnDrag(Pointer(2, new Vector2(-80f, 0f), Vector2.zero));
 		Assert.AreEqual(held, joystick.inputVector);
+		joystick.OnCancel(Pointer(2, Vector2.zero, Vector2.zero));
+		Assert.IsTrue(joystick.Owned, "cancelling another pointer must not cancel the active joystick finger");
 		joystick.OnPointerUp(Pointer(2, Vector2.zero, Vector2.zero));
 		Assert.AreEqual(held, joystick.inputVector);
 		joystick.OnPointerUp(Pointer(1, Vector2.zero, Vector2.zero));
@@ -152,6 +154,8 @@ public class ControlTests {
 		look.OnPointerDown(Pointer(5, Vector2.zero, Vector2.zero));
 		look.OnDrag(Pointer(5, new Vector2(40f, 0f), new Vector2(40f, 0f)));
 		Assert.AreEqual(Vector2.zero, look.ConsumeDelta(), "the other finger does not turn the camera");
+		look.OnCancel(Pointer(5, Vector2.zero, Vector2.zero));
+		Assert.IsTrue(look.Owned, "cancelling another pointer must not cancel the active camera finger");
 		look.OnDrag(Pointer(-1, new Vector2(12f, 3f), new Vector2(12f, 3f)));
 		Assert.AreEqual(new Vector2(12f, 3f), look.ConsumeDelta());
 		look.OnPointerUp(Pointer(5, Vector2.zero, Vector2.zero));
@@ -159,6 +163,65 @@ public class ControlTests {
 		look.OnPointerUp(Pointer(-1, Vector2.zero, Vector2.zero));
 		Assert.IsFalse(look.Owned);
 		Object.DestroyImmediate(look.gameObject);
+	}
+
+	[Test]
+	public void LookAreaExcludesMovementJoystickRegion() {
+		GameFlow.ResetForScene();
+		FixedJoystick joystick = MakeJoystick();
+		TouchLookArea look = new GameObject("Look", typeof(RectTransform)).AddComponent<TouchLookArea>();
+
+		// The look graphic may overlap the joystick on a device with a different aspect ratio. The
+		// joystick's screen rectangle still wins, so a movement finger cannot also rotate the camera.
+		look.OnPointerDown(Pointer(7, new Vector2(80f, 0f), Vector2.zero));
+		Assert.IsFalse(look.Owned);
+
+		look.OnPointerDown(Pointer(7, new Vector2(250f, 250f), Vector2.zero));
+		Assert.IsTrue(look.Owned);
+		look.OnPointerUp(Pointer(7, Vector2.zero, Vector2.zero));
+		Object.DestroyImmediate(look.gameObject);
+		Object.DestroyImmediate(joystick.gameObject);
+	}
+
+	[Test]
+	public void LookAreaRejectsJoystickRaycastTarget() {
+		GameFlow.ResetForScene();
+		FixedJoystick joystick = MakeJoystick();
+		GameObject child = new GameObject("Joystick Graphic", typeof(RectTransform));
+		child.transform.SetParent(joystick.transform, false);
+		TouchLookArea look = new GameObject("Look", typeof(RectTransform)).AddComponent<TouchLookArea>();
+		PointerEventData pointer = Pointer(8, new Vector2(300f, 300f), Vector2.zero);
+		pointer.pointerPressRaycast = new RaycastResult { gameObject = child };
+		look.OnPointerDown(pointer);
+		Assert.IsFalse(look.Owned);
+		Object.DestroyImmediate(look.gameObject);
+		Object.DestroyImmediate(joystick.gameObject);
+	}
+
+	[Test]
+	public void LookAreaResetsWhenDragIsCancelled() {
+		GameFlow.ResetForScene();
+		TouchLookArea look = new GameObject("Look", typeof(RectTransform)).AddComponent<TouchLookArea>();
+		look.OnPointerDown(Pointer(9, Vector2.zero, Vector2.zero));
+		look.OnDrag(Pointer(9, new Vector2(40f, 10f), Vector2.zero));
+		look.OnEndDrag(Pointer(9, new Vector2(40f, 10f), Vector2.zero));
+		Assert.IsFalse(look.Owned);
+		Assert.AreEqual(Vector2.zero, look.ConsumeDelta());
+		Object.DestroyImmediate(look.gameObject);
+	}
+
+	[Test]
+	public void OrbitResetDropsQueuedLook() {
+		GameFlow.ResetForScene();
+		GameObject target = new GameObject("Orbit Target");
+		GameObject camera = new GameObject("Orbit Camera");
+		ThirdPersonOrbitCamera orbit = camera.AddComponent<ThirdPersonOrbitCamera>();
+		orbit.target = target.transform;
+		orbit.AddLook(new Vector2(500f, 0f));
+		orbit.ResetInput();
+		Assert.AreEqual(0f, orbit.yaw, 0.001f);
+		Object.DestroyImmediate(camera);
+		Object.DestroyImmediate(target);
 	}
 
 	static readonly string[] Tuning = { "m_MaxSpeed", "m_AccelerationRate", "m_Brake", "m_UseTorque" };

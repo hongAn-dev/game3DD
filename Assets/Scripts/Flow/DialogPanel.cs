@@ -12,6 +12,8 @@ public class DialogPanel : MonoBehaviour {
 	public RectTransform box;
 	public Text title;
 	public Text body;
+	/// <summary>Optional visual for guide pages. Older scenes leave this unset; it is created at runtime.</summary>
+	public Image illustration;
 	public Button backButton;
 	public Button skipButton;
 	public Button nextButton;
@@ -51,6 +53,21 @@ public class DialogPanel : MonoBehaviour {
 		startButton.GetComponentInChildren<Text>(true).text = finishLabel;
 		gameObject.SetActive(true);
 		Render();
+	}
+
+	void EnsureIllustration() {
+		if (illustration != null || box == null)
+			return;
+		GameObject go = new GameObject("Dialog Illustration", typeof(RectTransform), typeof(Image));
+		go.transform.SetParent(box, false);
+		illustration = go.GetComponent<Image>();
+		RectTransform rect = (RectTransform)go.transform;
+		rect.anchorMin = rect.anchorMax = new Vector2(1f, 0.5f);
+		rect.pivot = new Vector2(1f, 0.5f);
+		rect.anchoredPosition = new Vector2(-48f, 0f);
+		rect.sizeDelta = new Vector2(260f, 260f);
+		illustration.preserveAspect = true;
+		illustration.raycastTarget = false;
 	}
 
 	public void Next() {
@@ -98,9 +115,20 @@ public class DialogPanel : MonoBehaviour {
 	}
 
 	void Render() {
+		EnsureIllustration();
 		shownAt = Time.unscaledTime;
 		title.text = pages[page].title;
 		body.text = pages[page].body;
+		if (illustration != null) {
+			Sprite sprite = string.IsNullOrEmpty(pages[page].illustrationKey)
+				? null : Resources.Load<Sprite>("GuideSprites/" + pages[page].illustrationKey);
+			illustration.sprite = sprite;
+			illustration.gameObject.SetActive(sprite != null);
+			// Reserve the right side for the visual so explanatory text never runs underneath it.
+			body.rectTransform.sizeDelta = sprite != null ? new Vector2(980f, body.rectTransform.sizeDelta.y) : new Vector2(1300f, body.rectTransform.sizeDelta.y);
+			body.rectTransform.anchoredPosition = sprite != null ? new Vector2(-150f, body.rectTransform.anchoredPosition.y) : new Vector2(0f, body.rectTransform.anchoredPosition.y);
+			FitBodyText();
+		}
 		bool last = page == pages.Length - 1;
 		backButton.gameObject.SetActive(page > 0);
 		skipButton.gameObject.SetActive(skipCloses ? !last : skipTo >= 0 && page < skipTo);
@@ -109,5 +137,20 @@ public class DialogPanel : MonoBehaviour {
 		// Keyboard/gamepad players land on the forward button.
 		if (EventSystem.current != null)
 			EventSystem.current.SetSelectedGameObject((last ? startButton : nextButton).gameObject);
+	}
+
+	void FitBodyText() {
+		if (body == null)
+			return;
+		int original = body.fontSize;
+		TextGenerationSettings settings = body.GetGenerationSettings(body.rectTransform.sizeDelta);
+		for (int size = original; size >= 28; size--) {
+			body.fontSize = size;
+			settings.fontSize = size;
+			float height = new TextGenerator().GetPreferredHeight(body.text, settings) / body.pixelsPerUnit;
+			if (height <= body.rectTransform.sizeDelta.y)
+				return;
+		}
+		body.fontSize = 28;
 	}
 }

@@ -63,6 +63,14 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
 		pendingLook += deltaPixels;
 	}
 
+	/// <summary>Discards queued touch/mouse look input. Used when focus, pause, or scene state changes so a
+	/// stale drag cannot rotate the camera when gameplay resumes.</summary>
+	public void ResetInput() {
+		pendingLook = Vector2.zero;
+		if (TouchLookArea.Current != null)
+			TouchLookArea.Current.ResetInput();
+	}
+
 	void LateUpdate() {
 		if (target == null)
 			return;
@@ -70,9 +78,7 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
 		if (GameFlow.IsGameplayActive) {
 			ReadInput();
 		} else {
-			pendingLook = Vector2.zero;
-			if (TouchLookArea.Current != null)
-				TouchLookArea.Current.ConsumeDelta();
+			ResetInput();
 		}
 
 		// yaw/pitch are the input targets; the view eases toward them (frame-rate independent).
@@ -117,6 +123,20 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
 		float scroll = Input.GetAxis("Mouse ScrollWheel");
 		if (scroll != 0f)
 			distance = Mathf.Clamp(distance * (1f - scroll * zoomSpeed), minDistance, maxDistance);
+	}
+
+	void OnDisable() {
+		ResetInput();
+	}
+
+	void OnApplicationFocus(bool focused) {
+		if (!focused)
+			ResetInput();
+	}
+
+	void OnApplicationPause(bool paused) {
+		if (paused)
+			ResetInput();
 	}
 
 	// Distance along 'back' that stays in front of the nearest static obstacle. Ignores triggers, the target and

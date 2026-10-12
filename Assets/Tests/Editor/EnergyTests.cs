@@ -57,13 +57,15 @@ public class EnergyTests {
 	// Spec §5.1, same on every difficulty.
 	[Test]
 	public void EnergyConfigFollowsTheTable() {
-		int[] target = { 6, 10, 14, 18 }, atStart = { 8, 12, 16, 20 }, cap = { 8, 12, 16, 20 }, batchMin = { 2, 3, 4, 5 }, batchMax = { 3, 4, 6, 7 };
+		int[] target = { 6, 10, 14, 18 }, atStart = { 8, 12, 16, 20 }, cap = { 11, 15, 19, 23 }, batchMin = { 2, 3, 4, 5 }, batchMax = { 3, 4, 6, 7 };
 		float[] intervalMin = { 1.5f, 1f, .8f, .8f }, intervalMax = { 2f, 1.5f, 1.2f, 1f };
 		for (int i = 0; i < 4; i++) {
 			LevelConfig c = LevelCatalog.All[i];
 			Assert.AreEqual(target[i], c.energyTarget, c.levelId);
 			Assert.AreEqual(atStart[i], c.energyAtStart, c.levelId);
-			Assert.AreEqual(target[i] + 2, c.EnergySupply, c.levelId + " fixed supply: target + 2");
+			Assert.AreEqual(target[i] + 2, c.EnergySupplyMin, c.levelId + " minimum supply: target + 2");
+			Assert.AreEqual(target[i] + 5, c.EnergySupplyMax, c.levelId + " maximum supply: target + 5");
+			Assert.AreEqual(5, c.energySpareMax, c.levelId + " random spare upper bound");
 			Assert.AreEqual(cap[i], c.energyCap, c.levelId);
 			Assert.AreEqual(intervalMin[i], c.energyIntervalMin, 0.001f, c.levelId);
 			Assert.AreEqual(intervalMax[i], c.energyIntervalMax, 0.001f, c.levelId);
@@ -86,6 +88,20 @@ public class EnergyTests {
 		Assert.AreEqual(0, EnergySpawnDirector.SpawnCount(3, 2, 2, 0));
 		Assert.AreEqual(0, EnergySpawnDirector.SpawnCount(3, 2, 1, 2), "reservations count");
 		Assert.AreEqual(2, EnergySpawnDirector.SpawnCount(2, 8, 3, 1));
+	}
+
+	[Test]
+	public void RandomSupplyStaysWithinTargetPlusTwoToFive() {
+		Random.InitState(12345);
+		int min = int.MaxValue, max = int.MinValue;
+		for (int i = 0; i < 2000; i++) {
+			int supply = EnergySpawnDirector.RandomSupply(18, 2, 5);
+			min = Mathf.Min(min, supply);
+			max = Mathf.Max(max, supply);
+		}
+		Assert.That(min, Is.GreaterThanOrEqualTo(20));
+		Assert.That(max, Is.LessThanOrEqualTo(23));
+		Assert.AreEqual(18, EnergySpawnDirector.RandomSupply(18, 0, 0));
 	}
 
 	[Test]

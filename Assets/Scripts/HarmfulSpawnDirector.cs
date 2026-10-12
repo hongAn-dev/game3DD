@@ -26,8 +26,16 @@ public class HarmfulSpawnDirector : MonoBehaviour {
         energy=GetComponent<EnergySpawnDirector>(); registry=SpawnRegistry.Current!=null?SpawnRegistry.Current:GetComponent<SpawnRegistry>();
         if(config==null||energy==null||registry==null||config.harmfulCap<=0){enabled=false;return;}
         GameFlow.Changed+=OnFlowChanged;
-        for(int i=0;i<config.harmfulAtStart&&i<config.harmfulCap;i++) TrySpawn(RandomKind(), true);
+        // Energy cores are created by their director in Start. Wait one frame so
+        // initial penalties can deliberately surround real drops instead of falling
+        // back to an arbitrary risk point when script execution order changes.
+        StartCoroutine(SpawnInitial());
         Schedule();
+    }
+    IEnumerator SpawnInitial() {
+        yield return null;
+        for(int i=0;i<config.harmfulAtStart&&i<config.harmfulCap;i++)
+            TrySpawn(RandomKind(), true);
     }
     void OnDestroy() { GameFlow.Changed-=OnFlowChanged; if(Current==this)Current=null; if(registry!=null)registry.ReleaseOwner(this); }
     void OnDisable() { CancelPending(); }

@@ -19,6 +19,7 @@ public struct EnemyProfile {
 	public float windup, windupMax, strike, recover;
 	public bool slam;   // guardian slam (all bosses)
 	public bool dash;   // Level4 guardian also dashes
+	public bool finalBoss; // Level4 contact is lethal, even before the attack windup
 
 	public static EnemyProfile For(LevelConfig config, GameSettings.gameDifficulties difficulty, bool boss) {
 		int d = (int)difficulty;
@@ -32,6 +33,7 @@ public struct EnemyProfile {
 			p.recover = config.bossRecover > 0f ? config.bossRecover : BossRecover;
 			p.slam = true;
 			p.dash = config.order >= 4;
+			p.finalBoss = config.IsFinal || config.order >= 4;
 		} else {
 			float easy = difficulty == GameSettings.gameDifficulties.Easy ? EasyExtraWindup : 0f;
 			p.windup = config.creepWindup + easy;

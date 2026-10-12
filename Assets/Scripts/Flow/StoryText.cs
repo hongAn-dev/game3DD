@@ -1,13 +1,21 @@
 using System.Collections.Generic;
 
-/// <summary>One dialog page: a title and its full text.</summary>
+/// <summary>One dialog page: a title, full text, and optional visual from Resources/GuideSprites.</summary>
 public struct StoryPage {
 	public string title;
 	public string body;
+	public string illustrationKey;
 
 	public StoryPage(string title, string body) {
 		this.title = title;
 		this.body = body;
+		this.illustrationKey = "";
+	}
+
+	public StoryPage(string title, string body, string illustrationKey) {
+		this.title = title;
+		this.body = body;
+		this.illustrationKey = illustrationKey ?? "";
 	}
 }
 
@@ -29,17 +37,22 @@ public static class StoryText {
 	static readonly StoryPage[] Basics = {
 		new StoryPage("Robo lạc lối", "Sau một sự cố, Robo bị mắc kẹt trên một hành tinh xa lạ. Hãy cùng Robo vượt qua bốn khu vực, thu thập năng lượng để khởi động lại phi thuyền và tìm đường trở về."),
 		new StoryPage("Di chuyển và quan sát", "Kéo cần điều khiển ở góc dưới bên trái để di chuyển Robo. Vuốt vùng trống bên phải màn hình để nhìn xung quanh. Bạn có thể dùng hai tay cùng lúc để vừa di chuyển, vừa quan sát đường đi."),
-		new StoryPage("Thu thập năng lượng", "Hãy nhặt những viên năng lượng phát sáng trên đường đi. Thu thập đủ số viên được yêu cầu để qua màn. Hoàn thành cả bốn màn chơi sẽ giúp Robo có đủ năng lượng khởi động phi thuyền và rời khỏi hành tinh."),
-		new StoryPage("Bảo vệ Robo", "Robo bắt đầu mỗi màn chơi với 100 HP. Mỗi lần bị quái vật đánh trúng, Robo sẽ mất một phần máu; khi máu về 0, bạn sẽ thua. Bạn cũng sẽ thua ngay nếu Robo rơi khỏi đất liền, xuống axit hoặc dung nham, dù vẫn còn máu."),
-		new StoryPage("Vật phẩm hỗ trợ", "Nhặt vật phẩm hồi máu để hồi 10 hoặc 20 HP, tùy loại. Nhặt khiên sẽ giúp Robo chặn đòn từ quái vật trong 5 giây. Tuy nhiên, khiên không thể bảo vệ Robo nếu rơi khỏi đất liền, xuống axit hoặc dung nham."),
+		new StoryPage("Thu thập năng lượng", "Hãy nhặt những viên năng lượng phát sáng trên đường đi. Thu thập đủ số viên được yêu cầu để qua màn. Hoàn thành cả bốn màn chơi sẽ giúp Robo có đủ năng lượng khởi động phi thuyền và rời khỏi hành tinh.", "core_icon"),
+		new StoryPage("Bảo vệ Robo", "Robo bắt đầu mỗi màn chơi với 100 HP. Mỗi lần bị quái vật đánh trúng, Robo sẽ mất một phần máu; khi máu về 0, bạn sẽ thua. Bạn cũng sẽ thua ngay nếu Robo rơi khỏi đất liền, xuống axit hoặc dung nham, dù vẫn còn máu.", "boss_icon"),
+		new StoryPage("Vật phẩm hỗ trợ", "Nhặt vật phẩm hồi máu để hồi 10 hoặc 20 HP, tùy loại. Nhặt khiên sẽ giúp Robo chặn đòn từ quái vật trong 5 giây. Tuy nhiên, khiên không thể bảo vệ Robo nếu rơi khỏi đất liền, xuống axit hoặc dung nham.", "shield_icon"),
 	};
 
 	// Extra pages for the main menu's "Hướng dẫn chơi" review.
 	static readonly StoryPage[] GuideExtras = {
-		new StoryPage("Vật phẩm nguy hiểm", "Hãy tránh ba loại vật phẩm gây hại trên đường đi. Hóa chất độc hại sẽ làm Robo mất máu. Phản năng lượng màu cam đỏ sẽ lấy đi 1 viên năng lượng bạn đã thu trong màn hiện tại. Từ trường nhiễu màu tím sẽ làm Robo chậm lại trong 3 giây. Khiên chỉ chặn sát thương của hóa chất, không ngăn được hai hiệu ứng còn lại."),
-		new StoryPage("Vật phẩm tăng tốc", "Từ màn thứ hai, bạn có thể gặp vật phẩm tăng tốc. Khi nhặt được, Robo sẽ di chuyển nhanh hơn trong 5 giây, giúp bạn thoát khỏi quái vật hoặc đến kịp những viên năng lượng ở xa."),
+		new StoryPage("Quái vật và boss", "Creep là quái nhỏ, di chuyển nhanh và đuổi Robo khi xuất hiện. Vệ binh là boss lớn, có vùng cảnh báo trước đòn đánh và tìm Robo dù ở xa. Ở màn cuối, chỉ một lần chạm vào boss cũng khiến Robo chết ngay.", "boss_icon"),
+		new StoryPage("Hồi HP và khiên", "Dấu cộng màu xanh hồi HP cho Robo; khiên giúp chặn sát thương từ quái vật trong thời gian ngắn. Dấu trừ màu đỏ là cảnh báo mất HP, còn tia sét tím báo hiệu Robo đang bị giảm tốc.", "hp_plus"),
+		new StoryPage("Vật phẩm nguy hiểm", "Hãy tránh ba loại vật phẩm gây hại trên đường đi. Hóa chất độc hại sẽ làm Robo mất máu. Phản năng lượng màu cam đỏ sẽ lấy đi 1 viên năng lượng bạn đã thu trong màn hiện tại. Từ trường nhiễu màu tím sẽ làm Robo chậm lại trong 3 giây. Khiên chỉ chặn sát thương của hóa chất, không ngăn được hai hiệu ứng còn lại.", "trap_poison"),
+		new StoryPage("Vật phẩm tăng tốc", "Từ màn thứ hai, bạn có thể gặp vật phẩm tăng tốc. Khi nhặt được, Robo sẽ di chuyển nhanh hơn trong 5 giây, giúp bạn thoát khỏi quái vật hoặc đến kịp những viên năng lượng ở xa.", "overdrive_icon"),
 		new StoryPage("Âm thanh và tạm dừng", "Nút SFX hình loa ở góc trên bên phải bật hoặc tắt hiệu ứng âm thanh và âm thanh môi trường. Nút BGM hình nốt nhạc bật hoặc tắt riêng nhạc nền. Nút tạm dừng ngay bên cạnh sẽ dừng trò chơi; khi đó bạn có thể chọn Tiếp tục hoặc Thoát về menu. Âm lượng nhạc nền, hiệu ứng và âm thanh môi trường có thể chỉnh trong phần Cài đặt ở menu chính."),
 	};
+
+	public static readonly StoryPage BossIntro = new StoryPage("Vệ binh cuối cùng",
+		"Đây là Vệ binh cuối cùng của bãi phóng. Boss tự tìm Robo trên toàn bản đồ, gây sát thương rất lớn và Robo sẽ chết ngay khi chạm vào nó. Hãy quan sát vùng cảnh báo màu đỏ, giữ khoảng cách và chỉ tiếp tục khi đã sẵn sàng.", "boss_icon");
 
 	static readonly Dictionary<string, string> Leads = new Dictionary<string, string> {
 		{ "Level1", "Robo tỉnh dậy trên một hòn đảo xa lạ, xung quanh là vùng axit nguy hiểm. Những viên năng lượng rải rác trên đảo là hy vọng đầu tiên để Robo tìm đường trở về." },
@@ -81,6 +94,8 @@ public static class StoryText {
 
 	/// <summary>New Game tutorial: five pages, then the first level's card as page 6.</summary>
 	public static StoryPage[] LevelCards(LevelConfig level) {
+		if (level.IsFinal)
+			return new[] { LevelCard(level), BossIntro };
 		if (level.levelId != "Level2")
 			return new[] { LevelCard(level) };
 		return new[] { LevelCard(level), new StoryPage("Cẩn thận với vật phẩm nguy hiểm", "Từ khu vực này, hãy cẩn thận với Hóa chất độc hại, Phản năng lượng và Từ trường nhiễu. Chúng có thể làm bạn mất máu, mất năng lượng đã thu hoặc di chuyển chậm lại. Những cụm năng lượng gần quái vật hoặc mép đất có thể giúp bạn thu thập nhanh hơn, nhưng hãy cân nhắc trước khi tiến tới.") };

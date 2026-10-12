@@ -47,10 +47,30 @@ public class StoryTests {
 	public void DangerousItemsAndL2AdviceStayComplete() {
 		StoryPage page = StoryText.Guide().Single(p => p.title == "Vật phẩm nguy hiểm");
 		StringAssert.Contains("Khiên chỉ chặn sát thương của hóa chất", page.body);
+		Assert.AreEqual("trap_poison", page.illustrationKey);
+		Assert.IsNotNull(Resources.Load<Sprite>("GuideSprites/trap_poison"));
 		StoryPage[] cards = StoryText.LevelCards(LevelCatalog.Get("Level2"));
 		Assert.AreEqual(2, cards.Length);
 		StringAssert.Contains("Những cụm năng lượng gần quái vật hoặc mép đất", cards[1].body);
 		StringAssert.EndsWith("trước khi tiến tới.", cards[1].body);
+	}
+
+	[Test]
+	public void FinalLevelIntroducesBossWithIllustration() {
+		StoryPage[] cards = StoryText.LevelCards(LevelCatalog.Get("Level4"));
+		Assert.AreEqual(2, cards.Length);
+		Assert.AreEqual("Vệ binh cuối cùng", cards[1].title);
+		StringAssert.Contains("chết ngay khi chạm vào", cards[1].body);
+		Assert.AreEqual("boss_icon", cards[1].illustrationKey);
+		Assert.IsNotNull(Resources.Load<Sprite>("GuideSprites/boss_icon"));
+	}
+
+	[Test]
+	public void GuideIllustrationsResolveToRuntimeSprites() {
+		foreach (StoryPage page in StoryText.Tutorial(LevelCatalog.Get("Level1")).Concat(StoryText.Guide()).Concat(StoryText.LevelCards(LevelCatalog.Get("Level4")))) {
+			if (!string.IsNullOrEmpty(page.illustrationKey))
+				Assert.IsNotNull(Resources.Load<Sprite>("GuideSprites/" + page.illustrationKey), page.title);
+		}
 	}
 
 	static string[] AllTexts() {

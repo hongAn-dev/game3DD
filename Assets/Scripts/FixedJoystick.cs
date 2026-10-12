@@ -6,7 +6,10 @@ using UnityEngine.EventSystems;
 /// magnitude (dead zone remapped, clamped to 1) and it resets on release, disable, focus loss, pause and whenever
 /// gameplay is not Playing (pause, dialogs, death, win, scene change).
 /// </summary>
-public class FixedJoystick : Joystick {
+public class FixedJoystick : Joystick, ICancelHandler {
+	/// <summary>Currently enabled fixed joystick. Touch look uses this to keep its hit area excluded even if
+	/// a canvas has overlapping transparent graphics.</summary>
+	public static FixedJoystick Current { get; private set; }
 
 	[Header("Fixed Joystick")]
 	[Range(0f, 0.5f)] public float deadZone = 0.1f;
@@ -16,6 +19,11 @@ public class FixedJoystick : Joystick {
 	private int activePointer;
 
 	public bool Owned { get { return owned; } }
+
+	/// <summary>Screen-space region reserved for movement input.</summary>
+	public RectTransform InputRegion {
+		get { return background != null ? background : transform as RectTransform; }
+	}
 
 	/// <summary>Local point inside the background (pixels from its centre) to a stick vector of magnitude 0..1.</summary>
 	public static Vector2 ToInput(Vector2 local, float radius, float deadZone) {
@@ -47,6 +55,12 @@ public class FixedJoystick : Joystick {
 			ResetInput();
 	}
 
+	public void OnCancel(BaseEventData eventData) {
+		PointerEventData pointer = eventData as PointerEventData;
+		if (pointer == null || !owned || pointer.pointerId == activePointer)
+			ResetInput();
+	}
+
 	void Steer(PointerEventData eventData) {
 		Vector2 local;
 		if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(background, eventData.position, eventData.pressEventCamera, out local))
@@ -70,6 +84,12 @@ public class FixedJoystick : Joystick {
 
 	void OnDisable() {
 		ResetInput();
+		if (Current == this)
+			Current = null;
+	}
+
+	void OnEnable() {
+		Current = this;
 	}
 
 	void OnApplicationFocus(bool focused) {

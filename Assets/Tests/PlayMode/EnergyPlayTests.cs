@@ -55,11 +55,12 @@ public class EnergyPlayTests {
 	public IEnumerator StartsWithConfiguredCores() {
 		foreach (string level in new[] { "Level1", "Level2", "Level3", "Level4" }) {
 			yield return Load(level, GameSettings.gameDifficulties.Easy);
-			int expected = LevelCatalog.Get(level).energyAtStart;
+			LevelConfig config = LevelCatalog.Get(level);
 			director.intervalOverride = 1000f;
 			yield return new WaitForSeconds(GroundSpawn.ScaleInDuration + 0.05f);
-			Assert.AreEqual(expected, director.AliveCount, level + ": starting budget after scale-in");
-			Assert.AreEqual(expected, Object.FindObjectsOfType<Treasure>().Length, level + ": visible starting cores");
+			Assert.That(director.StartingSupply, Is.InRange(config.EnergySupplyMin, config.EnergySupplyMax), level + ": target + 2..5 supply");
+			Assert.AreEqual(director.StartingSupply, director.AliveCount, level + ": starting budget after scale-in");
+			Assert.AreEqual(director.StartingSupply, Object.FindObjectsOfType<Treasure>().Length, level + ": visible starting cores");
 		}
 	}
 
@@ -81,14 +82,15 @@ public class EnergyPlayTests {
 	public IEnumerator NeverExceedsCapWithBatches() {
 		yield return Load("Level4", GameSettings.gameDifficulties.Normal);
 		director.intervalOverride = 0.2f;
-		int cap = Mathf.Min(LevelCatalog.Get("Level4").energyCap, EnergySpawnDirector.MaxAlive), max = 0;
+		int cap = director.Capacity, max = 0;
 		float end = Time.time + 4f;
 		while (Time.time < end) {
 			max = Mathf.Max(max, director.AliveCount);
 			Assert.LessOrEqual(director.AliveCount, cap);
 			yield return null;
 		}
-		Assert.AreEqual(cap, max, "fills up to the cap");
+		Assert.That(max, Is.InRange(LevelCatalog.Get("Level4").EnergySupplyMin, LevelCatalog.Get("Level4").EnergySupplyMax), "random starting supply stays in range");
+		Assert.AreEqual(director.StartingSupply, max, "no extra cores are needed while net energy is already sufficient");
 	}
 
 	[UnityTest]
@@ -96,14 +98,14 @@ public class EnergyPlayTests {
 		yield return Load("Level4", GameSettings.gameDifficulties.Normal);
 		yield return new WaitForSeconds(1.5f);
 		LevelConfig config = LevelCatalog.Get("Level4");
-		Assert.AreEqual(config.energyTarget + 2, director.AliveCount, "playtest: need 18, 20 on the map");
+		Assert.That(director.AliveCount, Is.InRange(config.EnergySupplyMin, config.EnergySupplyMax), "playtest: target + 2..5 on the map");
 		Treasure[] spawned = Object.FindObjectsOfType<Treasure>();
 		int clusters = spawned.Select(item => director.landingPoints
 			.OrderBy(point => Vector3.Distance(point.position, item.transform.position)).First()
 			.GetComponent<SpawnPoint>().clusterId).Distinct().Count();
 		Assert.GreaterOrEqual(clusters, 4, "spread over the map");
 		yield return new WaitForSeconds(4f);
-		Assert.AreEqual(config.energyTarget + 2, director.AliveCount, "nothing more spawns on a timer");
+		Assert.That(director.AliveCount, Is.InRange(config.EnergySupplyMin, config.EnergySupplyMax), "nothing more spawns on a timer");
 	}
 
 	[UnityTest]

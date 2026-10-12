@@ -16,8 +16,12 @@ public class LevelConfig : ScriptableObject {
 	public int energyAtStart;
 	[Tooltip("Cores on the map beyond the target (fixed supply: target + spare, all placed at the start).")]
 	public int energySpare = 2;
+	[Tooltip("Upper bound for the random spare supply. A level always starts with target + [min,max] cores.")]
+	public int energySpareMax = 5;
 	/// <summary>Cores placed at the start of the level.</summary>
 	public int EnergySupply { get { return energyTarget + energySpare; } }
+	public int EnergySupplyMin { get { return energyTarget + Mathf.Max(0, energySpare); } }
+	public int EnergySupplyMax { get { return energyTarget + Mathf.Max(Mathf.Max(0, energySpare), energySpareMax); } }
 	public int energyCap;
 	public float energyIntervalMin;
 	public float energyIntervalMax;
