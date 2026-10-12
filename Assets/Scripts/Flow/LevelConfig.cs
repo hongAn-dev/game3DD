@@ -14,6 +14,10 @@ public class LevelConfig : ScriptableObject {
 	[Header("Energy (one core = +1)")]
 	public int energyTarget;
 	public int energyAtStart;
+	[Tooltip("Cores on the map beyond the target (fixed supply: target + spare, all placed at the start).")]
+	public int energySpare = 2;
+	/// <summary>Cores placed at the start of the level.</summary>
+	public int EnergySupply { get { return energyTarget + energySpare; } }
 	public int energyCap;
 	public float energyIntervalMin;
 	public float energyIntervalMax;

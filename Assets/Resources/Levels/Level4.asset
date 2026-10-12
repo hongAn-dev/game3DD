@@ -17,8 +17,9 @@ MonoBehaviour:
   displayName: "B\xE3i ph\xF3ng b\u1ECF hoang"
   nextScene: Ending
   energyTarget: 18
-  energyAtStart: 16
-  energyCap: 24
+  energyAtStart: 20
+  energySpare: 2
+  energyCap: 20
   energyIntervalMin: 0.8
   energyIntervalMax: 1
   energyBatchMin: 5

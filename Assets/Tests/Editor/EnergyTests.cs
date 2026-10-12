@@ -57,12 +57,13 @@ public class EnergyTests {
 	// Spec §5.1, same on every difficulty.
 	[Test]
 	public void EnergyConfigFollowsTheTable() {
-		int[] target = { 6, 10, 14, 18 }, atStart = { 4, 8, 12, 16 }, cap = { 6, 12, 18, 24 }, batchMin = { 2, 3, 4, 5 }, batchMax = { 3, 4, 6, 7 };
+		int[] target = { 6, 10, 14, 18 }, atStart = { 8, 12, 16, 20 }, cap = { 8, 12, 16, 20 }, batchMin = { 2, 3, 4, 5 }, batchMax = { 3, 4, 6, 7 };
 		float[] intervalMin = { 1.5f, 1f, .8f, .8f }, intervalMax = { 2f, 1.5f, 1.2f, 1f };
 		for (int i = 0; i < 4; i++) {
 			LevelConfig c = LevelCatalog.All[i];
 			Assert.AreEqual(target[i], c.energyTarget, c.levelId);
 			Assert.AreEqual(atStart[i], c.energyAtStart, c.levelId);
+			Assert.AreEqual(target[i] + 2, c.EnergySupply, c.levelId + " fixed supply: target + 2");
 			Assert.AreEqual(cap[i], c.energyCap, c.levelId);
 			Assert.AreEqual(intervalMin[i], c.energyIntervalMin, 0.001f, c.levelId);
 			Assert.AreEqual(intervalMax[i], c.energyIntervalMax, 0.001f, c.levelId);
@@ -190,5 +191,14 @@ public class EnergyTests {
 			EditorSceneManager.OpenScene("Assets/Scenes/" + level.levelId + ".unity", OpenSceneMode.Single);
 			Assert.AreEqual(0, Object.FindObjectsOfType<Treasure>(true).Length, level.levelId + ": cores come from the director only");
 		}
+	}
+
+	// Playtest: respawn only keeps the level winnable (collected + on the map back to target + 1).
+	[Test]
+	public void RespawnOnlyWhenTheLevelWouldBeLost() {
+		Assert.AreEqual(0, EnergySpawnDirector.Missing(18, 0, 20));
+		Assert.AreEqual(0, EnergySpawnDirector.Missing(18, 10, 8), "exactly enough left");
+		Assert.AreEqual(2, EnergySpawnDirector.Missing(18, 9, 8), "an anti-energy trap took one");
+		Assert.AreEqual(0, EnergySpawnDirector.Missing(6, 6, 0), "won");
 	}
 }

@@ -17,8 +17,9 @@ MonoBehaviour:
   displayName: "Thung l\u0169ng dung nham"
   nextScene: Level4
   energyTarget: 14
-  energyAtStart: 12
-  energyCap: 18
+  energyAtStart: 16
+  energySpare: 2
+  energyCap: 16
   energyIntervalMin: 0.8
   energyIntervalMax: 1.2
   energyBatchMin: 4

@@ -5,7 +5,12 @@ using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.SceneManagement;
 
-/// <summary>Owns energy budget and selects safe/risk clusters from editor-authored ground candidates.</summary>
+/// <summary>
+/// Owns the energy supply and selects safe/risk clusters from editor-authored ground candidates. Fixed supply
+/// (playtest): target + spare cores are placed at the start and nothing spawns on a timer; cores come back only
+/// when collected + on the map drops below the target (an anti-energy trap took one, a core was lost), so the
+/// level stays winnable. A far core nobody picks up for staleDelay seconds still moves closer.
+/// </summary>
 public class EnergySpawnDirector : MonoBehaviour {
     public const int MaxAlive = 24;
     public const float FallbackDelay = 3f;
@@ -87,7 +92,7 @@ public class EnergySpawnDirector : MonoBehaviour {
     void StartingCores() {
         foreach (Treasure old in FindObjectsOfType<Treasure>()) Destroy(old.gameObject);
         alive.Clear();
-        int want = Mathf.Min(config.energyAtStart, AllowedAlive(config.energyCap, config.energyTarget, Score()));
+        int want = Mathf.Min(config.EnergySupply, AllowedAlive(config.energyCap, config.energyTarget, Score()));
         Dictionary<SpawnPoint, float> paths;
         var candidates = GetCandidates(true, true, out paths);
         StartingNearSafePaths = candidates.Where(c => !c.IsRisk && CachedPath(c, paths) >= nearPath.x && CachedPath(c, paths) <= nearPath.y)
@@ -335,25 +340,26 @@ public class EnergySpawnDirector : MonoBehaviour {
         int count = AliveCount, score = Score();
         int allowed = AllowedAlive(config.energyCap, config.energyTarget, score);
         if (score != lastScore) { lastScore = score; staleTimer = 0f; }
-        if (allowed > 0 && count == 0) {
+        // Respawn only to keep the level winnable: collected + on the map must reach the target (+1 spare).
+        int missing = Missing(config.energyTarget, score, count);
+        if (allowed > 0 && missing > 0) {
             emptyTimer += Time.deltaTime;
             if (emptyTimer >= FallbackDelay) {
-                if (TrySpawnNear()) { emptyTimer = 0f; ScheduleNext(); }
-                else emptyTimer = FallbackDelay - FallbackRetry;
+                emptyTimer = 0f;
+                Dictionary<SpawnPoint, float> pathCache;
+                var candidates = GetCandidates(true, true, out pathCache);
+                List<SpawnPoint> selected = SelectBatch(candidates, missing, pathCache);
+                if (selected.Count == 0 && !TrySpawnNear()) emptyTimer = FallbackDelay - FallbackRetry;
+                foreach (SpawnPoint point in selected) StartSpawn(point.transform.position);
                 return;
             }
         } else emptyTimer = 0f;
         ReplaceStaleCore();
-        timer += Time.deltaTime;
-        if (timer < (intervalOverride > 0f ? intervalOverride : nextInterval)) return;
-        ScheduleNext();
-        int slots = Mathf.Max(0, AllowedAlive(config.energyCap, config.energyTarget, score) - AliveCount);
-        int n = Mathf.Min(RandomBatch(config.energyBatchMin, config.energyBatchMax), slots);
-        if (n <= 0) return;
-        Dictionary<SpawnPoint, float> pathCache;
-        var candidates = GetCandidates(true, true, out pathCache);
-        List<SpawnPoint> selected = SelectBatch(candidates, n, pathCache);
-        foreach (SpawnPoint point in selected) StartSpawn(point.transform.position);
+    }
+
+    /// <summary>Cores to bring back so collected + on the map is the target plus one spare; 0 while enough remain.</summary>
+    public static int Missing(int target, int score, int onMap) {
+        return score + onMap >= target ? 0 : target + 1 - score - onMap;
     }
 
     static float CachedPath(SpawnPoint p, Dictionary<SpawnPoint, float> paths) { float d; return paths.TryGetValue(p, out d) ? d : float.MaxValue; }

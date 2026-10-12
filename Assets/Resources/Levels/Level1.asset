@@ -17,8 +17,9 @@ MonoBehaviour:
   displayName: "\u0110\u1EA3o hoang"
   nextScene: Level2
   energyTarget: 6
-  energyAtStart: 4
-  energyCap: 6
+  energyAtStart: 8
+  energySpare: 2
+  energyCap: 8
   energyIntervalMin: 1.5
   energyIntervalMax: 2
   energyBatchMin: 2

@@ -5,7 +5,7 @@ public class ChallengeConfigTests {
     [Test]
     public void GroundSpawnAndEnemyBudgetsMatchChallenge() {
         int[][] chasers = { new[] {1,2,2}, new[] {2,3,3}, new[] {3,4,5}, new[] {4,5,6} };
-        int[] starts = {4,8,12,16}, caps = {6,12,18,24}, points = {20,40,64,88};
+        int[] starts = {8,12,16,20}, caps = {8,12,16,20}, points = {20,40,64,88};
         int[] trapCaps = {0,2,4,6}, trapStarts = {0,1,2,3}, trapDamage = {0,15,20,25};
         int[] initialEnemy = {1,2,3,4}, enemyBatch = {1,1,2,3};
         float[] risk = {.15f,.30f,.45f,.55f};

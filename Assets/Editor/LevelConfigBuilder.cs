@@ -13,11 +13,13 @@ public static class LevelConfigBuilder {
 		if (!AssetDatabase.IsValidFolder(Folder))
 			AssetDatabase.CreateFolder("Assets/Resources", "Levels");
 
+		// Energy is a fixed supply (playtest: too easy): target + 2 cores, all at the start, cap = supply; the
+		// interval/batch values only matter for the respawn that keeps a level winnable.
 		// Zone names follow spec §7.2 (scene IDs unchanged); hazards follow the first spec §5.
-		Write("Level1", 1, "Đảo hoang", "Level2", 6, 4, 6, 1.5f, 2f, "Robo rơi xuống biển axit");
-		Write("Level2", 2, "Trạm khai thác bỏ hoang", "Level3", 10, 8, 12, 1f, 1.5f, "Robo rơi xuống biển axit");
-		Write("Level3", 3, "Thung lũng dung nham", "Level4", 14, 12, 18, 0.8f, 1.2f, "Robo chạm dung nham");
-		Write("Level4", 4, "Bãi phóng bỏ hoang", SceneRouter.EndingScene, 18, 16, 24, 0.8f, 1f, "Robo rơi xuống biển axit");
+		Write("Level1", 1, "Đảo hoang", "Level2", 6, 8, 8, 1.5f, 2f, "Robo rơi xuống biển axit");
+		Write("Level2", 2, "Trạm khai thác bỏ hoang", "Level3", 10, 12, 12, 1f, 1.5f, "Robo rơi xuống biển axit");
+		Write("Level3", 3, "Thung lũng dung nham", "Level4", 14, 16, 16, 0.8f, 1.2f, "Robo chạm dung nham");
+		Write("Level4", 4, "Bãi phóng bỏ hoang", SceneRouter.EndingScene, 18, 20, 20, 0.8f, 1f, "Robo rơi xuống biển axit");
 		// Energy batches (spec §5.1): cores per drop, upper bound included.
 		Batch("Level1", 2, 3);
 		Batch("Level2", 3, 4);
@@ -108,6 +110,7 @@ public static class LevelConfigBuilder {
 		config.nextScene = next;
 		config.energyTarget = target;
 		config.energyAtStart = atStart;
+		config.energySpare = atStart - target;
 		config.energyCap = cap;
 		config.energyIntervalMin = intervalMin;
 		config.energyIntervalMax = intervalMax;

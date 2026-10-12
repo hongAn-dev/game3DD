@@ -92,22 +92,18 @@ public class EnergyPlayTests {
 	}
 
 	[UnityTest]
-	public IEnumerator BatchesDropSeveralCores() {
+	public IEnumerator StartPlacesTheWholeSupply() {
 		yield return Load("Level4", GameSettings.gameDifficulties.Normal);
-		ClearCores();
-		yield return null;
-		yield return null;
-		director.intervalOverride = 50f;
-		yield return null;
-		director.ForceBatch();
-		float deadline = Time.time + 2f;
-		while (director.AliveCount < 5 && Time.time < deadline) yield return null;
-		Assert.That(director.AliveCount, Is.InRange(5, 7), "one L4 batch fills across valid clusters");
+		yield return new WaitForSeconds(1.5f);
+		LevelConfig config = LevelCatalog.Get("Level4");
+		Assert.AreEqual(config.energyTarget + 2, director.AliveCount, "playtest: need 18, 20 on the map");
 		Treasure[] spawned = Object.FindObjectsOfType<Treasure>();
 		int clusters = spawned.Select(item => director.landingPoints
 			.OrderBy(point => Vector3.Distance(point.position, item.transform.position)).First()
 			.GetComponent<SpawnPoint>().clusterId).Distinct().Count();
-		Assert.GreaterOrEqual(clusters, 2, "batch draws from multiple authored clusters");
+		Assert.GreaterOrEqual(clusters, 4, "spread over the map");
+		yield return new WaitForSeconds(4f);
+		Assert.AreEqual(config.energyTarget + 2, director.AliveCount, "nothing more spawns on a timer");
 	}
 
 	[UnityTest]
@@ -129,11 +125,13 @@ public class EnergyPlayTests {
 	[UnityTest]
 	public IEnumerator GroundSpawnUsesBoundsAndScaleIn() {
 		yield return Load("Level1", GameSettings.gameDifficulties.Normal);
-		ClearCores();
-		director.intervalOverride=0.1f;
-		director.ForceBatch();
-		yield return null;
-		Treasure[] cores=Object.FindObjectsOfType<Treasure>();
+		ClearCores();   // checked as respawned cores land, before they start to bob
+		float deadline = Time.time + EnergySpawnDirector.FallbackDelay + 2f;
+		Treasure[] cores = new Treasure[0];
+		while (cores.Length == 0 && Time.time < deadline) {
+			yield return null;
+			cores = Object.FindObjectsOfType<Treasure>();
+		}
 		Assert.Greater(cores.Length,0);
 		foreach(Treasure core in cores) {
 			RaycastHit hit;
@@ -176,19 +174,17 @@ public class EnergyPlayTests {
 	}
 
 	[UnityTest]
-	public IEnumerator DestroyedCoreFreesSlot() {
+	public IEnumerator RespawnOnlyWhenTheLevelWouldBeLost() {
 		yield return Load("Level1", GameSettings.gameDifficulties.Easy);
-		director.intervalOverride = 0.2f;
-		yield return new WaitForSeconds(3f);
-		int cap = director.AliveCount;
-		director.intervalOverride = 100f;   // no refill in the same frame while checking the freed slot
-		Object.Destroy(Object.FindObjectsOfType<Treasure>().First().gameObject);
-		yield return null;
-		Assert.AreEqual(cap - 1, director.AliveCount);
-		director.intervalOverride = 0.2f;
-		director.ForceBatch();
-		yield return new WaitForSeconds(2f);
-		Assert.AreEqual(cap, director.AliveCount);
+		yield return new WaitForSeconds(1.5f);
+		Treasure[] cores = Object.FindObjectsOfType<Treasure>();
+		Object.Destroy(cores[0].gameObject);
+		Object.Destroy(cores[1].gameObject);   // 6 left = exactly the target
+		yield return new WaitForSeconds(EnergySpawnDirector.FallbackDelay + 1f);
+		Assert.AreEqual(6, director.AliveCount, "still winnable: no respawn");
+		Object.Destroy(Object.FindObjectsOfType<Treasure>()[0].gameObject);   // 5 < 6
+		yield return new WaitForSeconds(EnergySpawnDirector.FallbackDelay + 1.5f);
+		Assert.AreEqual(7, director.AliveCount, "back to target + 1");
 	}
 
 	// Spec §5.2: nothing alive or falling for 3 s while short → one core near the robot.
@@ -205,22 +201,21 @@ public class EnergyPlayTests {
 	}
 
 	[UnityTest]
-	public IEnumerator LastNeededEnergyStillKeepsFullLevelChoices() {
+	public IEnumerator LastNeededEnergyComesBackIfLost() {
 		yield return Load("Level1", GameSettings.gameDifficulties.Easy);
-		director.intervalOverride = 0.2f;
 		ClearCores();
 		GameManager.gm.Collect(GameManager.gm.BeatLevelScore - 1);
-		yield return new WaitForSeconds(2f);
-		Assert.AreEqual(LevelCatalog.Get("Level1").energyCap, Object.FindObjectsOfType<Treasure>().Length,
-			"the last point of score progress does not collapse the level's core choices");
+		yield return new WaitForSeconds(EnergySpawnDirector.FallbackDelay + 1.5f);
+		Assert.AreEqual(2, Object.FindObjectsOfType<Treasure>().Length, "the missing one plus one spare");
 	}
 
 	[UnityTest]
 	public IEnumerator HardDifficultyStillSpawnsEnergy() {
 		yield return Load("Level2", GameSettings.gameDifficulties.Hard);
-		director.intervalOverride = 0.2f;
+		yield return new WaitForSeconds(1.5f);
+		Assert.AreEqual(12, Object.FindObjectsOfType<Treasure>().Length, "same supply on every difficulty");
 		ClearCores();
-		yield return new WaitForSeconds(2.5f);
+		yield return new WaitForSeconds(EnergySpawnDirector.FallbackDelay + 1.5f);
 		Assert.GreaterOrEqual(Object.FindObjectsOfType<Treasure>().Length, 1);
 	}
 
@@ -287,8 +282,7 @@ public class EnergyPlayTests {
 		body.isKinematic = true;
 		body.position = player.position + Vector3.up * 20f;   // far above the ground
 		player.position = body.position;
-		director.intervalOverride = 0.1f;
-		yield return new WaitForSeconds(1.5f);
+		yield return new WaitForSeconds(EnergySpawnDirector.FallbackDelay + 1.5f);
 		Assert.Greater(director.AliveCount, 0, "drops use the last valid robot point");
 	}
 }

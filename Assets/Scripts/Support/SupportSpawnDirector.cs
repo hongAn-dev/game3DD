@@ -104,6 +104,11 @@ public class SupportSpawnDirector : MonoBehaviour {
         if (prefab == null) return false;
         SpawnPoint point; float path;
         bool found = energy.TryGetCandidate(false, near, near ? 5f : 0f, near ? 18f : float.MaxValue, out point, out path, visible);
+        // With the whole energy supply on the map the near visible points can all be taken (first shield, L1):
+        // relax the path band, then visibility.
+        if (!found && visible)
+            found = energy.TryGetCandidate(false, near, 0f, float.MaxValue, out point, out path, true)
+                || energy.TryGetCandidate(false, near, near ? 5f : 0f, near ? 18f : float.MaxValue, out point, out path, false);
         if (!found && kind == SupportKind.Heal20 && near)
             found = energy.TryGetCandidate(false, true, 0f, float.MaxValue, out point, out path, visible);
         if (!found) return false;
