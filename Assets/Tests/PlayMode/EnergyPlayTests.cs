@@ -108,6 +108,37 @@ public class EnergyPlayTests {
 		Assert.That(director.AliveCount, Is.InRange(config.EnergySupplyMin, config.EnergySupplyMax), "nothing more spawns on a timer");
 	}
 
+	// Playtest: cores were bunched up. Spread over the map, no two too close, some on risky ground.
+	[UnityTest]
+	public IEnumerator CoresAreSpreadAndSomeAreRisky() {
+		foreach (string level in new[] { "Level2", "Level4" }) {
+			yield return Load(level, GameSettings.gameDifficulties.Normal);
+			yield return new WaitForSeconds(1.5f);
+			Vector3[] cores = Object.FindObjectsOfType<Treasure>().Select(t => t.transform.position).ToArray();
+			float closest = float.MaxValue;
+			for (int i = 0; i < cores.Length; i++)
+				for (int j = i + 1; j < cores.Length; j++)
+					closest = Mathf.Min(closest, Vector3.Distance(cores[i], cores[j]));
+			Assert.GreaterOrEqual(closest, director.spreadSpacing - 0.01f, level + ": no two cores too close");
+			Vector3 centre = cores.Aggregate(Vector3.zero, (a, b) => a + b) / cores.Length;
+			float spread = cores.Average(c => Vector3.Distance(c, centre));
+			float mapSpread = director.landingPoints.Average(t => Vector3.Distance(t.position,
+				director.landingPoints.Aggregate(Vector3.zero, (a, b) => a + b.position) / director.landingPoints.Length));
+			Assert.GreaterOrEqual(spread, mapSpread * 0.8f, level + ": as spread out as the map's landing points");
+			int risky = cores.Count(c => director.landingPoints.OrderBy(t => Vector3.Distance(t.position, c)).First().GetComponent<SpawnPoint>().IsRisk);
+			Assert.Greater(risky, 0, level + ": some cores sit on risky ground");
+		}
+	}
+
+	[UnityTest]
+	public IEnumerator SupplyStaysAfterStart() {
+		yield return Load("Level4", GameSettings.gameDifficulties.Normal);
+		yield return new WaitForSeconds(1.5f);
+		LevelConfig config = LevelCatalog.Get("Level4");
+		yield return new WaitForSeconds(4f);
+		Assert.That(director.AliveCount, Is.InRange(config.EnergySupplyMin, config.EnergySupplyMax), "nothing more spawns on a timer");
+	}
+
 	[UnityTest]
 	public IEnumerator BatchCoresNeverShareAPoint() {
 		yield return Load("Level4", GameSettings.gameDifficulties.Normal);

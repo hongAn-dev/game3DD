@@ -109,7 +109,7 @@ public class EnergySpawnDirector : MonoBehaviour {
         StartingNearSafePaths = candidates.Where(c => !c.IsRisk && CachedPath(c, paths) >= nearPath.x && CachedPath(c, paths) <= nearPath.y)
             .Select(c => CachedPath(c, paths)).ToArray();
         StartingNearSafeCandidateCount = StartingNearSafePaths.Length;
-        List<SpawnPoint> selected = SelectBatch(candidates, want, paths);
+        List<SpawnPoint> selected = SpreadSelect(candidates, want, paths, true);
         for (int i = 0; i < selected.Count; i++) {
             if (i == 0) FirstCorePoint = selected[i].transform.position;
             StartSpawn(selected[i].transform.position);
@@ -392,7 +392,7 @@ public class EnergySpawnDirector : MonoBehaviour {
                 emptyTimer = 0f;
                 Dictionary<SpawnPoint, float> pathCache;
                 var candidates = GetCandidates(true, true, out pathCache);
-                List<SpawnPoint> selected = SelectBatch(candidates, missing, pathCache);
+                List<SpawnPoint> selected = SpreadSelect(candidates, missing, pathCache, false);
                 if (selected.Count == 0 && !TrySpawnNear()) emptyTimer = FallbackDelay - FallbackRetry;
                 foreach (SpawnPoint point in selected) StartSpawn(point.transform.position);
                 return;
@@ -408,81 +408,46 @@ public class EnergySpawnDirector : MonoBehaviour {
 
     static float CachedPath(SpawnPoint p, Dictionary<SpawnPoint, float> paths) { float d; return paths.TryGetValue(p, out d) ? d : float.MaxValue; }
 
-    List<SpawnPoint> SelectBatch(List<SpawnPoint> candidates, int count, Dictionary<SpawnPoint, float> paths) {
+    [Tooltip("Cores keep at least this far apart when the map allows it (playtest: cores were bunched up).")]
+    public float spreadSpacing = 5f;
+
+    /// <summary>
+    /// Spreads cores over the whole map (playtest): farthest-point sampling, each pick random among the three
+    /// candidates farthest from every core already chosen or on the map, at least spreadSpacing apart when possible.
+    /// A level's energyRiskFraction of the picks come from risky points (map edge, near enemies/traps). The first
+    /// core of a level stays 5–18 m from the robot so the start is easy.
+    /// </summary>
+    List<SpawnPoint> SpreadSelect(List<SpawnPoint> candidates, int count, Dictionary<SpawnPoint, float> paths, bool nearFirst) {
         var selected = new List<SpawnPoint>();
-        if (count <= 0 || candidates.Count == 0) return selected;
-        var used = new List<Vector3>();
-        float minSeparation = Mathf.Max(1.5f, GroundSpawn.FootprintRadius(corePrefab) * 2f);
-        var usedRiskTypes = new Dictionary<int, SpawnRisk>();
-        bool hasNearSafe = candidates.Any(c => !c.IsRisk && CachedPath(c, paths) >= nearPath.x && CachedPath(c, paths) <= nearPath.y);
-        if (hasNearSafe) TakeClustered(candidates, selected, used, usedRiskTypes, false, 1, paths, minSeparation, nearPath.x, nearPath.y, int.MinValue);
-        int preferredSafeCluster = selected.Count > 0 ? selected[0].clusterId : int.MinValue;
-        int riskBudget = Mathf.Clamp(Mathf.RoundToInt(count * Mathf.Clamp01(config.energyRiskFraction)), 0, count);
-        int riskTarget = Mathf.Min(riskBudget, count - selected.Count);
-        int safeBudget = count - riskTarget - selected.Count;
-        TakeClustered(candidates, selected, used, usedRiskTypes, false, safeBudget, paths, minSeparation, float.MinValue, float.MaxValue, preferredSafeCluster);
-        int selectedRisk = selected.Count(p => p.IsRisk);
-        TakeClustered(candidates, selected, used, usedRiskTypes, true, riskTarget - selectedRisk, paths, minSeparation, float.MinValue, float.MaxValue, int.MinValue);
-        // Fill remaining slots with safe choices first. Risk picks may not exceed the configured budget.
-        if (selected.Count < count) TakeClustered(candidates, selected, used, usedRiskTypes, false, count - selected.Count, paths, minSeparation, float.MinValue, float.MaxValue, preferredSafeCluster);
-        int remainingRiskBudget = Mathf.Max(0, riskBudget - selected.Count(p => p.IsRisk));
-        if (selected.Count < count && remainingRiskBudget > 0)
-            TakeClustered(candidates, selected, used, usedRiskTypes, true,
-                Mathf.Min(count - selected.Count, remainingRiskBudget), paths, minSeparation,
-                float.MinValue, float.MaxValue, int.MinValue);
+        var pool = new List<SpawnPoint>(candidates);
+        var anchors = alive.Where(t => t != null).Select(t => t.transform.position).ToList();
+        if (count <= 0 || pool.Count == 0) return selected;
+        if (nearFirst) {
+            var near = pool.Where(c => !c.IsRisk && CachedPath(c, paths) >= nearPath.x && CachedPath(c, paths) <= nearPath.y).ToList();
+            if (near.Count > 0) {
+                SpawnPoint first = near[Random.Range(0, near.Count)];
+                selected.Add(first); pool.Remove(first); anchors.Add(first.transform.position);
+            }
+        }
+        int risky = Mathf.Clamp(Mathf.RoundToInt(count * Mathf.Clamp01(config.energyRiskFraction)), 0, count);
+        var slots = new List<bool>();
+        for (int i = selected.Count; i < count; i++) slots.Add(i - selected.Count < risky);
+        slots = slots.OrderBy(_ => Random.value).ToList();
+        foreach (bool risk in slots) {
+            List<SpawnPoint> kind = pool.Where(c => c.IsRisk == risk).ToList();
+            if (kind.Count == 0) kind = pool;
+            if (kind.Count == 0) break;
+            var ranked = kind.Select(c => new KeyValuePair<SpawnPoint, float>(c, anchors.Count == 0 ? Random.value * 100f
+                    : anchors.Min(a => Vector3.Distance(a, c.transform.position))))
+                .OrderByDescending(x => x.Value).ToList();
+            var spaced = ranked.Where(x => x.Value >= spreadSpacing).ToList();
+            var choices = (spaced.Count > 0 ? spaced : ranked).Take(3).ToList();
+            SpawnPoint pick = choices[Random.Range(0, choices.Count)].Key;
+            selected.Add(pick); pool.Remove(pick); anchors.Add(pick.transform.position);
+        }
         return selected;
     }
-    void TakeClustered(List<SpawnPoint> candidates, List<SpawnPoint> selected, List<Vector3> used,
-        Dictionary<int, SpawnRisk> clusterRiskTypes, bool risk, int wanted, Dictionary<SpawnPoint, float> paths,
-        float minSeparation, float minPath, float maxPath, int preferredCluster) {
-        int picked = 0;
-        while (picked < wanted) {
-            var groups = candidates.Where(c => c.IsRisk == risk && CachedPath(c, paths) >= minPath && CachedPath(c, paths) <= maxPath)
-                .GroupBy(c => c.clusterId).Select(g => g.ToList())
-                .OrderBy(g => g[0].clusterId == preferredCluster ? 0 : 1)
-                .ThenByDescending(g => g.Count()).ThenBy(g => Random.value).ToList();
-            bool progressed = false;
-            foreach (List<SpawnPoint> group in groups) {
-                while (picked < wanted) {
-                    var pool = group.Where(c => used.All(u => Vector3.Distance(u, c.transform.position) >= minSeparation)
-                        && ClusterSelectionCanAccept(selected, c, risk)
-                        && (!risk || ClusterCanAccept(clusterRiskTypes, c.clusterId, c.EffectiveRisk))).ToList();
-                    if (pool.Count == 0) break;
-                    SpawnPoint point; float path;
-                    bool near = picked == 0 && minPath > float.MinValue;
-                    if (!TryPick(pool, near, !near, out point, out path, paths)) break;
-                    selected.Add(point);
-                    used.Add(point.transform.position);
-                    candidates.Remove(point);
-                    group.Remove(point);
-                    if (risk) AddRiskTypes(clusterRiskTypes, point.clusterId, point.EffectiveRisk);
-                    picked++;
-                    progressed = true;
-                }
-                if (picked >= wanted) break;
-            }
-            if (!progressed) break;
-        }
-    }
-    static bool ClusterSelectionCanAccept(List<SpawnPoint> selected, SpawnPoint candidate, bool risk) {
-        List<SpawnPoint> inCluster = selected.Where(p => p.clusterId == candidate.clusterId).ToList();
-        if (inCluster.Count >= (risk ? 4 : 3)) return false;
-        return inCluster.Count == 0 || inCluster.Any(p => Vector3.Distance(p.transform.position, candidate.transform.position) <= 2.5f);
-    }
-    static bool ClusterCanAccept(Dictionary<int, SpawnRisk> byCluster, int clusterId, SpawnRisk candidate) {
-        SpawnRisk used;
-        if (!byCluster.TryGetValue(clusterId, out used)) used = SpawnRisk.None;
-        return RiskTypeCount(used | candidate) <= 2;
-    }
-    static int RiskTypeCount(SpawnRisk flags) {
-        int count=0; foreach(SpawnRisk flag in new[] { SpawnRisk.Edge, SpawnRisk.Enemy, SpawnRisk.Trap }) if((flags&flag)!=0)count++;
-        return count;
-    }
-    static void AddRiskTypes(Dictionary<int, SpawnRisk> byCluster, int clusterId, SpawnRisk flags) {
-        SpawnRisk used;
-        if (!byCluster.TryGetValue(clusterId, out used)) used = SpawnRisk.None;
-        byCluster[clusterId] = used | flags;
-    }
+
     bool TrySpawnNear() {
         SpawnPoint point; float path;
         if (!TryGetCandidate(false, true, nearPath.x, nearPath.y, out point, out path)) return false;

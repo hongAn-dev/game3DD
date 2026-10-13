@@ -356,4 +356,19 @@ public class ControlTests {
 		Assert.AreEqual(new Vector2(8f, 0f), look.ConsumeDelta());
 		Object.DestroyImmediate(go);
 	}
+
+	// Playtest: holding the joystick and tapping the screen turned the camera ~90°. A jump bigger than a quarter
+	// of the screen in one event is a pointer mix-up, not a swipe; the simulated mouse never drives the camera on phones.
+	[Test]
+	public void LookIgnoresPointerJumps() {
+		GameFlow.ResetForScene();
+		TouchLookArea look = new GameObject("Look", typeof(RectTransform)).AddComponent<TouchLookArea>();
+		look.OnPointerDown(Pointer(2, new Vector2(900f, 300f), Vector2.zero));
+		look.OnDrag(Pointer(2, new Vector2(910f, 300f), Vector2.zero));
+		look.OnDrag(Pointer(2, new Vector2(100f, 300f), Vector2.zero));   // the joystick finger's position
+		look.OnDrag(Pointer(2, new Vector2(108f, 300f), Vector2.zero));
+		Assert.AreEqual(new Vector2(18f, 0f), look.ConsumeDelta());
+		Object.DestroyImmediate(look.gameObject);
+		Assert.AreEqual(!Application.isMobilePlatform && Input.touchCount == 0, ThirdPersonOrbitCamera.RealMouse);
+	}
 }

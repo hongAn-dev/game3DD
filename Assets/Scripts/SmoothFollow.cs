@@ -68,7 +68,7 @@ public class SmoothFollow : MonoBehaviour {
 		}
 
 		// Orbit and tilt while the right mouse button is held.
-		if (allowUserInput && GameFlow.IsGameplayActive && Input.GetMouseButton(1)) {
+		if (allowUserInput && GameFlow.IsGameplayActive && ThirdPersonOrbitCamera.RealMouse && Input.GetMouseButton(1)) {
 			currentRotationAngle += Input.GetAxis("Mouse X") * orbitSpeed;
 			currentHeight = Mathf.Clamp(currentHeight - Input.GetAxis("Mouse Y") * tiltSpeed,
 				target.position.y + 0.5f, target.position.y + maxDistance);

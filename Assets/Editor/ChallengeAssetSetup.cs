@@ -11,8 +11,8 @@ public static class ChallengeAssetSetup {
 	const string PlanetPath = Root + "Materials/Planet.mat";
 	const string AtmospherePath = Root + "Materials/PlanetAtmosphere.mat";
 	const string CrystalMeshPath = Root + "Models/AntiEnergyCrystal.asset";
-	static readonly Color Poison = new Color32(198, 154, 44, 255);
-	static readonly Color PoisonDark = new Color32(82, 64, 27, 255);
+	static readonly Color Poison = new Color32(235, 58, 58, 255);      // HP loss: the HUD's red minus
+	static readonly Color PoisonDark = new Color32(70, 18, 22, 255);
 	static readonly Color AntiEnergy = new Color32(255, 90, 54, 255);
 	static readonly Color AntiEnergyDark = new Color32(102, 35, 32, 255);
 	static readonly Color Magnetic = new Color32(159, 92, 224, 255);
@@ -150,7 +150,9 @@ public static class ChallengeAssetSetup {
 	static void SavePrefab(GameObject root) {
 		Transform model = root.transform.Find("Model");
 		Bounds bounds;
-		if (model != null && GroundSpawn.TryBounds(model, out bounds) && bounds.size.y > .001f) model.localScale *= .9f / bounds.size.y;
+		// Largest side 0.9 m: a flat symbol (the minus) must not grow to 2+ m wide when fitted by height.
+		float side = model != null && GroundSpawn.TryBounds(model, out bounds) ? Mathf.Max(bounds.size.x, bounds.size.y, bounds.size.z) : 0f;
+		if (side > .001f) model.localScale *= .9f / side;
 		if (GroundSpawn.TryBounds(model, out bounds)) {
 			SphereCollider trigger = root.GetComponent<SphereCollider>();
 			trigger.center = root.transform.InverseTransformPoint(bounds.center);
@@ -166,16 +168,13 @@ public static class ChallengeAssetSetup {
 		Object.DestroyImmediate(root);
 	}
 
+	// Playtest: the pickups read as their HUD/guide symbols. Poison = red minus (loses HP), drawn as a thick bar
+	// with a dark backing so it reads from any side.
 	static void BuildPoison(Material body, Material dark) {
 		GameObject root = RootObject("Poison");
 		root.GetComponent<HarmfulPickup>().kind = HarmfulKind.Poison;
-		Primitive(root.transform, PrimitiveType.Cylinder, "Bottle body", new Vector3(0f, 0.39f, 0f), new Vector3(0.62f, 0.37f, 0.62f), body);
-		Primitive(root.transform, PrimitiveType.Cylinder, "Bottle neck", new Vector3(0f, 0.76f, 0f), new Vector3(0.28f, 0.18f, 0.28f), dark);
-		Primitive(root.transform, PrimitiveType.Cube, "Stopper", new Vector3(0f, 0.91f, 0f), new Vector3(0.33f, 0.08f, 0.33f), body);
-		Primitive(root.transform, PrimitiveType.Sphere, "Skull", new Vector3(0f, 0.43f, -0.32f), new Vector3(0.2f, 0.18f, 0.07f), dark);
-		Primitive(root.transform, PrimitiveType.Sphere, "Skull eye L", new Vector3(-0.055f, 0.45f, -0.36f), new Vector3(0.045f, 0.045f, 0.025f), body);
-		Primitive(root.transform, PrimitiveType.Sphere, "Skull eye R", new Vector3(0.055f, 0.45f, -0.36f), new Vector3(0.045f, 0.045f, 0.025f), body);
-		Primitive(root.transform, PrimitiveType.Cube, "Skull jaw", new Vector3(0f, 0.36f, -0.34f), new Vector3(0.12f, 0.04f, 0.035f), dark);
+		Primitive(root.transform, PrimitiveType.Cube, "Minus backing", new Vector3(0f, 0.5f, 0f), new Vector3(0.86f, 0.32f, 0.12f), dark);
+		Primitive(root.transform, PrimitiveType.Cube, "Minus", new Vector3(0f, 0.5f, 0f), new Vector3(0.76f, 0.22f, 0.24f), body);
 		SavePrefab(root);
 	}
 
@@ -208,15 +207,56 @@ public static class ChallengeAssetSetup {
 		return mesh;
 	}
 
+	// Magnetic interference slows the robot: a purple lightning bolt (the HUD slow symbol), not a gate-like magnet.
 	static void BuildMagnetic(Material body, Material poles) {
 		GameObject root = RootObject("MagneticInterference");
 		root.GetComponent<HarmfulPickup>().kind = HarmfulKind.Magnetic;
-		Primitive(root.transform, PrimitiveType.Cylinder, "Magnet bridge", new Vector3(0f, 0.82f, 0f), new Vector3(0.12f, 0.43f, 0.12f), body,
-			Quaternion.Euler(0f, 0f, 90f));
-		Primitive(root.transform, PrimitiveType.Cylinder, "Magnet left", new Vector3(-0.32f, 0.54f, 0f), new Vector3(0.12f, 0.3f, 0.12f), body);
-		Primitive(root.transform, PrimitiveType.Cylinder, "Magnet right", new Vector3(0.32f, 0.54f, 0f), new Vector3(0.12f, 0.3f, 0.12f), body);
-		Primitive(root.transform, PrimitiveType.Cube, "Pole left", new Vector3(-0.32f, 0.35f, 0f), new Vector3(0.2f, 0.08f, 0.2f), poles);
-		Primitive(root.transform, PrimitiveType.Cube, "Pole right", new Vector3(0.32f, 0.35f, 0f), new Vector3(0.2f, 0.08f, 0.2f), poles);
+		GameObject bolt = new GameObject("Lightning bolt", typeof(MeshFilter), typeof(MeshRenderer));
+		bolt.transform.SetParent(root.transform.Find("Model"), false);
+		bolt.transform.localPosition = new Vector3(0f, 0.05f, 0f);
+		bolt.GetComponent<MeshFilter>().sharedMesh = Bolt();
+		bolt.GetComponent<MeshRenderer>().sharedMaterial = body;
+		Primitive(root.transform, PrimitiveType.Cylinder, "Base", new Vector3(0f, 0.04f, 0f), new Vector3(0.5f, 0.04f, 0.5f), poles);
 		SavePrefab(root);
+	}
+
+	const string BoltMeshPath = Root + "Models/SlowBolt.asset";
+
+	// Zig-zag bolt outline (x, y in metres), extruded 0.14 m.
+	static Mesh Bolt() {
+		Mesh saved = AssetDatabase.LoadAssetAtPath<Mesh>(BoltMeshPath);
+		if (saved != null)
+			AssetDatabase.DeleteAsset(BoltMeshPath);
+		Vector2[] outline = {
+			new Vector2(0.10f, 1.00f), new Vector2(-0.28f, 0.42f), new Vector2(-0.02f, 0.42f),
+			new Vector2(-0.14f, 0.00f), new Vector2(0.28f, 0.60f), new Vector2(0.02f, 0.60f),
+		};
+		const float half = 0.07f;
+		var vertices = new System.Collections.Generic.List<Vector3>();
+		var triangles = new System.Collections.Generic.List<int>();
+		// Front and back caps: the outline is two triangles' worth of quads, fanned from its two halves.
+		int[] cap = { 0, 1, 2, 0, 2, 5, 2, 3, 4, 2, 4, 5 };
+		foreach (float z in new[] { -half, half }) {
+			int b = vertices.Count;
+			foreach (Vector2 p in outline) vertices.Add(new Vector3(p.x, p.y, z));
+			for (int t = 0; t < cap.Length; t += 3) {
+				if (z < 0f) { triangles.Add(b + cap[t]); triangles.Add(b + cap[t + 2]); triangles.Add(b + cap[t + 1]); }
+				else { triangles.Add(b + cap[t]); triangles.Add(b + cap[t + 1]); triangles.Add(b + cap[t + 2]); }
+			}
+		}
+		for (int i = 0; i < outline.Length; i++) {   // sides, own vertices for flat shading
+			Vector2 a = outline[i], c = outline[(i + 1) % outline.Length];
+			int b = vertices.Count;
+			vertices.Add(new Vector3(a.x, a.y, -half)); vertices.Add(new Vector3(c.x, c.y, -half));
+			vertices.Add(new Vector3(c.x, c.y, half)); vertices.Add(new Vector3(a.x, a.y, half));
+			triangles.AddRange(new[] { b, b + 1, b + 2, b, b + 2, b + 3 });
+		}
+		Mesh mesh = new Mesh { name = "SlowBolt" };
+		mesh.SetVertices(vertices);
+		mesh.SetTriangles(triangles, 0);
+		mesh.RecalculateNormals();
+		mesh.RecalculateBounds();
+		AssetDatabase.CreateAsset(mesh, BoltMeshPath);
+		return mesh;
 	}
 }

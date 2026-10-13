@@ -47,7 +47,7 @@ public class StoryTests {
 	public void DangerousItemsAndL2AdviceStayComplete() {
 		StoryPage page = StoryText.Guide().Single(p => p.title == "Vật phẩm nguy hiểm");
 		StringAssert.Contains("Khiên chỉ chặn sát thương của hóa chất", page.body);
-		Assert.AreEqual("trap_poison", page.illustrationKey);
+		Assert.AreEqual("harmful_items", page.illustrationKey);
 		Assert.IsNotNull(Resources.Load<Sprite>("GuideSprites/trap_poison"));
 		StoryPage[] cards = StoryText.LevelCards(LevelCatalog.Get("Level2"));
 		Assert.AreEqual(2, cards.Length);

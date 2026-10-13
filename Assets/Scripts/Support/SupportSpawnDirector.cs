@@ -112,6 +112,10 @@ public class SupportSpawnDirector : MonoBehaviour {
                 || energy.TryGetCandidate(true, near, 0f, float.MaxValue, out point, out path, true);
         if (!found && kind == SupportKind.Heal20 && near)
             found = energy.TryGetCandidate(false, true, 0f, float.MaxValue, out point, out path, visible);
+        // With cores spread over the whole map most points beside them count as trap risk; support items may use them.
+        if (!found && !visible)
+            found = energy.TryGetCandidate(true, near, near ? 5f : 0f, near ? 18f : float.MaxValue, out point, out path)
+                || energy.TryGetCandidate(true, near, 0f, float.MaxValue, out point, out path);
         Vector3 ahead;
         if (!found && visible && energy.TryPointAhead(GroundSpawn.FootprintRadius(prefab), out ahead))
             return ReserveAndSpawn(kind, prefab, ahead);

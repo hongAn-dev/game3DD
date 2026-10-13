@@ -58,6 +58,13 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
 		return new Vector2(newYaw, newPitch);
 	}
 
+	/// <summary>
+	/// True only for a real mouse. On phones Unity simulates mouse buttons from touches: with one finger on the
+	/// joystick and a tap on the screen the simulated pointer jumps between the fingers, and reading "Mouse X" then
+	/// turned the camera by ~90° in one frame (playtest). Touch look goes through TouchLookArea only.
+	/// </summary>
+	public static bool RealMouse { get { return !Application.isMobilePlatform && Input.touchCount == 0; } }
+
 	/// <summary>Queues a look drag in screen pixels (used by touch and tests).</summary>
 	public void AddLook(Vector2 deltaPixels) {
 		pendingLook += deltaPixels;
@@ -116,7 +123,7 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
 			pendingLook = Vector2.zero;
 		}
 
-		if (Input.GetMouseButton(1)) {
+		if (RealMouse && Input.GetMouseButton(1)) {
 			yaw = Mathf.Repeat(yaw + Input.GetAxis("Mouse X") * mouseDegreesPerUnit * Sensitivity, 360f);
 			pitch = Mathf.Clamp(pitch - Input.GetAxis("Mouse Y") * mouseDegreesPerUnit * Sensitivity, minPitch, maxPitch);
 		}

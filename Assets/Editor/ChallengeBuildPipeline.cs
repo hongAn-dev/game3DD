@@ -25,6 +25,7 @@ public static class ChallengeBuildPipeline {
         AudioSetup.Apply();
         UiTheme.Apply();
         AppIconSetup.Apply();
+        GuideIconSetup.Apply();   // guide pictures from the final prefabs
         AssetDatabase.SaveAssets();
         Validate();
         Debug.Log("CHALLENGE_INTEGRATION_COMPLETE");

@@ -73,7 +73,11 @@ public class TouchLookArea : MonoBehaviour, IPointerDownHandler, IDragHandler, I
 		// Measured from the last position seen, not eventData.delta: the movement made before the EventSystem's
 		// drag threshold was crossed is kept, so a swipe does not start with a dead zone and then jump.
 		if (owned && eventData.pointerId == activePointer) {
-			delta += eventData.position - lastPosition;
+			Vector2 step = eventData.position - lastPosition;
+			// A finger cannot cross a quarter of the screen between two events; such a step is a pointer mix-up
+			// (another finger's position), so it is dropped instead of snapping the camera.
+			if (step.magnitude <= MaxStep())
+				delta += step;
 			lastPosition = eventData.position;
 		}
 	}
@@ -109,6 +113,10 @@ public class TouchLookArea : MonoBehaviour, IPointerDownHandler, IDragHandler, I
 		if (source == null || source == gameObject)
 			return false;
 		return source.GetComponentInParent<Joystick>() != null || source.GetComponentInParent<Selectable>() != null;
+	}
+
+	static float MaxStep() {
+		return Mathf.Max(Screen.width, 400) * 0.25f;
 	}
 
 	/// <summary>Returns the drag since the last call and clears it.</summary>
