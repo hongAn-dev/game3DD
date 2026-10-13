@@ -180,8 +180,8 @@ public class EnergyPlayTests {
 		yield return Load("Level1", GameSettings.gameDifficulties.Easy);
 		yield return new WaitForSeconds(1.5f);
 		Treasure[] cores = Object.FindObjectsOfType<Treasure>();
-		Object.Destroy(cores[0].gameObject);
-		Object.Destroy(cores[1].gameObject);   // 6 left = exactly the target
+		for (int i = 0; i < cores.Length - 6; i++)
+			Object.Destroy(cores[i].gameObject);   // 6 left = exactly the target
 		yield return new WaitForSeconds(EnergySpawnDirector.FallbackDelay + 1f);
 		Assert.AreEqual(6, director.AliveCount, "still winnable: no respawn");
 		Object.Destroy(Object.FindObjectsOfType<Treasure>()[0].gameObject);   // 5 < 6
@@ -215,7 +215,8 @@ public class EnergyPlayTests {
 	public IEnumerator HardDifficultyStillSpawnsEnergy() {
 		yield return Load("Level2", GameSettings.gameDifficulties.Hard);
 		yield return new WaitForSeconds(1.5f);
-		Assert.AreEqual(12, Object.FindObjectsOfType<Treasure>().Length, "same supply on every difficulty");
+		Assert.That(Object.FindObjectsOfType<Treasure>().Length, Is.EqualTo(director.StartingSupply), "the supply rolled for this run");
+		Assert.That(director.StartingSupply, Is.InRange(12, 15), "target 10 + 2..5 on every difficulty");
 		ClearCores();
 		yield return new WaitForSeconds(EnergySpawnDirector.FallbackDelay + 1.5f);
 		Assert.GreaterOrEqual(Object.FindObjectsOfType<Treasure>().Length, 1);

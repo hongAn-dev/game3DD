@@ -331,15 +331,16 @@ public class EnergySpawnDirector : MonoBehaviour {
         if (cam == null || player == null) return false;
         Vector3 ahead = Vector3.ProjectOnPlane(cam.transform.forward, Vector3.up).normalized;
         HazardVolume[] hazards = FindObjectsOfType<HazardVolume>();
-        foreach (float d in new[] { 6f, 5f, 7f, 8f, 9f }) {
-            RaycastHit ground;
-            Vector3 probe = player.position + ahead * d;
-            bool g = WalkableGround.Ground(probe, out ground, hazards);
-            if (!g || registry.IsOccupied(ground.point, radius)
-                || !IsVisible(ground.point) || PathFromRobot(ground.point) == float.MaxValue) continue;
-            point = ground.point;
-            return true;
-        }
+        // A fan of directions inside the view (the straight-ahead spot can be off the NavMesh, e.g. a pad or slope).
+        foreach (float d in new[] { 6f, 5f, 7f, 4f, 8f, 9f })
+            foreach (float angle in new[] { 0f, -20f, 20f, -35f, 35f }) {
+                RaycastHit ground;
+                Vector3 probe = player.position + Quaternion.Euler(0f, angle, 0f) * ahead * d;
+                if (!WalkableGround.Ground(probe, out ground, hazards) || registry.IsOccupied(ground.point, radius)
+                    || !IsVisible(ground.point) || PathFromRobot(ground.point) == float.MaxValue) continue;
+                point = ground.point;
+                return true;
+            }
         return false;
     }
     public bool TryGetRiskCandidate(bool near, float minPath, float maxPath, out SpawnPoint point, out float pathLength) {

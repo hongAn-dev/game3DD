@@ -107,7 +107,9 @@ public class SupportSpawnDirector : MonoBehaviour {
         // With the whole energy supply on the map the near visible points can all be taken (first shield, L1):
         // relax the path band but stay on screen; with no free visible point it simply tries again next frame.
         if (!found && visible)
-            found = energy.TryGetCandidate(false, near, 0f, float.MaxValue, out point, out path, true);
+            found = energy.TryGetCandidate(false, near, 0f, float.MaxValue, out point, out path, true)
+                // Points beside energy cores count as "trap risk" (they invite harmful items); a shield there is fine.
+                || energy.TryGetCandidate(true, near, 0f, float.MaxValue, out point, out path, true);
         if (!found && kind == SupportKind.Heal20 && near)
             found = energy.TryGetCandidate(false, true, 0f, float.MaxValue, out point, out path, visible);
         Vector3 ahead;

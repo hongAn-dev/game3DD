@@ -169,6 +169,8 @@ public class ControlTests {
 	public void LookAreaExcludesMovementJoystickRegion() {
 		GameFlow.ResetForScene();
 		FixedJoystick joystick = MakeJoystick();
+		// Edit-mode tests do not run OnEnable; the game does (it registers FixedJoystick.Current).
+		typeof(FixedJoystick).GetMethod("OnEnable", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(joystick, null);
 		TouchLookArea look = new GameObject("Look", typeof(RectTransform)).AddComponent<TouchLookArea>();
 
 		// The look graphic may overlap the joystick on a device with a different aspect ratio. The
@@ -179,6 +181,7 @@ public class ControlTests {
 		look.OnPointerDown(Pointer(7, new Vector2(250f, 250f), Vector2.zero));
 		Assert.IsTrue(look.Owned);
 		look.OnPointerUp(Pointer(7, Vector2.zero, Vector2.zero));
+		typeof(FixedJoystick).GetMethod("OnDisable", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(joystick, null);
 		Object.DestroyImmediate(look.gameObject);
 		Object.DestroyImmediate(joystick.gameObject);
 	}

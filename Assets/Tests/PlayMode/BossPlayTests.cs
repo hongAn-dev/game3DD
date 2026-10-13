@@ -56,13 +56,16 @@ public class BossPlayTests {
 		GameFlow.ResetForScene();
 	}
 
-	EnemyBrain Boss(string level, Vector3 position) {
+	// Attack-mechanics tests turn the Level4 contact kill off (it ends the run before a dash can recover);
+	// FinalBossContactKills covers it.
+	EnemyBrain Boss(string level, Vector3 position, bool lethalContact = false) {
 #if UNITY_EDITOR
 		GameObject enemy = (GameObject)Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Enemy - Monster.prefab"),
 			position, Quaternion.LookRotation(Flat(player.transform.position - position)));
 		EnemyBrain brain = enemy.GetComponent<EnemyBrain>();
 		brain.target = player.transform;
 		brain.Configure(EnemyProfile.For(LevelCatalog.Get(level), GameSettings.gameDifficulties.Normal, true));
+		brain.finalBoss = lethalContact;
 		return brain;
 #else
 		return null;
@@ -84,6 +87,21 @@ public class BossPlayTests {
 		while (brain.State != state && Time.time < end)
 			yield return null;
 		Assert.AreEqual(state, brain.State, "never reached " + state);
+	}
+
+	// Level4 guardian: touching it ends the run at once, shield or not.
+	[UnityTest]
+	public IEnumerator FinalBossContactKills() {
+		yield return Arena();
+		Assert.IsTrue(EnemyProfile.For(LevelCatalog.Get("Level4"), GameSettings.gameDifficulties.Normal, true).finalBoss);
+		Assert.IsFalse(EnemyProfile.For(LevelCatalog.Get("Level3"), GameSettings.gameDifficulties.Normal, true).finalBoss);
+		player.GetComponent<ShieldEffect>().Activate();
+		EnemyBrain boss = Boss("Level4", player.transform.position + new Vector3(0f, 0f, 1.2f), true);
+		float end = Time.time + 1f;
+		while (player.GetComponent<Health>().healthPoints > 0f && Time.time < end)
+			yield return null;
+		Assert.AreEqual(0f, player.GetComponent<Health>().healthPoints, "contact kills through the shield");
+		Assert.AreEqual(1, boss.HitAttempts, "once");
 	}
 
 	[UnityTest]
@@ -225,6 +243,7 @@ public class BossPlayTests {
 		EnemyBrain boss = enemy.GetComponent<EnemyBrain>();
 		boss.target = player.transform;
 		boss.Configure(EnemyProfile.For(LevelCatalog.Get("Level4"), GameSettings.gameDifficulties.Normal, true));
+		boss.finalBoss = false;
 #else
 		EnemyBrain boss = null;
 #endif
