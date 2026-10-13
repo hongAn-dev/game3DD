@@ -57,20 +57,28 @@ public sealed class HarmfulPickup : MonoBehaviour {
             Health health = robot.GetComponent<Health>();
             if (health == null)
                 return;
+            ShieldEffect shield = robot.GetComponent<ShieldEffect>();
+            bool shielded = shield != null && shield.Active;
             bool applied = health.TakeDamage(Mathf.Max(0, damage), DamageKind.Trap);
             if (applied && health.healthPoints <= 0f)
                 GameFlow.ReportDeathCause("Robo chạm hóa chất độc hại");
+            if (applied)
+                PickupToast.Show("-" + Mathf.Max(0, damage) + " HP!", PickupToast.Hurt, robot.transform.position);
+            else if (shielded)
+                PickupToast.Show("Khiên đã chặn!", PickupToast.Shield, robot.transform.position);
             break;
         }
         case HarmfulKind.AntiEnergy:
             if (GameManager.gm != null)
                 GameManager.gm.QueueScoreDelta(this, -1, true);
+            PickupToast.Show("-1 năng lượng!", PickupToast.EnergyLoss, robot.transform.position);
             break;
         case HarmfulKind.Magnetic: {
             SlowStatus slow = robot.GetComponent<SlowStatus>();
             if (slow == null)
                 slow = robot.AddComponent<SlowStatus>();
             slow.Apply(SlowStatus.Duration);
+            PickupToast.Show("Chậm lại " + SlowStatus.Duration.ToString("0") + " giây!", PickupToast.Slow, robot.transform.position);
             break;
         }
         }

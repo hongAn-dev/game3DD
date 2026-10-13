@@ -26,6 +26,7 @@ public static class FlowUiSetup {
 				&& PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(t.gameObject) == "Assets/Prefabs/IntroBeatLevelCanvas.prefab").ToList())
 				Object.DestroyImmediate(t.gameObject);
 			manager.dialog = Dialog();
+			ToastCanvas();
 			TopBar(Object.FindObjectOfType<PauseController>(true));
 			ScorePanelToTheCentre();
 			manager.hideOnResult = new[] { Object.FindObjectsOfType<Camera>(true).Single(c => c.name == "Minimap Camera").gameObject,
@@ -43,6 +44,16 @@ public static class FlowUiSetup {
 		EditorSceneManager.MarkSceneDirty(ending);
 		EditorSceneManager.SaveScene(ending);
 		Debug.Log("FlowUiSetup: done");
+	}
+
+	// Floating pickup messages ("+1 năng lượng!", "-20 HP!"), under the dialogs and the pause panel.
+	static void ToastCanvas() {
+		GameObject old = GameObject.Find("Toast Canvas");
+		if (old != null)
+			Object.DestroyImmediate(old);
+		GameObject root = Canvas("Toast Canvas", 30);
+		root.GetComponent<GraphicRaycaster>().enabled = false;   // never catches touches
+		root.AddComponent<PickupToast>().font = AssetDatabase.LoadAssetAtPath<Font>(Fonts + "ChakraPetch-Bold.ttf");
 	}
 
 	static DialogPanel Dialog() {

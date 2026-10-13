@@ -23,6 +23,7 @@ public class Treasure : MonoBehaviour {
 		if (GameManager.gm != null)
 			GameManager.gm.QueueScoreDelta (this, value);
 		Sfx.Play (SfxEvent.EnergyPickup);   // the explosion effect is silent: one sound per pickup
+		PickupToast.Show ("+" + value + " năng lượng!", PickupToast.Energy, transform.position);
 
 		if (explosionPrefab != null)
 			Instantiate (explosionPrefab, transform.position, Quaternion.identity);

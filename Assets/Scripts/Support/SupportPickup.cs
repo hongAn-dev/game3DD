@@ -67,7 +67,15 @@ public class SupportPickup : MonoBehaviour {
 	}
 
 	bool Apply(GameObject robot) {
-		return Apply(kind, robot);
+		if (!Apply(kind, robot))
+			return false;
+		switch (kind) {   // what the item did, above the robot (playtest)
+		case SupportKind.Shield: PickupToast.Show("Khiên 5 giây!", PickupToast.Shield, robot.transform.position); break;
+		case SupportKind.Heal10: PickupToast.Show("+10 HP", PickupToast.Heal, robot.transform.position); break;
+		case SupportKind.Heal20: PickupToast.Show("+20 HP", PickupToast.Heal, robot.transform.position); break;
+		default: PickupToast.Show("Tăng tốc 5 giây!", PickupToast.Boost, robot.transform.position); break;
+		}
+		return true;
 	}
 
 	void Update() {

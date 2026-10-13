@@ -374,4 +374,30 @@ public class StoryPlayTests {
 			CampaignProgress.Reset();
 		}
 	}
+
+	// Playtest: each pickup says what it did ("+1 năng lượng!", "-20 HP!").
+	[UnityTest]
+	public IEnumerator PickupsShowWhatTheyDid() {
+		yield return Playing("Level1");
+		yield return new WaitForSeconds(1.2f);   // the robot has landed
+		GameObject player = GameObject.FindWithTag("Player");
+		Assert.IsNotNull(PickupToast.Current, "every level has the toast canvas");
+		Treasure core = Object.FindObjectOfType<Treasure>();
+		player.GetComponent<Rigidbody>().position = core.transform.position;
+		player.transform.position = core.transform.position;
+		for (int i = 0; i < 4; i++) yield return new WaitForFixedUpdate();
+		yield return null;
+		Assert.AreEqual("+1 năng lượng!", PickupToast.Current.Last);
+#if UNITY_EDITOR
+		GameObject poison = Object.Instantiate(UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Harmful/Poison.prefab"));
+		HarmfulPickup trap = poison.GetComponent<HarmfulPickup>();
+		trap.damage = 20;
+		typeof(HarmfulPickup).GetMethod("ApplyEffect", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(trap, new object[] { player });
+		Assert.AreEqual("-20 HP!", PickupToast.Current.Last);
+		Object.Destroy(poison);
+#endif
+		Assert.IsTrue(SupportPickup.Apply(SupportKind.Heal10, player));   // the static helper itself stays silent
+		yield return new WaitForSeconds(PickupToast.Life + 0.1f);
+		Assert.IsFalse(PickupToast.Current.GetComponentsInChildren<UnityEngine.UI.Text>().Any(), "messages fade away");
+	}
 }
