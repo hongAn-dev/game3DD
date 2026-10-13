@@ -111,7 +111,7 @@ public class EnergyPlayTests {
 	// Playtest: cores were bunched up. Spread over the map, no two too close, some on risky ground.
 	[UnityTest]
 	public IEnumerator CoresAreSpreadAndSomeAreRisky() {
-		foreach (string level in new[] { "Level2", "Level4" }) {
+		foreach (string level in new[] { "Level1", "Level2", "Level4" }) {
 			yield return Load(level, GameSettings.gameDifficulties.Normal);
 			yield return new WaitForSeconds(1.5f);
 			Vector3[] cores = Object.FindObjectsOfType<Treasure>().Select(t => t.transform.position).ToArray();
@@ -119,7 +119,10 @@ public class EnergyPlayTests {
 			for (int i = 0; i < cores.Length; i++)
 				for (int j = i + 1; j < cores.Length; j++)
 					closest = Mathf.Min(closest, Vector3.Distance(cores[i], cores[j]));
-			Assert.GreaterOrEqual(closest, director.spreadSpacing - 0.01f, level + ": no two cores too close");
+			Assert.GreaterOrEqual(closest, director.LastSpacing - 0.01f, level + ": no two cores closer than the spacing achieved");
+			if (level == "Level4")
+				Assert.AreEqual(8f, director.LastSpacing, 0.01f, "a large map keeps the full 8 m");
+			Assert.GreaterOrEqual(director.LastSpacing, EnergySpawnDirector.MinSpread, level);
 			Vector3 centre = cores.Aggregate(Vector3.zero, (a, b) => a + b) / cores.Length;
 			float spread = cores.Average(c => Vector3.Distance(c, centre));
 			float mapSpread = director.landingPoints.Average(t => Vector3.Distance(t.position,
@@ -228,9 +231,10 @@ public class EnergyPlayTests {
 		yield return new WaitForSeconds(1.5f);   // robot has landed
 		ClearCores();
 		yield return new WaitForSeconds(EnergySpawnDirector.FallbackDelay + 0.35f + 0.5f + 0.3f);
-		Treasure core = Object.FindObjectOfType<Treasure>();
-		Assert.IsNotNull(core);
-		Assert.LessOrEqual(PathFromRobot(core.transform.position), 18.5f, "near the robot");
+		Treasure[] cores = Object.FindObjectsOfType<Treasure>();
+		Assert.IsNotEmpty(cores);
+		// The respawn brings back target + 1 cores spread over the map; the first of them lands near the robot.
+		Assert.LessOrEqual(cores.Min(c => PathFromRobot(c.transform.position)), 18.5f, "one near the robot");
 	}
 
 	[UnityTest]

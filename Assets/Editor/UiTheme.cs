@@ -233,12 +233,13 @@ public static class UiTheme {
 			body.GetComponent<Text>().alignment = TextAnchor.MiddleCenter;
 			SetCenter(root.transform.Find("Next Level Button"), -205f, new Vector2(560f, 110f));
 		} else {
-			SetCenter(box, 0f, new Vector2(820f, 440f));
+			// Playtest: the buttons sat on the corner brackets. Box 980×600; buttons 520×110, 30 apart, ≥ 60 from the edge.
+			SetCenter(box, 0f, new Vector2(980f, 600f));
 			Transform lost = root.transform.Find("Lost Title");
-			SetCenter(lost, 100f, new Vector2(740f, 100f));
-			FitFor(lost, null, 72);
-			SetCenter(root.transform.Find("Play Again Button"), -35f, new Vector2(460f, 100f));
-			SetCenter(root.transform.Find("Main Menu Button"), -155f, new Vector2(460f, 100f));
+			SetCenter(lost, 160f, new Vector2(840f, 120f));
+			FitFor(lost, null, 80);
+			SetCenter(root.transform.Find("Play Again Button"), -30f, new Vector2(520f, 110f));
+			SetCenter(root.transform.Find("Main Menu Button"), -170f, new Vector2(520f, 110f));
 		}
 		if (border != null)
 			SetCenter(border, 0f, ((RectTransform)box).sizeDelta);
@@ -464,10 +465,12 @@ public static class UiTheme {
 			shadow.effectDistance = new Vector2(2f, -2f);
 			changed = true;
 		}
-		changed |= Place(root, "Play Button", 0f, new Vector2(520f, 110f));
-		changed |= Place(root, "Guide Button", -130f, new Vector2(520f, 110f));
-		changed |= Place(root, "Settings Button", -260f, new Vector2(520f, 110f));
-		changed |= Place(root, "Quit Button", -390f, new Vector2(520f, 110f));
+		// Chơi tiếp on top; 90-tall buttons 18 apart so five fit under the subtitle on a 20:9 screen.
+		changed |= Place(root, "Continue Button", 20f, new Vector2(520f, 90f));
+		changed |= Place(root, "Play Button", -88f, new Vector2(520f, 90f));
+		changed |= Place(root, "Guide Button", -196f, new Vector2(520f, 90f));
+		changed |= Place(root, "Settings Button", -304f, new Vector2(520f, 90f));
+		changed |= Place(root, "Quit Button", -412f, new Vector2(520f, 90f));
 		changed |= Place(root, "Easy Button", 140f, new Vector2(440f, 110f), "DifficultCanvas");
 		changed |= Place(root, "Normal Button", 0f, new Vector2(440f, 110f), "DifficultCanvas");
 		changed |= Place(root, "Hard Button", -140f, new Vector2(440f, 110f), "DifficultCanvas");

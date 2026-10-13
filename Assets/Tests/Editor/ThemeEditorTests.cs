@@ -139,7 +139,7 @@ public class ThemeEditorTests {
 	[Test]
 	public void MainMenuButtonsAreStackedWithoutGap() {
 		EditorSceneManager.OpenScene("Assets/Scenes/MainMenu.unity", OpenSceneMode.Single);
-		string[] column = { "Play Button", "Guide Button", "Settings Button", "Quit Button" };
+		string[] column = { "Continue Button", "Play Button", "Guide Button", "Settings Button", "Quit Button" };
 		for (int i = 0; i + 1 < column.Length; i++) {
 			RectTransform upper = GameObject.Find(column[i]).GetComponent<RectTransform>();
 			RectTransform lower = GameObject.Find(column[i + 1]).GetComponent<RectTransform>();
@@ -262,6 +262,27 @@ public class ThemeEditorTests {
 			} finally {
 				PrefabUtility.UnloadPrefabContents(root);
 			}
+		}
+	}
+
+	// Playtest: the lose panel's buttons touched the corner brackets.
+	[Test]
+	public void LosePanelHasRoomAroundItsButtons() {
+		GameObject root = PrefabUtility.LoadPrefabContents("Assets/Prefabs/GameOver Canvas.prefab");
+		try {
+			Rect box = LocalRect((RectTransform)root.transform.Find("BoxBackground"));
+			Rect retry = LocalRect((RectTransform)root.transform.Find("Play Again Button"));
+			Rect menu = LocalRect((RectTransform)root.transform.Find("Main Menu Button"));
+			Assert.GreaterOrEqual(box.width, 960f);
+			Assert.GreaterOrEqual(retry.width, 500f);
+			Assert.GreaterOrEqual(retry.height, 100f);
+			foreach (Rect b in new[] { retry, menu }) {
+				Assert.GreaterOrEqual(b.yMin - box.yMin, 60f, "bottom margin");
+				Assert.GreaterOrEqual(b.xMin - box.xMin, 60f, "side margin");
+			}
+			Assert.GreaterOrEqual(retry.yMin - menu.yMax, 30f, "gap between the buttons");
+		} finally {
+			PrefabUtility.UnloadPrefabContents(root);
 		}
 	}
 }

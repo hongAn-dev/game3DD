@@ -20,7 +20,8 @@ public class DecorTests {
 				Vector2 p = new Vector2(piece.position.x, piece.position.z);
 				Assert.GreaterOrEqual(Vector2.Distance(p, new Vector2(start.x, start.z)), DecorSetup.StartClear - 1f, level.levelId + " " + piece.name + " near the start");
 				foreach (Transform point in energy.landingPoints.Where(t => piece.GetComponent<CapsuleCollider>() != null))
-					Assert.GreaterOrEqual(Vector2.Distance(p, new Vector2(point.position.x, point.position.z)), 1.5f, level.levelId + " " + piece.name + " on a landing point");
+					// trunk capsule ≤ 0.9 m + core footprint ≈ 0.4 m
+					Assert.GreaterOrEqual(Vector2.Distance(p, new Vector2(point.position.x, point.position.z)), 1.3f, level.levelId + " " + piece.name + " on a landing point");
 			}
 			EnemyDirector director = Object.FindObjectOfType<EnemyDirector>();
 			Assert.AreEqual(2, director.creepVariants.Length, level.levelId);

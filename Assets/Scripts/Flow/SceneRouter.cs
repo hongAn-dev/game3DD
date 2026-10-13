@@ -17,10 +17,26 @@ public static class SceneRouter {
 
 	/// <summary>New Game: resets the campaign and starts the first level with the tutorial (or only its intro card).</summary>
 	public static void StartCampaign(GameSettings.gameDifficulties difficulty, bool tutorial) {
+		// The saved progress is cleared only here, once a new run really starts (not when "Chơi mới" is tapped).
+		SaveProgress.Reset();
+		SaveProgress.Difficulty = difficulty;
 		CampaignProgress.BeginRun(difficulty);
 		CampaignProgress.TutorialPending = tutorial;
 		GameSettings.showIntroLevelMessage = true;
 		Load(LevelCatalog.First.levelId);
+	}
+
+	/// <summary>"Chơi tiếp": an unlocked level with the last difficulty; earlier completed levels count for the
+	/// Ending. Opens with the level's intro card, no tutorial.</summary>
+	public static void ContinueAt(LevelConfig level) {
+		if (level == null || !SaveProgress.Unlocked(level))
+			return;
+		CampaignProgress.BeginRun(SaveProgress.Difficulty);
+		foreach (LevelConfig l in LevelCatalog.All)
+			if (l.order < level.order && SaveProgress.Completed(l))
+				CampaignProgress.CompleteLevel(l.levelId);
+		GameSettings.showIntroLevelMessage = true;
+		Load(level.levelId);
 	}
 
 	public static void Next() {

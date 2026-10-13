@@ -247,6 +247,8 @@ public class GameManager : MonoBehaviour {
 			GameFlow.Die ("MẤT KẾT NỐI");
 			gameState = gameStates.Death;
 			BeginResult (SfxEvent.Lose);
+			if (config != null)
+				SaveProgress.RecordBest (config, score);
 			// The panel only says "Bạn đã thua" (spec §7.1); the cause goes to the development log.
 			if (Debug.isDebugBuild)
 				Debug.Log ("GameManager: lost, cause: " + GameFlow.DeathCause);
@@ -260,6 +262,8 @@ public class GameManager : MonoBehaviour {
 			BeginResult (config != null && config.IsFinal ? SfxEvent.CampaignWin : SfxEvent.LevelWin);
 			if (config != null)
 				CampaignProgress.CompleteLevel (config.levelId);
+			if (config != null)
+				SaveProgress.RecordBest (config, score);   // unlocks the next level for "Chơi tiếp"
 			player.SetActive (false);
 			HideHud ();
 			if (config != null && config.IsFinal) {

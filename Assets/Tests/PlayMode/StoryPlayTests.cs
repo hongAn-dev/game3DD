@@ -328,4 +328,50 @@ public class StoryPlayTests {
 		Assert.IsFalse(dialog.IsOpen);
 		Assert.AreEqual(FlowState.Playing, GameFlow.State);
 	}
+
+	// "Chơi tiếp": saved progress unlocks levels in order; a locked level does not start; the last difficulty is used;
+	// winning records the level; "Chơi mới" clears it only when a run starts.
+	[UnityTest]
+	public IEnumerator ContinueUsesSavedProgress() {
+		int[] keep = LevelCatalog.All.Select(SaveProgress.Best).ToArray();
+		GameSettings.gameDifficulties keepDifficulty = SaveProgress.Difficulty, keepRun = GameSettings.difficulty;
+		try {
+			SaveProgress.Reset();
+			SaveProgress.Difficulty = GameSettings.gameDifficulties.Hard;
+			SaveProgress.RecordBest(LevelCatalog.Get("Level1"), 6);
+			yield return Open("MainMenu");
+			MainMenuPanels panels = Object.FindObjectOfType<MainMenuPanels>(true);
+			Assert.AreEqual("Năng lượng: 6/48", panels.totalEnergy.text);
+			panels.OpenLevels();
+			Assert.IsTrue(panels.levelButtons[1].interactable, "level 2 opens after level 1");
+			Assert.IsFalse(panels.levelButtons[2].interactable);
+			Assert.IsTrue(panels.levelLocks[2].gameObject.activeSelf);
+			StringAssert.Contains("Khoá", panels.levelLabels[2].text);
+			panels.PlayLevel(2);   // locked: nothing happens
+			yield return null;
+			Assert.AreEqual(SceneRouter.MainMenuScene, SceneManager.GetActiveScene().name);
+			panels.PlayLevel(1);
+			yield return null;
+			yield return null;
+			Assert.AreEqual("Level2", SceneManager.GetActiveScene().name);
+			Assert.AreEqual(GameSettings.gameDifficulties.Hard, GameSettings.difficulty, "last difficulty");
+			Assert.IsTrue(CampaignProgress.IsCompleted("Level1"), "earlier levels count for the Ending");
+			Object.FindObjectOfType<DialogPanel>(true).Finish();
+			GameManager.gm.Collect(GameManager.gm.BeatLevelScore);
+			yield return null;
+			yield return null;
+			Assert.IsTrue(SaveProgress.Unlocked(LevelCatalog.Get("Level3")), "winning level 2 unlocks level 3");
+			SceneRouter.ToMenu();
+			yield return null;
+			yield return null;
+			Assert.AreEqual(16, SaveProgress.TotalEnergy(), "going back to the menu keeps the progress");
+		} finally {
+			SaveProgress.Reset();
+			for (int i = 0; i < keep.Length; i++)
+				SaveProgress.RecordBest(LevelCatalog.All[i], keep[i]);
+			SaveProgress.Difficulty = keepDifficulty;
+			GameSettings.difficulty = keepRun;   // later tests load levels with the default difficulty
+			CampaignProgress.Reset();
+		}
+	}
 }

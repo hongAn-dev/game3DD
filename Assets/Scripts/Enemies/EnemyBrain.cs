@@ -67,7 +67,7 @@ public class EnemyBrain : MonoBehaviour {
 	public int HitAttempts { get; private set; }   // strikes that reached Hit (one per attack at most)
 	public AttackKind CurrentAttack { get; private set; }
 	public int PatrolRegionId { get; private set; }
-	public bool CanYieldChaseToken { get { return State == EnemyState.Chase; } }
+	public bool CanYieldChaseToken { get { return State == EnemyState.Chase && !IsBoss; } }
 
 	/// <summary>Ends an ordinary chase immediately when the director transfers its token to a closer enemy.</summary>
 	public bool YieldChaseToken() {
@@ -142,9 +142,10 @@ public class EnemyBrain : MonoBehaviour {
 		Enter(EnemyState.Idle);
 	}
 
-	// Chase tokens are globally budgeted by the active director; no director means no limit.
+	// Chase tokens are globally budgeted by the active director; no director means no limit. Guardians (bosses)
+	// are outside the budget (playtest: the final boss lost its token to nearer creeps and wandered on patrol).
 	bool MayChase() {
-		return EnemyDirector.Current == null || EnemyDirector.Current.RequestChase(this);
+		return IsBoss || EnemyDirector.Current == null || EnemyDirector.Current.RequestChase(this);
 	}
 
 	void ReleaseToken() {
@@ -265,13 +266,13 @@ public class EnemyBrain : MonoBehaviour {
 
 		switch (State) {
 		case EnemyState.Idle:
-			if (ShouldChase(distance) && MayChase())
+			if ((IsBoss || ShouldChase(distance)) && MayChase())
 				Enter(EnemyState.Chase);
 			else if (stateTime > 2f)
 				Enter(EnemyState.Patrol);
 			break;
 		case EnemyState.Patrol:
-			if (ShouldChase(distance) && MayChase()) {
+			if ((IsBoss || ShouldChase(distance)) && MayChase()) {
 				Enter(EnemyState.Chase);
 			} else if (stateTime > 6f || (!agent.pathPending && agent.remainingDistance < 1f)) {
 				NavMeshHit hit;
@@ -287,7 +288,7 @@ public class EnemyBrain : MonoBehaviour {
 				Enter(EnemyState.Return);
 				break;
 			}
-			if (EnemyDirector.Current != null && !EnemyDirector.Current.HoldsChase(this)) {
+			if (!IsBoss && EnemyDirector.Current != null && !EnemyDirector.Current.HoldsChase(this)) {
 				Enter(EnemyState.Patrol);   // a closer enemy took this token
 				break;
 			}
@@ -360,10 +361,14 @@ public class EnemyBrain : MonoBehaviour {
 			break;
 		case EnemyState.Recover:
 			if (stateTime >= (CurrentAttack == AttackKind.Dash ? dashRecover : recover)) {
-				Enter(distance <= loseRadius ? EnemyState.Chase : EnemyState.Return);
+				Enter(distance <= loseRadius || IsBoss ? EnemyState.Chase : EnemyState.Return);
 			}
 			break;
 		case EnemyState.Return:
+			if (IsBoss) {   // guardians never walk home: back on the robot
+				Enter(EnemyState.Chase);
+				break;
+			}
 			Repath(false);
 			// Back home, or at least 3 s of retreat, before chasing again (no chase/retreat flapping when stuck).
 			if (ShouldChase(distance) && stateTime > 3f && MayChase())
@@ -430,7 +435,7 @@ public class EnemyBrain : MonoBehaviour {
 		stuckTime = moved || arrived ? 0f : stuckTime + stuckCheckTimer;
 		stuckCheckTimer = 0f;
 		lastCheckPosition = transform.position;
-		if (stuckTime >= stuckReturn) {
+		if (stuckTime >= stuckReturn && !IsBoss) {
 			Enter(EnemyState.Return);
 		} else if (stuckTime >= stuckRepath && agent.isOnNavMesh) {
 			NavMeshHit hit;

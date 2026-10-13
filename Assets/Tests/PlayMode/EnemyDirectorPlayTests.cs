@@ -243,10 +243,37 @@ public class EnemyDirectorPlayTests {
 				brain.detectRadius = brain.loseRadius = 500f;
 			most = Mathf.Max(most, director.Chasing);
 			Assert.LessOrEqual(director.Chasing, limit);
-			Assert.LessOrEqual(Object.FindObjectsOfType<EnemyBrain>().Count(Chasing), limit, "respects the configured Level4 chase limit");
+			Assert.LessOrEqual(Object.FindObjectsOfType<EnemyBrain>().Where(b => !IsBoss(b)).Count(Chasing), limit, "creeps respect the configured Level4 chase limit (bosses are outside it)");
 			yield return null;
 		}
 		Assert.AreEqual(limit, most, "the configured limit is actually reached");
+	}
+
+	// Playtest: the final boss lost its chase token to nearer creeps and wandered on patrol. Bosses always chase.
+	[UnityTest]
+	public IEnumerator BossesAlwaysChaseEvenWhenTokensAreTaken() {
+		yield return Load("Level4", GameSettings.gameDifficulties.Hard);
+		director.quietTime = 0f;
+		director.intervalOverride = 0.1f;
+		director.bossGateOverride = true;
+		PinRobotOnGround();
+		var seen = new System.Collections.Generic.Dictionary<EnemyBrain, float>();
+		bool bossSeen = false;
+		float end = Time.time + 8f;
+		while (Time.time < end) {
+			foreach (EnemyBrain brain in Object.FindObjectsOfType<EnemyBrain>()) {
+				if (!IsBoss(brain))
+					continue;
+				bossSeen = true;
+				if (!seen.ContainsKey(brain))
+					seen[brain] = Time.time;
+				if (Time.time - seen[brain] > 0.5f)
+					Assert.IsFalse(brain.State == EnemyState.Patrol || brain.State == EnemyState.Return || brain.State == EnemyState.Idle,
+						"boss " + brain.State + " while " + director.Chasing + " creeps hold the tokens");
+			}
+			yield return null;
+		}
+		Assert.IsTrue(bossSeen, "a boss spawned");
 	}
 
 	// Spec §4.2: the first creep comes when the quiet time ends (not one interval later).

@@ -392,7 +392,7 @@ public class EnergySpawnDirector : MonoBehaviour {
                 emptyTimer = 0f;
                 Dictionary<SpawnPoint, float> pathCache;
                 var candidates = GetCandidates(true, true, out pathCache);
-                List<SpawnPoint> selected = SpreadSelect(candidates, missing, pathCache, false);
+                List<SpawnPoint> selected = SpreadSelect(candidates, missing, pathCache, true);   // the first one near the robot
                 if (selected.Count == 0 && !TrySpawnNear()) emptyTimer = FallbackDelay - FallbackRetry;
                 foreach (SpawnPoint point in selected) StartSpawn(point.transform.position);
                 return;
@@ -408,22 +408,43 @@ public class EnergySpawnDirector : MonoBehaviour {
 
     static float CachedPath(SpawnPoint p, Dictionary<SpawnPoint, float> paths) { float d; return paths.TryGetValue(p, out d) ? d : float.MaxValue; }
 
-    [Tooltip("Cores keep at least this far apart when the map allows it (playtest: cores were bunched up).")]
-    public float spreadSpacing = 5f;
+    [Tooltip("Cores keep at least this far apart; small maps step it down a metre at a time (never below minSpread).")]
+    public float spreadSpacing = 8f;
+    public const float MinSpread = 3f;
+
+    /// <summary>The spacing the last selection achieved (8 m on large maps, less on a small island).</summary>
+    public float LastSpacing { get; private set; }
+
+    // Risk for energy placement: map edge / enemies / real traps, but not "beside another core" (the harmful
+    // director's tag), which made new cores land next to old ones.
+    static bool EnergyRisk(SpawnPoint c) {
+        return (c.riskFlags | (c.dynamicRiskFlags & ~SpawnRisk.Trap)) != SpawnRisk.None;
+    }
 
     /// <summary>
-    /// Spreads cores over the whole map (playtest): farthest-point sampling, each pick random among the three
-    /// candidates farthest from every core already chosen or on the map, at least spreadSpacing apart when possible.
-    /// A level's energyRiskFraction of the picks come from risky points (map edge, near enemies/traps). The first
-    /// core of a level stays 5–18 m from the robot so the start is easy.
+    /// Spreads cores over the whole map (playtest): every core at least spreadSpacing (8 m) from the others and
+    /// from cores already on the map; when the map cannot fit that many, the spacing steps down a metre at a time.
+    /// Farthest-point picks (random among the 3 farthest) keep the coverage even; a level's energyRiskFraction of
+    /// the picks come from risky ground. The first core of a level stays 5–18 m from the robot.
     /// </summary>
     List<SpawnPoint> SpreadSelect(List<SpawnPoint> candidates, int count, Dictionary<SpawnPoint, float> paths, bool nearFirst) {
+        List<SpawnPoint> best = new List<SpawnPoint>();
+        if (count <= 0 || candidates.Count == 0) return best;
+        for (float spacing = spreadSpacing; spacing >= MinSpread - 0.01f; spacing -= 1f) {
+            List<SpawnPoint> picks = SpreadAt(candidates, count, paths, nearFirst, spacing);
+            if (picks.Count > best.Count) { best = picks; LastSpacing = spacing; }
+            if (picks.Count >= count) break;
+        }
+        return best;
+    }
+
+    List<SpawnPoint> SpreadAt(List<SpawnPoint> candidates, int count, Dictionary<SpawnPoint, float> paths, bool nearFirst, float spacing) {
         var selected = new List<SpawnPoint>();
         var pool = new List<SpawnPoint>(candidates);
         var anchors = alive.Where(t => t != null).Select(t => t.transform.position).ToList();
-        if (count <= 0 || pool.Count == 0) return selected;
+        System.Func<SpawnPoint, float> gap = c => anchors.Count == 0 ? float.MaxValue : anchors.Min(a => Vector3.Distance(a, c.transform.position));
         if (nearFirst) {
-            var near = pool.Where(c => !c.IsRisk && CachedPath(c, paths) >= nearPath.x && CachedPath(c, paths) <= nearPath.y).ToList();
+            var near = pool.Where(c => !EnergyRisk(c) && CachedPath(c, paths) >= nearPath.x && CachedPath(c, paths) <= nearPath.y && gap(c) >= spacing).ToList();
             if (near.Count > 0) {
                 SpawnPoint first = near[Random.Range(0, near.Count)];
                 selected.Add(first); pool.Remove(first); anchors.Add(first.transform.position);
@@ -434,15 +455,12 @@ public class EnergySpawnDirector : MonoBehaviour {
         for (int i = selected.Count; i < count; i++) slots.Add(i - selected.Count < risky);
         slots = slots.OrderBy(_ => Random.value).ToList();
         foreach (bool risk in slots) {
-            List<SpawnPoint> kind = pool.Where(c => c.IsRisk == risk).ToList();
-            if (kind.Count == 0) kind = pool;
-            if (kind.Count == 0) break;
-            var ranked = kind.Select(c => new KeyValuePair<SpawnPoint, float>(c, anchors.Count == 0 ? Random.value * 100f
-                    : anchors.Min(a => Vector3.Distance(a, c.transform.position))))
-                .OrderByDescending(x => x.Value).ToList();
-            var spaced = ranked.Where(x => x.Value >= spreadSpacing).ToList();
-            var choices = (spaced.Count > 0 ? spaced : ranked).Take(3).ToList();
-            SpawnPoint pick = choices[Random.Range(0, choices.Count)].Key;
+            var open = pool.Where(c => gap(c) >= spacing).ToList();
+            if (open.Count == 0) break;
+            List<SpawnPoint> kind = open.Where(c => EnergyRisk(c) == risk).ToList();
+            if (kind.Count == 0) kind = open;
+            var choices = kind.OrderByDescending(gap).Take(3).ToList();
+            SpawnPoint pick = choices[Random.Range(0, choices.Count)];
             selected.Add(pick); pool.Remove(pick); anchors.Add(pick.transform.position);
         }
         return selected;

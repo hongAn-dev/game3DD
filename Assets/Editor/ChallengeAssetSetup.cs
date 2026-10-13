@@ -10,29 +10,25 @@ public static class ChallengeAssetSetup {
 	const string TexturePath = Root + "Textures/planet_surface.png";
 	const string PlanetPath = Root + "Materials/Planet.mat";
 	const string AtmospherePath = Root + "Materials/PlanetAtmosphere.mat";
-	const string CrystalMeshPath = Root + "Models/AntiEnergyCrystal.asset";
-	static readonly Color Poison = new Color32(235, 58, 58, 255);      // HP loss: the HUD's red minus
-	static readonly Color PoisonDark = new Color32(70, 18, 22, 255);
-	static readonly Color AntiEnergy = new Color32(255, 90, 54, 255);
-	static readonly Color AntiEnergyDark = new Color32(102, 35, 32, 255);
-	static readonly Color Magnetic = new Color32(159, 92, 224, 255);
-	static readonly Color MagneticDark = new Color32(65, 40, 103, 255);
+	// Harmful pickups wear the energy core's shape in colours opposed to its cyan (playtest): red takes HP,
+	// magenta takes energy, orange slows the robot. Glow (body) and shard colours per kind.
+	static readonly Color Poison = new Color32(235, 45, 45, 255);
+	static readonly Color PoisonShard = new Color32(255, 150, 140, 255);
+	static readonly Color AntiEnergy = new Color32(225, 40, 205, 255);
+	static readonly Color AntiEnergyShard = new Color32(255, 150, 240, 255);
+	static readonly Color Magnetic = new Color32(255, 105, 15, 255);
+	static readonly Color MagneticShard = new Color32(255, 205, 130, 255);
+	const string CoreModel = Root + "Models/EnergyCore.fbx";
 
 	[MenuItem("Tools/Robo Lac Loi/Apply Challenge Assets")]
 	public static void Apply() {
 		EnsureFolder("Assets/ThirdParty/RoboLacLoi/Materials", "Harmful");
 		EnsureFolder("Assets/Prefabs", "Harmful");
 		ImportIcons();
-		Material poison = MakeMaterial(MaterialFolder + "/Poison.mat", Poison, 0.05f);
-		Material poisonDark = MakeMaterial(MaterialFolder + "/PoisonDark.mat", PoisonDark, 0.05f);
-		Material anti = MakeMaterial(MaterialFolder + "/AntiEnergy.mat", AntiEnergy, 0.15f);
-		Material antiDark = MakeMaterial(MaterialFolder + "/AntiEnergyDark.mat", AntiEnergyDark, 0.1f);
-		Material magnetic = MakeMaterial(MaterialFolder + "/Magnetic.mat", Magnetic, 0.15f);
-		Material magneticDark = MakeMaterial(MaterialFolder + "/MagneticDark.mat", MagneticDark, 0.05f);
 		BuildPlanet();
-		BuildPoison(poison, poisonDark);
-		BuildAntiEnergy(anti, antiDark);
-		BuildMagnetic(magnetic, magneticDark);
+		BuildCore("Poison", HarmfulKind.Poison, Poison, PoisonShard);
+		BuildCore("AntiEnergy", HarmfulKind.AntiEnergy, AntiEnergy, AntiEnergyShard);
+		BuildCore("MagneticInterference", HarmfulKind.Magnetic, Magnetic, MagneticShard);
 		AssetDatabase.SaveAssets();
 		Debug.Log("ChallengeAssetSetup: planet materials and three harmful-item prefabs rebuilt");
 	}
@@ -56,21 +52,6 @@ public static class ChallengeAssetSetup {
 		string path = parent + "/" + name;
 		if (!AssetDatabase.IsValidFolder(path))
 			AssetDatabase.CreateFolder(parent, name);
-	}
-
-	static Material MakeMaterial(string path, Color color, float metallic) {
-		Material material = AssetDatabase.LoadAssetAtPath<Material>(path);
-		if (material == null) {
-			Shader shader = Shader.Find("Standard");
-			material = new Material(shader) { name = Path.GetFileNameWithoutExtension(path) };
-			AssetDatabase.CreateAsset(material, path);
-		}
-		material.shader = Shader.Find("Standard");
-		material.color = color;
-		material.SetFloat("_Metallic", metallic);
-		material.SetFloat("_Glossiness", 0.28f);
-		EditorUtility.SetDirty(material);
-		return material;
 	}
 
 	static void BuildPlanet() {
@@ -129,24 +110,6 @@ public static class ChallengeAssetSetup {
 		return root;
 	}
 
-	static GameObject Primitive(Transform parent, PrimitiveType type, string name, Vector3 position, Vector3 scale,
-		Material material, Quaternion rotation = default(Quaternion)) {
-		if (parent.GetComponent<HarmfulPickup>() != null) parent = parent.Find("Model");
-		GameObject child = GameObject.CreatePrimitive(type);
-		child.name = name;
-		child.transform.SetParent(parent, false);
-		child.transform.localPosition = position;
-		child.transform.localScale = scale;
-		if (rotation != default(Quaternion))
-			child.transform.localRotation = rotation;
-		Renderer renderer = child.GetComponent<Renderer>();
-		renderer.sharedMaterial = material;
-		Collider collider = child.GetComponent<Collider>();
-		if (collider != null)
-			Object.DestroyImmediate(collider);
-		return child;
-	}
-
 	static void SavePrefab(GameObject root) {
 		Transform model = root.transform.Find("Model");
 		Bounds bounds;
@@ -168,95 +131,45 @@ public static class ChallengeAssetSetup {
 		Object.DestroyImmediate(root);
 	}
 
-	// Playtest: the pickups read as their HUD/guide symbols. Poison = red minus (loses HP), drawn as a thick bar
-	// with a dark backing so it reads from any side.
-	static void BuildPoison(Material body, Material dark) {
-		GameObject root = RootObject("Poison");
-		root.GetComponent<HarmfulPickup>().kind = HarmfulKind.Poison;
-		Primitive(root.transform, PrimitiveType.Cube, "Minus backing", new Vector3(0f, 0.5f, 0f), new Vector3(0.86f, 0.32f, 0.12f), dark);
-		Primitive(root.transform, PrimitiveType.Cube, "Minus", new Vector3(0f, 0.5f, 0f), new Vector3(0.76f, 0.22f, 0.24f), body);
-		SavePrefab(root);
-	}
-
-	static void BuildAntiEnergy(Material body, Material dark) {
-		GameObject root = RootObject("AntiEnergy", 0.42f);
-		root.GetComponent<HarmfulPickup>().kind = HarmfulKind.AntiEnergy;
-		GameObject crystal = new GameObject("Minus crystal", typeof(MeshFilter), typeof(MeshRenderer));
-		crystal.transform.SetParent(root.transform.Find("Model"), false);
-		crystal.transform.localPosition = new Vector3(0f, 0.48f, 0f);
-		crystal.transform.localScale = new Vector3(0.8f, 0.8f, 0.8f);
-		crystal.GetComponent<MeshFilter>().sharedMesh = Octahedron();
-		crystal.GetComponent<MeshRenderer>().sharedMaterial = body;
-		Primitive(root.transform, PrimitiveType.Cube, "Minus sign", new Vector3(0f, 0.49f, -0.36f), new Vector3(0.42f, 0.09f, 0.06f), dark);
-		SavePrefab(root);
-	}
-
-	static Mesh Octahedron() {
-		Mesh saved = AssetDatabase.LoadAssetAtPath<Mesh>(CrystalMeshPath);
-		if (saved != null)
-			return saved;
-		Mesh mesh = new Mesh { name = "AntiEnergyCrystal" };
-		mesh.vertices = new[] {
-			new Vector3(0, 0.5f, 0), new Vector3(0, -0.5f, 0), new Vector3(-0.5f, 0, 0),
-			new Vector3(0, 0, 0.5f), new Vector3(0.5f, 0, 0), new Vector3(0, 0, -0.5f)
-		};
-		mesh.triangles = new[] { 0, 2, 3, 0, 3, 4, 0, 4, 5, 0, 5, 2, 1, 3, 2, 1, 4, 3, 1, 5, 4, 1, 2, 5 };
-		mesh.RecalculateNormals();
-		mesh.RecalculateBounds();
-		AssetDatabase.CreateAsset(mesh, CrystalMeshPath);
-		return mesh;
-	}
-
-	// Magnetic interference slows the robot: a purple lightning bolt (the HUD slow symbol), not a gate-like magnet.
-	static void BuildMagnetic(Material body, Material poles) {
-		GameObject root = RootObject("MagneticInterference");
-		root.GetComponent<HarmfulPickup>().kind = HarmfulKind.Magnetic;
-		GameObject bolt = new GameObject("Lightning bolt", typeof(MeshFilter), typeof(MeshRenderer));
-		bolt.transform.SetParent(root.transform.Find("Model"), false);
-		bolt.transform.localPosition = new Vector3(0f, 0.05f, 0f);
-		bolt.GetComponent<MeshFilter>().sharedMesh = Bolt();
-		bolt.GetComponent<MeshRenderer>().sharedMaterial = body;
-		Primitive(root.transform, PrimitiveType.Cylinder, "Base", new Vector3(0f, 0.04f, 0f), new Vector3(0.5f, 0.04f, 0.5f), poles);
-		SavePrefab(root);
-	}
-
-	const string BoltMeshPath = Root + "Models/SlowBolt.asset";
-
-	// Zig-zag bolt outline (x, y in metres), extruded 0.14 m.
-	static Mesh Bolt() {
-		Mesh saved = AssetDatabase.LoadAssetAtPath<Mesh>(BoltMeshPath);
-		if (saved != null)
-			AssetDatabase.DeleteAsset(BoltMeshPath);
-		Vector2[] outline = {
-			new Vector2(0.10f, 1.00f), new Vector2(-0.28f, 0.42f), new Vector2(-0.02f, 0.42f),
-			new Vector2(-0.14f, 0.00f), new Vector2(0.28f, 0.60f), new Vector2(0.02f, 0.60f),
-		};
-		const float half = 0.07f;
-		var vertices = new System.Collections.Generic.List<Vector3>();
-		var triangles = new System.Collections.Generic.List<int>();
-		// Front and back caps: the outline is two triangles' worth of quads, fanned from its two halves.
-		int[] cap = { 0, 1, 2, 0, 2, 5, 2, 3, 4, 2, 4, 5 };
-		foreach (float z in new[] { -half, half }) {
-			int b = vertices.Count;
-			foreach (Vector2 p in outline) vertices.Add(new Vector3(p.x, p.y, z));
-			for (int t = 0; t < cap.Length; t += 3) {
-				if (z < 0f) { triangles.Add(b + cap[t]); triangles.Add(b + cap[t + 2]); triangles.Add(b + cap[t + 1]); }
-				else { triangles.Add(b + cap[t]); triangles.Add(b + cap[t + 1]); triangles.Add(b + cap[t + 2]); }
-			}
+	// The energy core model (EnergyCore.fbx) with the kind's own glow/shard materials; no Treasure on it.
+	static void BuildCore(string name, HarmfulKind kind, Color glow, Color shard) {
+		GameObject root = RootObject(name);
+		root.GetComponent<HarmfulPickup>().kind = kind;
+		Material glowMat = CoreMaterial(MaterialFolder + "/" + name + "Glow.mat", "CoreGlow", glow, 1.5f);
+		Material shardMat = CoreMaterial(MaterialFolder + "/" + name + "Shard.mat", "CoreShard", shard, 1.2f);
+		GameObject core = (GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(CoreModel));
+		PrefabUtility.UnpackPrefabInstance(core, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
+		core.name = "Core";
+		core.transform.SetParent(root.transform.Find("Model"), false);
+		foreach (Renderer r in core.GetComponentsInChildren<Renderer>()) {
+			Material[] mats = r.sharedMaterials;
+			for (int i = 0; i < mats.Length; i++)
+				mats[i] = mats[i] != null && mats[i].name.Contains("Shard") ? shardMat : glowMat;
+			r.sharedMaterials = mats;
 		}
-		for (int i = 0; i < outline.Length; i++) {   // sides, own vertices for flat shading
-			Vector2 a = outline[i], c = outline[(i + 1) % outline.Length];
-			int b = vertices.Count;
-			vertices.Add(new Vector3(a.x, a.y, -half)); vertices.Add(new Vector3(c.x, c.y, -half));
-			vertices.Add(new Vector3(c.x, c.y, half)); vertices.Add(new Vector3(a.x, a.y, half));
-			triangles.AddRange(new[] { b, b + 1, b + 2, b, b + 2, b + 3 });
-		}
-		Mesh mesh = new Mesh { name = "SlowBolt" };
-		mesh.SetVertices(vertices);
-		mesh.SetTriangles(triangles, 0);
-		mesh.RecalculateNormals();
-		mesh.RecalculateBounds();
-		AssetDatabase.CreateAsset(mesh, BoltMeshPath);
-		return mesh;
+		foreach (Collider c in core.GetComponentsInChildren<Collider>())
+			Object.DestroyImmediate(c);
+		SavePrefab(root);
 	}
+
+	// A copy of the energy core's material (same shader and emission setup) in the kind's colour.
+	static Material CoreMaterial(string path, string template, Color color, float emission) {
+		Material source = AssetDatabase.LoadAssetAtPath<Material>(Root + "Materials/" + template + ".mat");
+		Material material = AssetDatabase.LoadAssetAtPath<Material>(path);
+		if (material == null) {
+			material = new Material(source);
+			AssetDatabase.CreateAsset(material, path);
+		} else {
+			material.CopyPropertiesFromMaterial(source);
+			material.shader = source.shader;
+		}
+		material.color = color;
+		if (material.HasProperty("_EmissionColor")) {
+			material.EnableKeyword("_EMISSION");
+			material.SetColor("_EmissionColor", color * emission * 0.6f);
+		}
+		EditorUtility.SetDirty(material);
+		return material;
+	}
+
 }

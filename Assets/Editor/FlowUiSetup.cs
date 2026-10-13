@@ -105,14 +105,72 @@ public static class FlowUiSetup {
 		Button("Close Button", box, 0f, 340f, "Đóng", panels.CloseSettings);
 		backdrop.gameObject.SetActive(false);
 
+		LevelSelect(root.transform, panels);
+
 		Transform play = Object.FindObjectsOfType<Button>(true).Single(x => x.name == "Play Button").transform;
-		foreach (string name in new[] { "Guide Button", "Settings Button" }) {
+		foreach (string name in new[] { "Continue Button", "Guide Button", "Settings Button" }) {
 			Transform existing = play.parent.Find(name);
 			if (existing != null)
 				Object.DestroyImmediate(existing.gameObject);
 		}
 		MenuButton("Guide Button", play.parent, "Hướng dẫn chơi", panels.OpenGuide);
 		MenuButton("Settings Button", play.parent, "Cài đặt", panels.OpenSettings);
+		MenuButton("Continue Button", play.parent, "Chơi tiếp", panels.OpenLevels);
+		play.parent.Find("Continue Button").SetSiblingIndex(play.GetSiblingIndex());   // top of the column
+	}
+
+	// "Chơi tiếp": one row per level (padlock + "Khoá" when locked), Đóng; and the campaign energy total top right,
+	// left of the SFX/BGM buttons.
+	static void LevelSelect(Transform root, MainMenuPanels panels) {
+		RectTransform backdrop = Rect("Level Select", root, Vector2.zero);
+		Stretch(backdrop);
+		backdrop.gameObject.AddComponent<Image>().color = new Color(0f, 0f, 0f, 0.6f);
+		backdrop.gameObject.AddComponent<ModalBackdrop>();
+		panels.levelSelect = backdrop.gameObject;
+		RectTransform box = Rect("Box", backdrop, new Vector2(1240f, 880f));
+		foreach (string name in new[] { "BoxBackground", "BoxBorder" }) {
+			RectTransform part = Rect(name, box, Vector2.zero);
+			Stretch(part);
+			part.gameObject.AddComponent<Image>().raycastTarget = false;
+		}
+		Label("Dialog Title", box, new Vector2(0f, 350f), new Vector2(1100f, 100f), "Bold", 60).text = "Chơi tiếp";
+		int count = LevelCatalog.All.Count;
+		panels.levelButtons = new Button[count];
+		panels.levelLabels = new Text[count];
+		panels.levelLocks = new Image[count];
+		for (int i = 0; i < count; i++) {
+			Button row = Button("Level Button " + (i + 1), box, 0f, 1000f, "Màn " + (i + 1), null);
+			RectTransform rect = (RectTransform)row.transform;
+			rect.sizeDelta = new Vector2(1000f, 110f);
+			rect.anchoredPosition = new Vector2(0f, 220f - i * 135f);
+			UnityEventTools.AddIntPersistentListener(row.onClick, panels.PlayLevel, i);
+			Text label = row.GetComponentInChildren<Text>();
+			label.rectTransform.offsetMin = new Vector2(110f, 0f);   // room for the padlock
+			label.alignment = TextAnchor.MiddleLeft;
+			RectTransform lockRect = Rect("Lock", rect, new Vector2(64f, 64f));
+			lockRect.anchorMin = lockRect.anchorMax = new Vector2(0f, 0.5f);
+			lockRect.anchoredPosition = new Vector2(60f, 0f);
+			Image lockIcon = lockRect.gameObject.AddComponent<Image>();
+			lockIcon.sprite = Sprite("lock");
+			lockIcon.preserveAspect = true;
+			lockIcon.raycastTarget = false;
+			panels.levelButtons[i] = row;
+			panels.levelLabels[i] = label;
+			panels.levelLocks[i] = lockIcon;
+		}
+		Button("Close Button", box, 0f, 340f, "Đóng", panels.CloseLevels);
+		((RectTransform)box.Find("Close Button")).anchoredPosition = new Vector2(0f, -360f);
+		backdrop.gameObject.SetActive(false);
+
+		Text total = Label("Total Energy", root, Vector2.zero, new Vector2(520f, 80f), "Bold", 40);
+		total.rectTransform.anchorMin = total.rectTransform.anchorMax = total.rectTransform.pivot = new Vector2(1f, 1f);
+		total.rectTransform.anchoredPosition = new Vector2(-(Margin + 2f * Touch + 2f * Gap + 20f), -(Margin + (Touch - 80f) / 2f));
+		total.alignment = TextAnchor.MiddleRight;
+		total.text = StoryText.EnergyLabel(0, 48);
+		Shadow outline = total.gameObject.AddComponent<Shadow>();   // readable over the scenery (UiTheme strips Outline)
+		outline.effectColor = new Color(0f, 0f, 0f, 0.85f);
+		outline.effectDistance = new Vector2(2f, -2f);
+		panels.totalEnergy = total;
 	}
 
 	static Slider SettingRow(Transform box, string label, float y, float min, float max, UnityEngine.Events.UnityAction<float> action) {
@@ -318,7 +376,8 @@ public static class FlowUiSetup {
 		text.rectTransform.anchorMax = Vector2.one;
 		text.rectTransform.offsetMin = text.rectTransform.offsetMax = Vector2.zero;
 		text.text = label;
-		UnityEventTools.AddPersistentListener(button.onClick, action);
+		if (action != null)
+			UnityEventTools.AddPersistentListener(button.onClick, action);
 		return button;
 	}
 }

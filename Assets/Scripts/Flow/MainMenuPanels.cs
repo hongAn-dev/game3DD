@@ -4,7 +4,8 @@ using UnityEngine.UI;
 /// <summary>
 /// Main menu extras (spec §7.3, §7.6, §8.2): "Hướng dẫn chơi" opens the how-to-play pages in the story dialog (Đóng
 /// returns to the menu; no run starts), "Cài đặt" shows camera sensitivity and Music/SFX/Ambience volumes, saved on the
-/// device as they move.
+/// device as they move. "Chơi tiếp" lists the four levels: unlocked ones start with the last difficulty, locked ones
+/// show a padlock and "Khoá" and cannot be tapped. The campaign energy total ("Năng lượng: x/48") sits top right.
 /// </summary>
 public class MainMenuPanels : MonoBehaviour {
 
@@ -14,6 +15,42 @@ public class MainMenuPanels : MonoBehaviour {
 	public Slider music;
 	public Slider sfx;
 	public Slider ambience;
+	public GameObject levelSelect;
+	public Button[] levelButtons = new Button[0];
+	public Text[] levelLabels = new Text[0];
+	public Image[] levelLocks = new Image[0];
+	public Text totalEnergy;
+
+	void Start() {
+		ShowTotal();
+	}
+
+	void ShowTotal() {
+		if (totalEnergy != null)
+			totalEnergy.text = StoryText.EnergyLabel(SaveProgress.TotalEnergy(), SaveProgress.TotalTarget());
+	}
+
+	public void OpenLevels() {
+		for (int i = 0; i < levelButtons.Length && i < LevelCatalog.All.Count; i++) {
+			LevelConfig level = LevelCatalog.All[i];
+			bool open = SaveProgress.Unlocked(level);
+			levelButtons[i].interactable = open;
+			levelLocks[i].gameObject.SetActive(!open);
+			levelLabels[i].text = open
+				? "Màn " + level.order + ": " + level.displayName + "  (" + SaveProgress.Best(level) + "/" + level.energyTarget + ")"
+				: "Màn " + level.order + ": Khoá";
+		}
+		levelSelect.SetActive(true);
+	}
+
+	public void CloseLevels() {
+		levelSelect.SetActive(false);
+	}
+
+	public void PlayLevel(int index) {
+		if (index >= 0 && index < LevelCatalog.All.Count)
+			SceneRouter.ContinueAt(LevelCatalog.All[index]);
+	}
 
 	public void OpenGuide() {
 		dialog.ShowClosable(StoryText.Guide(), "Đóng", null);
@@ -27,6 +64,8 @@ public class MainMenuPanels : MonoBehaviour {
 			dialog.Finish();
 		else if (settings.activeSelf)
 			CloseSettings();
+		else if (levelSelect != null && levelSelect.activeSelf)
+			CloseLevels();
 	}
 
 	public void OpenSettings() {

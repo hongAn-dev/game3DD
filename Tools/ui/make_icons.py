@@ -90,6 +90,15 @@ write('trap_poison', bottle)
 write('trap_anti_energy', minus_crystal)
 write('trap_magnetic', magnet)
 
+def lock(x, y):   # padlock: shackle arc over a rounded body (locked level in "Chơi tiếp")
+    body = 26 <= x <= 102 and 56 <= y <= 112
+    d = math.hypot(x - 64, y - 52)
+    shackle = 22 <= d <= 34 and y <= 58
+    keyhole = math.hypot(x - 64, y - 78) <= 7 or (61 <= x <= 67 and 78 <= y <= 98)
+    return (body or shackle) and not keyhole
+
+write('lock', lock)
+
 # Soft dark radial gradient used only behind the menu title/subtitle. Peak alpha is about 76%; edges fade clear.
 def write_gradient(name, width=512, height=256):
     rows = []

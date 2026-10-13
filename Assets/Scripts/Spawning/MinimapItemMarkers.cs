@@ -42,7 +42,8 @@ public sealed class MinimapItemMarkers : MonoBehaviour {
             Collider trigger=item.GetComponent<Collider>(); if(trigger==null)trigger=item.GetComponentInChildren<Collider>();
             if(trigger==null||!trigger.enabled)continue;
             Sprite icon=item.kind==HarmfulKind.Poison?poisonIcon:item.kind==HarmfulKind.AntiEnergy?antiEnergyIcon:magneticIcon;
-            Color color=item.kind==HarmfulKind.Poison?new Color(1f,.75f,.12f):item.kind==HarmfulKind.AntiEnergy?new Color(1f,.28f,.18f):new Color(.75f,.35f,1f);
+            // Same colours as the pickups: red (HP), magenta (energy), orange (slow).
+            Color color=item.kind==HarmfulKind.Poison?new Color(.92f,.18f,.18f):item.kind==HarmfulKind.AntiEnergy?new Color(.88f,.16f,.8f):new Color(1f,.41f,.06f);
             UpdateMarker(item.transform,item.GetInstanceID(),icon,color,seen);
         }
         var remove=new List<int>();

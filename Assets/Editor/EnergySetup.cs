@@ -19,6 +19,7 @@ public static class EnergySetup {
             if (director == null) director = manager.gameObject.AddComponent<EnergySpawnDirector>();
             director.corePrefab = core;
             director.minSpacing = 1.5f;
+            director.spreadSpacing = 8f;   // cores 8 m apart (stepped down only on small maps)
             director.minPlayerDistance = 3f;
             director.staleDelay = 12f;
             director.intervalOverride = -1f;
@@ -176,13 +177,33 @@ public static class EnergySetup {
         // Keep the ordinary candidate set complete first. If fewer than the required count pass validation, report it;
         // do not widen clearance or admit points outside the connected walkable region.
         int target = Mathf.Max(minimum, 0);
-        var selected = ClusteredSpread(safe, target);
+        // Grow the cell until the map gives about 1.5× the level's minimum: even coverage without thousands of
+        // points (the runtime measures a NavMesh path to every candidate when it picks).
+        float gridCell = GridCell;
+        var selected = GridSpread(safe, gridCell, 1);
+        while (selected.Count > target * 3 / 2 && gridCell < 20f) {
+            gridCell += 0.5f;
+            selected = GridSpread(safe, gridCell, 1);
+        }
+        // The start area (5–18 m by path) keeps the fine 3 m grid: the first core and the near fallback live there.
+        foreach (Candidate near in GridSpread(safe.Where(c => c.path <= 18f).ToList(), GridCell, 500000))
+            if (selected.All(c => Vector3.Distance(c.point, near.point) >= GridCell))
+                selected.Add(near);
         int selectedNearSafeCount = selected.Count(c => c.risk == SpawnRisk.None && c.path >= 5f && c.path <= 18f);
         Debug.Log("EnergySetup: near safe candidates (5-18 m path) coarse=" + coarseNearSafeCount
             + ", subgrid added=" + fineNearAdded + ", raw validated=" + rawNearSafeCount
             + ", selected=" + selectedNearSafeCount);
         // Edge points are an additional layer for risk-budget batches.
-        selected.AddRange(ClusteredSpread(risk, Mathf.Min(Mathf.Max(6, target/3), risk.Count)));
+        if (selected.Count < target)
+            Debug.LogWarning("EnergySetup: the " + gridCell + " m grid gives only " + selected.Count + " safe points; target " + target);
+        // Edge points: an extra layer (about a third of the safe count) on a coarser grid for the risk share.
+        float riskCell = gridCell * 2f;
+        var edges = GridSpread(risk, riskCell, 1000000);
+        while (edges.Count > Mathf.Max(6, target / 3) && riskCell < 24f) {
+            riskCell += 1f;
+            edges = GridSpread(risk, riskCell, 1000000);
+        }
+        selected.AddRange(edges);
         var points = new List<Transform>();
         for (int i=0;i<selected.Count;i++) {
             Candidate c=selected[i];
@@ -211,38 +232,18 @@ public static class EnergySetup {
         }
         return radius+.25f;
     }
-    static List<Candidate> ClusteredSpread(List<Candidate> source,int count) {
-        var remaining=source.ToList();
-        var groups=new List<List<Candidate>>();
-        int nextCluster=source.Count>0&&source[0].risk!=SpawnRisk.None?1000000:1;
-        while(remaining.Count>0) {
-            Candidate seed=remaining.OrderBy(c=>c.path).First();
-            var group=remaining.Where(c=>Vector3.Distance(c.point,seed.point)>=1.5f&&Vector3.Distance(c.point,seed.point)<=2.5f)
-                .OrderBy(c=>Vector3.Distance(c.point,seed.point)).Take(3).ToList();
-            group.Insert(0,seed);
-            foreach(Candidate c in group)remaining.Remove(c);
-            for(int i=0;i<group.Count;i++){Candidate c=group[i];c.cluster=nextCluster;group[i]=c;}
-            // A single validated cell is still a useful authored choice, especially near the
-            // starting island where safe ground can be too small for a multi-point cluster.
-            if(group.Count>=1)groups.Add(group);
-            nextCluster++;
-        }
-        var regions=groups.GroupBy(g=>g[0].region)
-            .OrderBy(g=>g.Min(cluster=>cluster.Min(candidate=>candidate.path)))
-            .Select(g=>g.OrderBy(x=>x[0].path).ToList()).ToList();
-        var result=new List<Candidate>();
-        int depth=0;
-        bool added=true;
-        while(result.Count<count&&added) {
-            added=false;
-            foreach(var region in regions) {
-                if(depth>=region.Count)continue;
-                added=true;
-                List<Candidate> group=region[depth];
-                result.AddRange(group);
-                if(result.Count>=count)break;
-            }
-            depth++;
+    const float GridCell = 3f;
+
+    // Playtest: points used to come in 1.5–2.5 m clusters near the start. One point per cell over every reachable
+    // cell covers the whole map evenly; the runtime keeps cores 8 m apart. Each point is its own cluster.
+    static List<Candidate> GridSpread(List<Candidate> source, float cell, int firstCluster) {
+        var result = new List<Candidate>();
+        foreach (var bucket in source.GroupBy(c => new Vector2Int(Mathf.FloorToInt(c.point.x / cell), Mathf.FloorToInt(c.point.z / cell)))
+                     .OrderBy(g => g.Min(c => c.path))) {
+            Vector2 centre = ((Vector2)bucket.Key + Vector2.one * 0.5f) * cell;
+            Candidate pick = bucket.OrderBy(c => Vector2.Distance(new Vector2(c.point.x, c.point.z), centre)).First();
+            pick.cluster = firstCluster + result.Count;
+            result.Add(pick);
         }
         return result;
     }
