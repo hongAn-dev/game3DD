@@ -16,6 +16,7 @@ MonoBehaviour:
   order: 3
   displayName: "Thung l\u0169ng dung nham"
   nextScene: Level4
+  timeLimitSeconds: 210
   energyTarget: 14
   energyAtStart: 16
   energySpare: 2

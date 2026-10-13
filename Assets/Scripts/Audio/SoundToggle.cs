@@ -18,6 +18,7 @@ public class SoundToggle : MonoBehaviour, IPointerEnterHandler, IPointerExitHand
 	public string ActionLabel { get { return SoundSettings.SfxEnabled ? "Tắt hiệu ứng âm thanh" : "Bật hiệu ứng âm thanh"; } }
 
 	void OnEnable() {
+		QuickButtonLayout.Apply(transform as RectTransform);
 		Show();
 		SoundSettings.Changed += Show;
 		if (tooltip != null)

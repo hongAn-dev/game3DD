@@ -3,8 +3,8 @@ using UnityEngine;
 /// <summary>Temporary magnetic slow. Ball composes this multiplier with Overdrive and the base speed.</summary>
 [RequireComponent(typeof(Ball))]
 public sealed class SlowStatus : MonoBehaviour {
-    public const float Duration = 3f;
-    public const float SlowMultiplier = 0.75f;
+	public const float Duration = 5f;
+	public const float SlowMultiplier = 0.5f;
 
     public bool Active { get { return remaining > 0f; } }
     public float Remaining { get { return remaining; } }

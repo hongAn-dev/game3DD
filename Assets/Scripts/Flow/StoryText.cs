@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using UnityEngine;
 
 /// <summary>One dialog page: a title, full text, and optional visual from Resources/GuideSprites.</summary>
 public struct StoryPage {
@@ -44,9 +45,10 @@ public static class StoryText {
 
 	// Extra pages for the main menu's "Hướng dẫn chơi" review.
 	static readonly StoryPage[] GuideExtras = {
+		new StoryPage("Chạy đua với thời gian", "Mỗi màn có một bộ đếm ngược ở góc trên bên trái. Hãy hoàn thành mục tiêu trước khi đồng hồ về 0; thời gian dài hơn ở các bản đồ rộng và khó hơn."),
 		new StoryPage("Quái vật và boss", "Creep là quái nhỏ, di chuyển nhanh và đuổi Robo khi xuất hiện. Vệ binh là boss lớn, có vùng cảnh báo trước đòn đánh và tìm Robo dù ở xa. Ở màn cuối, chỉ một lần chạm vào boss cũng khiến Robo chết ngay.", "monsters"),
 		new StoryPage("Hồi HP và khiên", "Dấu cộng màu xanh hồi HP cho Robo; khiên giúp chặn sát thương từ quái vật trong thời gian ngắn. Dấu trừ màu đỏ là cảnh báo mất HP, còn tia sét tím báo hiệu Robo đang bị giảm tốc.", "hp_plus"),
-		new StoryPage("Vật phẩm nguy hiểm", "Hãy tránh ba loại vật phẩm gây hại trên đường đi. Chúng có hình giống viên năng lượng nhưng khác màu. Hóa chất độc hại màu đỏ sẽ làm Robo mất máu. Phản năng lượng màu tím hồng sẽ lấy đi 1 viên năng lượng bạn đã thu trong màn hiện tại. Từ trường nhiễu màu cam sẽ làm Robo chậm lại trong 3 giây. Khiên chỉ chặn sát thương của hóa chất, không ngăn được hai hiệu ứng còn lại.", "harmful_items"),
+		new StoryPage("Vật phẩm nguy hiểm", "Hãy tránh ba loại vật phẩm gây hại trên đường đi. Chúng có hình giống viên năng lượng nhưng khác màu. Hóa chất độc hại màu đỏ sẽ làm Robo mất máu. Bẫy hút năng lượng màu tím hồng sẽ lấy đi 1 viên năng lượng bạn đã thu trong màn hiện tại. Bẫy giảm tốc màu cam sẽ làm Robo chậm lại 50% trong 5 giây. Khoảng 2/3 vật phẩm trên bản đồ là vật phẩm gây hại; hãy quan sát toàn bộ khu vực. Khiên chỉ chặn sát thương của hóa chất, không ngăn được hai hiệu ứng còn lại.", "harmful_items"),
 		new StoryPage("Vật phẩm tăng tốc", "Từ màn thứ hai, bạn có thể gặp vật phẩm tăng tốc. Khi nhặt được, Robo sẽ di chuyển nhanh hơn trong 5 giây, giúp bạn thoát khỏi quái vật hoặc đến kịp những viên năng lượng ở xa.", "overdrive_icon"),
 		new StoryPage("Âm thanh và tạm dừng", "Nút SFX hình loa ở góc trên bên phải bật hoặc tắt hiệu ứng âm thanh và âm thanh môi trường. Nút BGM hình nốt nhạc bật hoặc tắt riêng nhạc nền. Nút tạm dừng ngay bên cạnh sẽ dừng trò chơi; khi đó bạn có thể chọn Tiếp tục hoặc Thoát về menu. Âm lượng nhạc nền, hiệu ứng và âm thanh môi trường có thể chỉnh trong phần Cài đặt ở menu chính."),
 	};
@@ -84,7 +86,14 @@ public static class StoryText {
 		string goal = level.IsFinal
 			? "Thu thập đủ " + level.energyTarget + " viên năng lượng để khởi động phi thuyền và hoàn thành hành trình."
 			: "Thu thập đủ " + level.energyTarget + " viên năng lượng để qua màn.";
-		return goal + " " + Get(Advice, level);
+		int seconds = Mathf.CeilToInt(level.timeLimitSeconds > 0f ? level.timeLimitSeconds : 30f);
+		return goal + " Bạn có " + FormatTime(seconds) + ". " + Get(Advice, level);
+	}
+
+	public static string FormatTime(int seconds) {
+		int minutes = seconds / 60;
+		int remainder = seconds % 60;
+		return minutes > 0 ? minutes + " phút " + remainder.ToString("00") + " giây" : seconds + " giây";
 	}
 
 	/// <summary>The level's intro card: its name, the lead, then the goal.</summary>
@@ -98,7 +107,7 @@ public static class StoryText {
 			return new[] { LevelCard(level), BossIntro };
 		if (level.levelId != "Level2")
 			return new[] { LevelCard(level) };
-		return new[] { LevelCard(level), new StoryPage("Cẩn thận với vật phẩm nguy hiểm", "Từ khu vực này, hãy cẩn thận với Hóa chất độc hại, Phản năng lượng và Từ trường nhiễu. Chúng có thể làm bạn mất máu, mất năng lượng đã thu hoặc di chuyển chậm lại. Những cụm năng lượng gần quái vật hoặc mép đất có thể giúp bạn thu thập nhanh hơn, nhưng hãy cân nhắc trước khi tiến tới.") };
+		return new[] { LevelCard(level), new StoryPage("Cẩn thận với vật phẩm nguy hiểm", "Từ khu vực này, hãy cẩn thận với Hóa chất độc hại, Bẫy hút năng lượng và Bẫy giảm tốc. Chúng có thể làm bạn mất máu, mất năng lượng đã thu hoặc di chuyển chậm lại. Những cụm năng lượng gần quái vật hoặc mép đất có thể giúp bạn thu thập nhanh hơn, nhưng hãy cân nhắc trước khi tiến tới.") };
 	}
 
 	public static StoryPage[] Tutorial(LevelConfig first) {

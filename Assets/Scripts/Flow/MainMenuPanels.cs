@@ -23,6 +23,14 @@ public class MainMenuPanels : MonoBehaviour {
 
 	void Start() {
 		ShowTotal();
+		RefreshContinueButton();
+	}
+
+	void RefreshContinueButton() {
+		GameObject go = GameObject.Find("Continue Button");
+		Button button = go != null ? go.GetComponent<Button>() : null;
+		if (button != null)
+			button.interactable = SaveProgress.HasAnyProgress();
 	}
 
 	void ShowTotal() {
@@ -31,6 +39,10 @@ public class MainMenuPanels : MonoBehaviour {
 	}
 
 	public void OpenLevels() {
+		if (!SaveProgress.HasAnyProgress()) {
+			RefreshContinueButton();
+			return;
+		}
 		for (int i = 0; i < levelButtons.Length && i < LevelCatalog.All.Count; i++) {
 			LevelConfig level = LevelCatalog.All[i];
 			bool open = SaveProgress.Unlocked(level);

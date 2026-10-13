@@ -11,6 +11,10 @@ public class LevelConfig : ScriptableObject {
 	public string displayName;
 	public string nextScene;
 
+	[Header("Time limit")]
+	[Tooltip("Gameplay seconds available after the intro. Increase for larger maps.")]
+	public float timeLimitSeconds = 30f;
+
 	[Header("Energy (one core = +1)")]
 	public int energyTarget;
 	public int energyAtStart;

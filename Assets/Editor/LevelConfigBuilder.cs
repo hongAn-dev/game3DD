@@ -108,6 +108,7 @@ public static class LevelConfigBuilder {
 		config.order = order;
 		config.displayName = name;
 		config.nextScene = next;
+		config.timeLimitSeconds = order == 1 ? 30f : order == 2 ? 105f : order == 3 ? 210f : 300f;
 		config.energyTarget = target;
 		config.energyAtStart = atStart;
 		config.energySpare = atStart - target;

@@ -16,6 +16,7 @@ MonoBehaviour:
   order: 2
   displayName: "Tr\u1EA1m khai th\xE1c b\u1ECF hoang"
   nextScene: Level3
+  timeLimitSeconds: 105
   energyTarget: 10
   energyAtStart: 12
   energySpare: 2

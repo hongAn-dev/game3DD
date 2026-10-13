@@ -22,7 +22,7 @@ public static class BuildScript {
 	[MenuItem("Tools/Robo Lac Loi/Build Android (test)")]
 	public static void BuildAndroidTest() {
 		ConfigureAndroid();
-		Build(BuildTarget.Android, "Builds/Android/RoboLacLoi.apk", BuildOptions.None);
+		Build(BuildTarget.Android, "RoboLacloi.apk", BuildOptions.None);
 	}
 
 	// Spec §7/§12: landscape, ARM64 + IL2CPP, Android 9+ (API 28).

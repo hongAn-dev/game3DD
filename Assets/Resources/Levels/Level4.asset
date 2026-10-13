@@ -16,6 +16,7 @@ MonoBehaviour:
   order: 4
   displayName: "B\xE3i ph\xF3ng b\u1ECF hoang"
   nextScene: Ending
+  timeLimitSeconds: 300
   energyTarget: 18
   energyAtStart: 20
   energySpare: 2

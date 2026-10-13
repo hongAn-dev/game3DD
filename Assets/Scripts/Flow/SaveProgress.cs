@@ -26,6 +26,14 @@ public static class SaveProgress {
 		return Best(level) >= level.energyTarget;
 	}
 
+	/// <summary>True when there is anything meaningful to resume from the main menu.</summary>
+	public static bool HasAnyProgress() {
+		foreach (LevelConfig level in LevelCatalog.All)
+			if (Best(level) > 0)
+				return true;
+		return false;
+	}
+
 	public static bool Unlocked(LevelConfig level) {
 		LevelConfig previous = null;
 		foreach (LevelConfig l in LevelCatalog.All)

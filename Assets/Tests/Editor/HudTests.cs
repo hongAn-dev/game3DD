@@ -25,8 +25,8 @@ public class HudTests {
 			Assert.IsNotNull(bar, level.levelId);
 			Assert.AreEqual(Image.Type.Filled, bar.fill.type, level.levelId);
 			Vector2 size = bar.fill.rectTransform.rect.size;
-			Assert.That(size.x, Is.InRange(64f, 88f), level.levelId + " bar width");
-			Assert.That(size.y, Is.InRange(6f, 8f), level.levelId + " bar height");
+			Assert.That(size.x, Is.InRange(106f, 122f), level.levelId + " bar width");
+			Assert.That(size.y, Is.InRange(8f, 10f), level.levelId + " bar height");
 			foreach (Graphic g in bar.GetComponentsInChildren<Graphic>(true))
 				Assert.IsFalse(g.raycastTarget, level.levelId + " " + g.name);
 			Assert.AreEqual(RenderMode.ScreenSpaceOverlay, bar.GetComponentInParent<Canvas>().rootCanvas.renderMode, "screen overlay: never drawn in the minimap");

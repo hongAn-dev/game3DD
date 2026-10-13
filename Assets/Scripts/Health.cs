@@ -39,6 +39,15 @@ public class Health : MonoBehaviour {
 	public event System.Action<float> Healed;
 	public event System.Action Blocked;   // an enemy attack hit the shield
 
+	void Awake() {
+		// Player instances from older scene/prefab revisions used a 10 HP prototype value.
+		// Normalize them before any HUD reads the component so a new level always starts at 100/100.
+		if (CompareTag("Player")) {
+			maxHealth = 100f;
+			respawnHealthPoints = 100f;
+			healthPoints = 100f;
+		}
+	}
 	
 
 	/// <summary>

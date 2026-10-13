@@ -159,6 +159,11 @@ public class GameManager : MonoBehaviour {
 			StartStory ();
 		}
 
+		LevelTimer timer = GetComponent<LevelTimer>();
+		if (timer == null)
+			timer = gameObject.AddComponent<LevelTimer>();
+		timer.Configure(config);
+
 		// Setup score display.
 		Collect (0);
 			

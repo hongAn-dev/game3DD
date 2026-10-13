@@ -261,12 +261,14 @@ public static class FlowUiSetup {
 		tip.gameObject.SetActive(false);
 		// The toggle's listener first: muting happens before the click sound would play (UiTheme appends it).
 		UnityEventTools.AddPersistentListener(sound.onClick, toggle.Toggle);
-
 		if (pause != null) {
 			Image pauseIcon;
 			IconButton("Pause Button", safe, -Margin, Sprite("pause"), out pauseIcon);
 			WirePauseButton(pause);
 		}
+		// Audio controls use a slightly smaller footprint than the pause control so the menu title remains clear.
+		QuickButtonLayout.Apply((RectTransform)music.transform);
+		QuickButtonLayout.Apply((RectTransform)sound.transform);
 	}
 
 	/// <summary>Points the top bar's pause button at the level's PauseController (ControlSetup rebuilds that).</summary>

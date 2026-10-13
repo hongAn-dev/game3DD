@@ -13,6 +13,7 @@ public class MusicToggle : MonoBehaviour, IPointerEnterHandler, IPointerExitHand
 	public string ActionLabel { get { return SoundSettings.MusicEnabled ? "Tắt nhạc nền" : "Bật nhạc nền"; } }
 
 	void OnEnable() {
+		QuickButtonLayout.Apply(transform as RectTransform);
 		Show();
 		SoundSettings.Changed += Show;
 		if (tooltip != null)

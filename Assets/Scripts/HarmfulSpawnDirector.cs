@@ -24,7 +24,7 @@ public class HarmfulSpawnDirector : MonoBehaviour {
     void Start() {
         config=LevelCatalog.Get(SceneManager.GetActiveScene().name);
         energy=GetComponent<EnergySpawnDirector>(); registry=SpawnRegistry.Current!=null?SpawnRegistry.Current:GetComponent<SpawnRegistry>();
-        if(config==null||energy==null||registry==null||config.harmfulCap<=0){enabled=false;return;}
+		if(config==null||energy==null||registry==null||EffectiveCap()<=0){enabled=false;return;}
         GameFlow.Changed+=OnFlowChanged;
         // Energy cores are created by their director in Start. Wait one frame so
         // initial penalties can deliberately surround real drops instead of falling
@@ -34,7 +34,7 @@ public class HarmfulSpawnDirector : MonoBehaviour {
     }
     IEnumerator SpawnInitial() {
         yield return null;
-        for(int i=0;i<config.harmfulAtStart&&i<config.harmfulCap;i++)
+		for(int i=0;i<EffectiveAtStart()&&i<EffectiveCap();i++)
             TrySpawn(RandomKind(), true);
     }
     void OnDestroy() { GameFlow.Changed-=OnFlowChanged; if(Current==this)Current=null; if(registry!=null)registry.ReleaseOwner(this); }
@@ -53,13 +53,20 @@ public class HarmfulSpawnDirector : MonoBehaviour {
         spawning.Clear();
     }
     void Schedule() {
-        float lo=intervalOverride>0f?intervalOverride:config.harmfulIntervalMin;
-        float hi=intervalOverride>0f?intervalOverride:config.harmfulIntervalMax;
+		float lo=intervalOverride>0f?intervalOverride:EffectiveIntervalMin();
+		float hi=intervalOverride>0f?intervalOverride:EffectiveIntervalMax();
         next=Random.Range(lo,hi); timer=0f;
     }
+
+	// Keep authored challenge values intact while giving the live game a much denser, map-wide hazard field.
+	int EffectiveCap() { return Mathf.Max(6, config.energyCap + 8); }
+	int EffectiveAtStart() { return Mathf.Clamp(Mathf.Max(config.harmfulAtStart, Mathf.CeilToInt(EffectiveCap() * 0.25f)), 0, EffectiveCap()); }
+	float EffectiveIntervalMin() { return Mathf.Max(1.25f, config.harmfulIntervalMin * 0.35f); }
+	float EffectiveIntervalMax() { return Mathf.Max(2f, config.harmfulIntervalMax * 0.5f); }
+
     HarmfulKind RandomKind() {
         float roll=Random.value;
-        return roll<.35f?HarmfulKind.Poison:roll<.60f?HarmfulKind.AntiEnergy:HarmfulKind.Magnetic;
+		return roll<.45f?HarmfulKind.Poison:roll<.55f?HarmfulKind.AntiEnergy:HarmfulKind.Magnetic;
     }
     GameObject Prefab(HarmfulKind kind) {
         switch(kind){case HarmfulKind.Poison:return poisonPrefab;case HarmfulKind.AntiEnergy:return antiEnergyPrefab;default:return magneticPrefab;}
@@ -70,16 +77,18 @@ public class HarmfulSpawnDirector : MonoBehaviour {
         timer+=Time.deltaTime;
         if(timer<next)return;
         Schedule();
-        if(AliveCount>=config.harmfulCap)return;
+		if(AliveCount>=EffectiveCap())return;
         TrySpawn(RandomKind(),false);
     }
     bool TrySpawn(HarmfulKind kind,bool initial) {
         GameObject prefab=Prefab(kind);
         if(prefab==null)return false;
         SpawnPoint point; float path;
-        if(!energy.TryGetRiskCandidate(false,initial?10f:3f,float.MaxValue,out point,out path))return false;
+		// Hazards are deliberately distributed across every reachable map region, not just energy-risk flags.
+		if(!energy.TryGetCandidate(false,false,0f,float.MaxValue,out point,out path)
+			&& !energy.TryGetRiskCandidate(false,initial?10f:3f,float.MaxValue,out point,out path))return false;
         int id;
-        if(!registry.TryReserve(SpawnRegistry.SpawnCategory.Harmful,this,point.transform.position,GroundSpawn.FootprintRadius(prefab),config.harmfulCap,out id))return false;
+		if(!registry.TryReserve(SpawnRegistry.SpawnCategory.Harmful,this,point.transform.position,GroundSpawn.FootprintRadius(prefab),EffectiveCap(),out id))return false;
         pending.Add(id);
         StartCoroutine(SpawnAndWarn(kind,prefab,point.transform.position,id));
         return true;
@@ -104,7 +113,7 @@ public class HarmfulSpawnDirector : MonoBehaviour {
         HarmfulPickup pickup=item.GetComponent<HarmfulPickup>();
         pickup.kind=kind;
         pickup.damage=Damage();
-        pickup.lifetime=lifetimeOverride>0f?lifetimeOverride:config.harmfulLifetime;
+		pickup.lifetime=lifetimeOverride>0f?lifetimeOverride:Mathf.Max(35f,config.harmfulLifetime);
         pickup.Gone+=p=>{items.Remove(p);registry.ReleaseAlive(p.gameObject);};
         items.Add(pickup);
         Vector3 full=item.transform.localScale;
